@@ -1,0 +1,89 @@
+banner:
+  location: /home/user/banner.txt
+app:
+  name: XYZ Service
+  id: xyz-service
+  description: XYZ Service
+  version: 1.0.0-SNAPSHOT
+winter:
+  application:
+    name: xyz-service
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      INDENT_OUTPUT: true
+  profiles:
+    active:
+      - prod
+datasource:
+  url: jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;INIT=runscript from 'classpath:/test_db_init.sql'
+  username: sa
+  password: sa
+  validationQuery: SELECT 1 FROM TABLE
+  driverClassName: org.h2.Driver
+  connectionPoolSize: 5
+  connectionProperties:
+    defaultRowPrefetch: 100
+
+auth.enabled: false
+
+ignite:
+  dataNodes: 127.0.0.1
+  tcpPort: 40000..40009
+  diskPersistence: false
+  diskPath: "/home/user/igniteData"
+  systemRegionInitialSize: 104857600
+  pageSize: 16384
+  region:
+    initialSize: 1073741824
+    maxSize: 1395864371
+  segmentCheckFrequency: 1000
+  segmentationResolveAttempts: 5
+  network:
+    socketTimeout: 3000
+    ackTimeout: 1000
+    maxAckTimeout: 6000
+    reconnectCount: 10
+  metricsLogFrequency: 0
+  queryThreadPoolSize: 2
+  dataStreamerThreadPoolSize: 1
+  managementThreadPoolSize: 1
+  publicThreadPoolSize: 1
+  systemThreadPoolSize: 2
+  rebalanceThreadPoolSize: 1
+  asyncCallbackPoolSize: 1
+  peerClassLoadingEnabled: false
+
+kafka:
+  enabled: false
+  config:
+    path:
+
+tesla:
+  key:
+    krazy: "Thgh%#)()*$l;',./po"
+    super: "!@#~#$%^&*()_+{}\":?><,./;'[]=-`"
+xob.xml.enabled: true
+xob.kb.unPublishedIncluded: true
+rhino.config: "/home/user/config.yml"
+
+graphite:
+  host: 10.10.11.11
+  port: 2003
+  reporting-delay: 10000
+  prefix: xyz.service
+
+management:
+  endpoints:
+    web:
+      base-path: /
+  health:
+    defaults:
+      enabled: true
+
+schedule:
+  poolSize: 2
+  syncXobCron: "0 18 * * * *"
+
+debug:
+  enabled: false

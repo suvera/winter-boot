@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+BASEDIR=$(dirname "$0")
+APPDIR=$(dirname "$BASEDIR")
+
+echo "[COMMAND]:";
+echo "    $APPDIR/vendor/phpunit/phpunit/phpunit --bootstrap $APPDIR/vendor/autoload.php $@"
+echo ""
+echo "[RESULTS]:"
+
+$APPDIR/vendor/phpunit/phpunit/phpunit --bootstrap $APPDIR/vendor/autoload.php "$@"

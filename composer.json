@@ -1,0 +1,36 @@
+{
+  "name": "suvera/winter-boot",
+  "description": "Winter Boot Framework",
+  "type": "library",
+  "config": {
+    "platform": {
+      "php": "8.0"
+    }
+  },
+  "license": "Apache",
+  "authors": [
+    {
+      "name": "Suvera",
+      "email": "rana.ram@gmail.com"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "dev\\winterframework\\": "src/",
+      "test\\winterframework\\": "srcTest/"
+    }
+  },
+  "minimum-stability": "dev",
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/suvera/monolog-cascade"
+    }
+  ],
+  "require": {
+    "symfony/yaml": "5.x-dev",
+    "phpunit/phpunit": "10.0.x-dev",
+    "monolog/monolog": "2.x-dev",
+    "theorchard/monolog-cascade": "0.5.x-dev"
+  }
+}

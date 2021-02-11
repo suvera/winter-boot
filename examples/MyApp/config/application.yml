@@ -1,0 +1,18 @@
+server:
+    port: 80
+    address: 127.0.0.1
+    context-path: /
+winter:
+    application:
+        name: My Demo Application
+        id: MyApp
+        version: 1.0.0-DEV
+    namespaces:
+        cacheTime: 10
+    route:
+        cacheTime: 10
+myApp:
+    value1: This is string
+    value2: 99
+    value3: true
+    value4: 10.89
