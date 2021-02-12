@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace dev\winterframework\type;
 
 final class Arrays {
+    public static array $EMPTY_ARRAY = [];
 
     public static function flattenByKey(array $array, string $delimiter = '.', string $prefix = ''): array {
         $result = [];

@@ -1,5 +1,5 @@
 <?php
-/** @noinspection PhpPureAttributeCanBeAddedInspection */
+
 declare(strict_types=1);
 
 namespace dev\winterframework\type;
@@ -38,6 +38,12 @@ abstract class ArrayList implements Countable, ArrayAccess, IteratorAggregate {
 
     public function getIterator(): ArrayIterator {
         return new ArrayIterator($this->values);
+    }
+
+    public function addAll(array $items): void {
+        foreach ($items as $value) {
+            $this[] = $value;
+        }
     }
 
     public function offsetSet($offset, $value): void {

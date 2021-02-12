@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace dev\winterframework\core\context;
 
+use dev\winterframework\core\aop\AopInterceptorRegistry;
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\ClassResources;
 use dev\winterframework\reflection\ClassResourceScanner;
@@ -15,6 +16,8 @@ final class ApplicationContextData {
     private WinterBootApplication $bootConfig;
     private ClassResource $bootApp;
     private ClassResourceScanner $scanner;
+
+    private AopInterceptorRegistry $aopRegistry;
 
     public function getBeanProvider(): BeanProviderContext {
         return $this->beanProvider;
@@ -64,4 +67,11 @@ final class ApplicationContextData {
         $this->bootApp = $bootApp;
     }
 
+    public function getAopRegistry(): AopInterceptorRegistry {
+        return $this->aopRegistry;
+    }
+
+    public function setAopRegistry(AopInterceptorRegistry $aopRegistry): void {
+        $this->aopRegistry = $aopRegistry;
+    }
 }

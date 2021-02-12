@@ -3,6 +3,11 @@ declare(strict_types=1);
 
 namespace dev\winterframework\core\context;
 
+use dev\winterframework\cache\CacheManager;
+use dev\winterframework\cache\impl\DefaultCacheManager;
+use dev\winterframework\cache\impl\SimpleKeyGenerator;
+use dev\winterframework\cache\KeyGenerator;
+use dev\winterframework\core\aop\AopInterceptorRegistry;
 use dev\winterframework\core\web\error\DefaultErrorController;
 use dev\winterframework\core\web\error\ErrorController;
 use dev\winterframework\core\web\format\DefaultResponseRenderer;
@@ -31,6 +36,7 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         $this->bootConfig = $this->contextData->getBootConfig();
         $this->propertyContext = $this->contextData->getPropertyContext();
         $this->contextData->setPropertyContext($this->propertyContext);
+        $this->contextData->setAopRegistry(new AopInterceptorRegistry($this->contextData, $this));
 
         $this->beanProvider = new WinterBeanProviderContext($this->contextData, $this);
         $this->contextData->setBeanProvider($this->beanProvider);
@@ -84,6 +90,11 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         $this->beanProvider->registerInternalBean(
             $this, ApplicationContext::class
         );
+
+        $this->beanProvider->registerInternalBean(
+            $this->contextData->getAopRegistry(), AopInterceptorRegistry::class
+        );
+
         $this->beanProvider->registerInternalBean(
             new ApplicationLogger(), ApplicationLogger::class
         );
@@ -94,6 +105,14 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
 
         $this->beanProvider->registerInternalBean(
             new DefaultErrorController(), ErrorController::class, false
+        );
+
+        $this->beanProvider->registerInternalBean(
+            new DefaultCacheManager(), CacheManager::class, false
+        );
+
+        $this->beanProvider->registerInternalBean(
+            new SimpleKeyGenerator(), KeyGenerator::class, false
         );
 
     }

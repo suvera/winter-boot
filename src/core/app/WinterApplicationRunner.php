@@ -1,5 +1,5 @@
 <?php
-/** @noinspection PhpPureAttributeCanBeAddedInspection */
+
 declare(strict_types=1);
 
 namespace dev\winterframework\core\app;
@@ -19,6 +19,7 @@ use dev\winterframework\reflection\ClassResourceScanner;
 use dev\winterframework\reflection\Psr4Namespace;
 use dev\winterframework\reflection\Psr4Namespaces;
 use dev\winterframework\reflection\ReflectionUtil;
+use dev\winterframework\stereotype\cache\EnableCaching;
 use dev\winterframework\stereotype\WinterBootApplication;
 use dev\winterframework\type\StringList;
 use dev\winterframework\type\TypeAssert;
@@ -141,8 +142,9 @@ abstract class WinterApplicationRunner {
         }
 
         if (!isset($this->resources)) {
-            $this->resources = $this->scanner->scanDefault(
-                $this->scanNamespaces,
+            $this->resources = $this->scanner->scan(
+                $this->nameSpacesToScan($this->scanNamespaces),
+                $this->attributesToScan(),
                 $this->bootConfig->autoload,
                 $this->bootConfig->scanExcludeNamespaces
             );
@@ -159,6 +161,25 @@ abstract class WinterApplicationRunner {
         //print_r($this->resources);
     }
 
+    private function nameSpacesToScan(Psr4Namespaces $ns): Psr4Namespaces {
+        return $ns;
+    }
+
+    private function attributesToScan(): StringList {
+        $stereoTypes = $this->scanner->getDefaultStereoTypes();
+
+        if ($this->bootApp->getAttribute(EnableCaching::class) != null) {
+            $cacheTypes = array_keys(
+                DirectoryScanner::scanForPhpClasses(
+                    dirname(dirname(__DIR__)) . '/cache/stereotype',
+                    'dev\\winterframework\\cache\\stereotype'
+                )
+            );
+            $stereoTypes->addAll($cacheTypes);
+        }
+
+        return $stereoTypes;
+    }
 
     private function buildApplicationLogger(array $configDirs, ?string $profile = null): void {
         $suffix = (isset($this->profile) && strlen($profile) ? '-' . $profile : '');
@@ -185,4 +206,5 @@ abstract class WinterApplicationRunner {
     }
 
     protected abstract function runBootApp(): void;
+
 }

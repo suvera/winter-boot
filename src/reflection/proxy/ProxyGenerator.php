@@ -48,6 +48,8 @@ final class ProxyGenerator {
 
         $code .= 'use dev\\winterframework\\core\\aop\\AopInterceptorRegistry;' . "\n";
         $code .= 'use dev\\winterframework\\util\\log\\Wlf4p;' . "\n";
+        $code .= 'use dev\\winterframework\\stereotype\\Autowired;' . "\n";
+        $code .= 'use dev\\winterframework\\core\\aop\\AopResultsFound;' . "\n";
 
         $code .= "\n";
 
@@ -55,6 +57,13 @@ final class ProxyGenerator {
             . ' extends ' . ReflectionUtil::getFqName($class->getClass()) . ' {' . "\n";
 
         $code .= "    use Wlf4p;\n\n";
+
+        /**
+         * 1. Add Autowired
+         */
+        $code .= "    #[Autowired]\n";
+        $code .= "    private static AopInterceptorRegistry \$aopRegistry;\n\n";
+
         foreach ($class->getMethods() as $method) {
             $createProxy = false;
             foreach ($method->getAttributes() as $attribute) {
@@ -155,10 +164,13 @@ final class ProxyGenerator {
         \$args = func_get_args();
         \$result = null;
         
-        \$interceptor = AopInterceptorRegistry::get("$className", "$methodName");
+        \$interceptor = self::\$aopRegistry->get("$className", "$methodName");
         try {
             \$interceptor->aspectBegin(\$this, \$args);
         } catch (\Throwable \$e) {
+            if (\$e instanceof AopResultsFound) {
+                return \$e->getResult();
+            }
             \$interceptor->aspectFailed(\$this, \$args, \$e);
             $return
         }

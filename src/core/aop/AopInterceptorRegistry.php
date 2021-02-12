@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace dev\winterframework\core\aop;
 
+use dev\winterframework\core\context\ApplicationContext;
+use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\exception\ClassNotFoundException;
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\ClassResourceScanner;
@@ -10,42 +12,32 @@ use dev\winterframework\reflection\MethodResource;
 
 class AopInterceptorRegistry {
 
-    private static array $registry = [];
+    private array $registry = [];
 
-    /**
-     * AopInterceptorRegistry constructor.
-     */
-    private function __construct() {
+    public function __construct(
+        protected ApplicationContextData $ctxData,
+        protected ApplicationContext $appCtx
+    ) {
     }
 
-    private static AopInterceptorRegistry $instance;
-
-    public static function getInstance(): AopInterceptorRegistry {
-        if (!isset(self::$instance)) {
-            self::$instance = new self();
-        }
-
-        return self::$instance;
+    public function register(ClassResource $class, MethodResource $method): void {
+        $this->registry[$class->getClass()->getName()][$method->getMethod()->getShortName()]
+            = new WinterAopInterceptor($class, $method, $this->ctxData, $this->appCtx);
     }
 
-    public static function register(ClassResource $class, MethodResource $method): void {
-        self::$registry[$class->getClass()->getName()][$method->getMethod()->getShortName()]
-            = new WinterAopInterceptor($class, $method);
-    }
-
-    public static function unregister(ClassResource $class, MethodResource $method): void {
+    public function unregister(ClassResource $class, MethodResource $method): void {
         self::unregister2($class->getClass()->getName(), $method->getMethod()->getShortName());
     }
 
-    public static function unregister2(string $className, string $methodName): void {
-        if (isset(self::$registry[$className][$methodName])) {
-            unset(self::$registry[$className][$methodName]);
+    public function unregister2(string $className, string $methodName): void {
+        if (isset($this->registry[$className][$methodName])) {
+            unset($this->registry[$className][$methodName]);
         }
     }
 
-    public static function get(string $className, string $methodName): AopInterceptor {
-        if (isset(self::$registry[$className][$methodName])) {
-            return self::$registry[$className][$methodName];
+    public function get(string $className, string $methodName): AopInterceptor {
+        if (isset($this->registry[$className][$methodName])) {
+            return $this->registry[$className][$methodName];
         }
 
         $resource = ClassResourceScanner::getDefaultScanner()->scanDefaultClass($className);
@@ -54,9 +46,9 @@ class AopInterceptorRegistry {
             throw new ClassNotFoundException('Could not find Class ' . $className);
         }
 
-        self::register($resource, $resource->getMethod($methodName));
+        $this->register($resource, $resource->getMethod($methodName));
 
-        return self::$registry[$className][$methodName];
+        return $this->registry[$className][$methodName];
     }
 
 }

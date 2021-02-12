@@ -278,7 +278,7 @@ class ClassResourceScanner {
         return $obj;
     }
 
-    private function getDefaultStereoTypes(): StringList {
+    public function getDefaultStereoTypes(): StringList {
         if (!isset(self::$defaultStereoTypes)) {
             self::$defaultStereoTypes = StringList::ofArray(
                 array_keys(

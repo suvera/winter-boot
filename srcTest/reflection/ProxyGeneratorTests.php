@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace test\winterframework\reflection;
 
+use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\core\context\WinterBeanProviderContext;
 use dev\winterframework\reflection\ClassResourceScanner;
 use dev\winterframework\reflection\proxy\ProxyGenerator;
@@ -12,6 +13,7 @@ use Monolog\Handler\StreamHandler;
 use PHPUnit\Framework\TestCase;
 use test\winterframework\core\context\classes\t0002\ProxyTest001;
 use test\winterframework\core\context\classes\t0002\ProxyTest002;
+use test\winterframework\lib\TestUtil;
 
 class ProxyGeneratorTests extends TestCase {
 
@@ -49,7 +51,10 @@ class ProxyGeneratorTests extends TestCase {
     }
 
     public function testProxyGenerator02() {
-        $provider = new WinterBeanProviderContext();
+        /** @var ApplicationContextData $ctxData */
+        list($ctxData, $appCtx) = TestUtil::getApplicationContext();
+
+        $provider = $ctxData->getBeanProvider();
         $provider->addProviderClass(self::$scanner->scanDefaultClass(ProxyTest002::class));
         $provider->addProviderClass(self::$scanner->scanDefaultClass(ProxyTest001::class));
 
@@ -60,6 +65,7 @@ class ProxyGeneratorTests extends TestCase {
         $bean = $provider->beanByClass(ProxyTest001::class);
         $this->assertTrue(is_a($bean::class, ProxyTest001::class, true));
 
+        /** @noinspection PhpExpressionResultUnusedInspection */
         $bean->synchronizedMethod();
 
     }

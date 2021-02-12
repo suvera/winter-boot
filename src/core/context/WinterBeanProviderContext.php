@@ -1,10 +1,9 @@
 <?php
-/** @noinspection PhpPureAttributeCanBeAddedInspection */
+
 declare(strict_types=1);
 
 namespace dev\winterframework\core\context;
 
-use dev\winterframework\core\aop\AopInterceptorRegistry;
 use dev\winterframework\enums\Allowable;
 use dev\winterframework\exception\BeansDependencyException;
 use dev\winterframework\exception\BeansException;
@@ -56,7 +55,6 @@ final class WinterBeanProviderContext implements BeanProviderContext {
 
     private ClassResourceScanner $scanner;
 
-
     public function __construct(
         protected ApplicationContextData $ctxData,
         protected ApplicationContext $appCtx
@@ -75,7 +73,9 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         }
 
         foreach ($class->getMethods() as $method) {
-            AopInterceptorRegistry::register($class, $method);
+            if ($needProxy) {
+                $this->ctxData->getAopRegistry()->register($class, $method);
+            }
             $this->addProviderMethod($class, $method);
         }
     }

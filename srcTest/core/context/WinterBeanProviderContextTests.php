@@ -10,7 +10,6 @@ use dev\winterframework\core\context\BeanProviderContext;
 use dev\winterframework\core\context\WinterApplicationContext;
 use dev\winterframework\core\context\WinterBeanProviderContext;
 use dev\winterframework\core\context\WinterPropertyContext;
-use dev\winterframework\reflection\ClassResources;
 use dev\winterframework\reflection\ClassResourceScanner;
 use dev\winterframework\stereotype\WinterBootApplication;
 use dev\winterframework\type\StringList;
@@ -71,23 +70,7 @@ class WinterBeanProviderContextTests extends TestCase {
     }
 
     private static function getApplicationContext(): array {
-        $bootApp = self::$scanner->scanClass(
-            TestApplication::class,
-            StringList::ofValues(WinterBootApplication::class)
-        );
-        /** @var WinterBootApplication $bootConfig */
-        $bootConfig = $bootApp->getAttribute(WinterBootApplication::class);
-        $contextData = new ApplicationContextData();
-        $contextData->setBootApp($bootApp);
-        $contextData->setBootConfig($bootConfig);
-        $contextData->setScanner(self::$scanner);
-        $contextData->setPropertyContext(new WinterPropertyContext(
-            $bootConfig->configDirectory,
-            $bootConfig->profile
-        ));
-        $contextData->setResources(ClassResources::ofValues());
-
-        return [$contextData, new WinterApplicationContext($contextData)];
+        return TestUtil::getApplicationContext();
     }
 
     private function beanNameExists(BeanProviderContext $provider, string $name) {

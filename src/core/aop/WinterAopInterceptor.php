@@ -1,9 +1,12 @@
 <?php
+/** @noinspection PhpStatementHasEmptyBodyInspection */
 /** @noinspection PhpUnhandledExceptionInspection */
 declare(strict_types=1);
 
 namespace dev\winterframework\core\aop;
 
+use dev\winterframework\core\context\ApplicationContext;
+use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\MethodResource;
 use dev\winterframework\reflection\ReflectionUtil;
@@ -36,7 +39,9 @@ class WinterAopInterceptor implements AopInterceptor {
 
     public function __construct(
         protected ClassResource $class,
-        protected MethodResource $method
+        protected MethodResource $method,
+        protected ApplicationContextData $ctxData,
+        protected ApplicationContext $appCtx
     ) {
         $this->init();
     }
@@ -49,7 +54,11 @@ class WinterAopInterceptor implements AopInterceptor {
             }
             /** @var AopStereoType $attribute */
 
-            $this->aopContexts[] = new AopContext($attribute, $this->method->getMethod());
+            $this->aopContexts[] = new AopContext(
+                $attribute,
+                $this->method->getMethod(),
+                $this->appCtx
+            );
             $this->aspects[] = $attribute->getAspect();
         }
     }
@@ -80,8 +89,8 @@ class WinterAopInterceptor implements AopInterceptor {
                 $this->aspects[$idx]->beginFailed($this->aopContexts[$i], $obj, $args, $e);
             } catch (Throwable $e) {
                 self::logException($e, 'Aspect beginFailed handler call failed, for Type "'
-                    . get_class($this->aopContexts[$idx]->stereoType) . '" on Method '
-                    . ReflectionUtil::getFqName($this->aopContexts[$idx]->method)
+                    . get_class($this->aopContexts[$idx]->getStereoType()) . '" on Method '
+                    . ReflectionUtil::getFqName($this->aopContexts[$idx]->getMethod())
                     . '. ');
             }
         }
@@ -95,8 +104,8 @@ class WinterAopInterceptor implements AopInterceptor {
                 $this->aspects[$idx]->failed($aopCtx, $obj, $args, $e);
             } catch (Throwable $e) {
                 self::logException($e, 'Aspect fail handler call failed, for Type "'
-                    . get_class($aopCtx->stereoType) . '" on Method '
-                    . ReflectionUtil::getFqName($aopCtx->method)
+                    . get_class($aopCtx->getStereoType()) . '" on Method '
+                    . ReflectionUtil::getFqName($aopCtx->getMethod())
                     . '. ');
             }
         }

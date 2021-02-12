@@ -15,7 +15,7 @@ class LockableAspect implements WinterAspect {
 
     public function begin(AopContext $ctx, object $target, array $args) {
         /** @var Lockable $stereoType */
-        $stereoType = $ctx->stereoType;
+        $stereoType = $ctx->getStereoType();
         $this->lock = DefaultLockManager::get()->createLock($stereoType->name, $stereoType->provider);
         if (!$this->lock->tryLock()) {
             throw new LockException('Lock cannot be acquired ');
