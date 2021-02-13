@@ -34,14 +34,6 @@ final class AttributeList extends ArrayList {
         $this->byName[$value::class][spl_object_hash($value)] = $value;
     }
 
-    public static function ofArray(array $values): AttributeList {
-        return parent::ofArray($values);
-    }
-
-    public static function ofValues(mixed ...$values): AttributeList {
-        return parent::ofArray($values);
-    }
-
     public function getByNames(string ...$names): array {
         $new = [];
 

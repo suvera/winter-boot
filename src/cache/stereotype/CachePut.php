@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace dev\winterframework\cache\stereotype;
 
 use Attribute;
-use dev\winterframework\cache\aop\CacheEvictAspect;
+use dev\winterframework\cache\aop\CachePutAspect;
 use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\stereotype\aop\AopStereoType;
 use dev\winterframework\stereotype\aop\WinterAspect;
@@ -15,7 +15,7 @@ class CachePut implements AopStereoType {
     private WinterAspect $aspect;
 
     public function __construct(
-        public array|string $cacheNames,
+        public array|string $cacheNames = 'default',
         public string $key = '',
         public string $keyGenerator = '',
         public string $cacheManager = '',
@@ -23,6 +23,17 @@ class CachePut implements AopStereoType {
         public string $condition = '',
         public string $unless = ''
     ) {
+        if (!is_array($this->cacheNames)) {
+            $this->cacheNames = [$this->cacheNames];
+        }
+        TypeAssert::stringArray($this->cacheNames);
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getCacheNames(): array {
+        return $this->cacheNames;
     }
 
     public function isPerInstance(): bool {
@@ -31,7 +42,7 @@ class CachePut implements AopStereoType {
 
     public function getAspect(): WinterAspect {
         if (!isset($this->aspect)) {
-            $this->aspect = new CacheEvictAspect();
+            $this->aspect = new CachePutAspect();
         }
         return $this->aspect;
     }

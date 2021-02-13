@@ -1,5 +1,4 @@
 <?php
-
 declare(strict_types=1);
 
 namespace dev\winterframework\type;
@@ -8,8 +7,13 @@ use ArrayAccess;
 use ArrayIterator;
 use Countable;
 use IteratorAggregate;
+use OutOfBoundsException;
 
 abstract class ArrayList implements Countable, ArrayAccess, IteratorAggregate {
+
+    protected static mixed $EMPTY_LIST;
+    protected bool $emptyList = false;
+
     /**
      * @var mixed[]
      */
@@ -47,10 +51,17 @@ abstract class ArrayList implements Countable, ArrayAccess, IteratorAggregate {
     }
 
     public function offsetSet($offset, $value): void {
+        if ($this->emptyList) {
+            throw new OutOfBoundsException('Could not add item to "EmptyList" object');
+        }
         $this->values[] = $value;
     }
 
-    public static function ofArray(array $values): mixed {
+    public static function ofValues(mixed ...$values): static {
+        return static::ofArray($values);
+    }
+
+    public static function ofArray(array $values): static {
         $obj = new static();
 
         foreach ($values as $value) {
@@ -58,6 +69,16 @@ abstract class ArrayList implements Countable, ArrayAccess, IteratorAggregate {
         }
 
         return $obj;
+    }
+
+    public final static function emptyList(): static {
+        if (isset(static::$EMPTY_LIST)) {
+            return static::$EMPTY_LIST;
+        }
+
+        static::$EMPTY_LIST = new static();
+        static::$EMPTY_LIST->emptyList = true;
+        return static::$EMPTY_LIST;
     }
 
 }

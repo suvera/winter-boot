@@ -136,7 +136,8 @@ abstract class WinterApplicationRunner {
         $key = $this->bootApp->getClass()->getName() . '.resources';
         if (ApcCache::isEnabled()) {
             //ApcCache::delete($key);
-            if (ApcCache::exists($key)) {
+            if (ApcCache::exists($key)
+                && !$this->propertyCtx->getBool('winter.namespaces.cacheDisabled',false)) {
                 $this->resources = ApcCache::get($key);
             }
         }

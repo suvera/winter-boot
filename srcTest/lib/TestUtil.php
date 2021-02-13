@@ -4,7 +4,9 @@ declare(strict_types=1);
 namespace test\winterframework\lib;
 
 use dev\winterframework\cache\CacheManager;
+use dev\winterframework\cache\CacheResolver;
 use dev\winterframework\cache\impl\DefaultCacheManager;
+use dev\winterframework\cache\impl\SimpleCacheResolver;
 use dev\winterframework\cache\impl\SimpleKeyGenerator;
 use dev\winterframework\cache\KeyGenerator;
 use dev\winterframework\core\aop\AopInterceptorRegistry;
@@ -74,8 +76,13 @@ class TestUtil {
             new DefaultErrorController(), ErrorController::class, false
         );
 
+        $cacheManager = new DefaultCacheManager();
         $contextData->getBeanProvider()->registerInternalBean(
-            new DefaultCacheManager(), CacheManager::class, false
+            $cacheManager, CacheManager::class, false
+        );
+
+        $contextData->getBeanProvider()->registerInternalBean(
+            new SimpleCacheResolver($cacheManager), CacheResolver::class, false
         );
 
         $contextData->getBeanProvider()->registerInternalBean(

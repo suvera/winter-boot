@@ -65,6 +65,7 @@ final class ProxyGenerator {
         $code .= "    private static AopInterceptorRegistry \$aopRegistry;\n\n";
 
         foreach ($class->getMethods() as $method) {
+            /** @var MethodResource $method */
             $createProxy = false;
             foreach ($method->getAttributes() as $attribute) {
                 $name = $attribute::class;
@@ -140,6 +141,7 @@ final class ProxyGenerator {
         $code .= implode(', ', $params) . ')';
 
         $return = 'return;';
+        $returnBegin = $return;
         $resultId = '';
         $retType = $method->getReturnNamedType();
         if (!$retType->isNoType()) {
@@ -148,6 +150,7 @@ final class ProxyGenerator {
             if (!$retType->isVoidType()) {
                 $return = 'return $result;';
                 $resultId = ' $result =';
+                $returnBegin = 'return $e->getResult();';
             }
         }
 
@@ -169,7 +172,7 @@ final class ProxyGenerator {
             \$interceptor->aspectBegin(\$this, \$args);
         } catch (\Throwable \$e) {
             if (\$e instanceof AopResultsFound) {
-                return \$e->getResult();
+                $returnBegin
             }
             \$interceptor->aspectFailed(\$this, \$args, \$e);
             $return

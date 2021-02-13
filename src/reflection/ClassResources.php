@@ -49,12 +49,4 @@ class ClassResources extends ArrayList {
     public function get1stClassByAttribute(string $attrCls): ?ClassResource {
         return isset($this->byAttributes[$attrCls]) ? $this->byAttributes[$attrCls][0] : null;
     }
-
-    public static function ofArray(array $values): ClassResources {
-        return parent::ofArray($values);
-    }
-
-    public static function ofValues(mixed ...$values): ClassResources {
-        return parent::ofArray($values);
-    }
 }

@@ -23,18 +23,17 @@ class Cacheable implements AopStereoType {
         public string $condition = '',
         public string $unless = ''
     ) {
+        if (!is_array($this->cacheNames)) {
+            $this->cacheNames = [$this->cacheNames];
+        }
+        TypeAssert::stringArray($this->cacheNames);
     }
 
     /**
      * @return string[]
      */
     public function getCacheNames(): array {
-        if (is_array($this->cacheNames)) {
-            $cacheNames = $this->cacheNames;
-        } else {
-            $cacheNames = [$this->cacheNames];
-        }
-        return $cacheNames;
+        return $this->cacheNames;
     }
 
     public function isPerInstance(): bool {

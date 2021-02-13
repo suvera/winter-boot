@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace dev\winterframework\type;
 
+use dev\winterframework\exception\IllegalStateException;
 use TypeError;
 
 final class TypeAssert {
@@ -156,6 +157,12 @@ final class TypeAssert {
     public static function notEmpty(string $name, mixed $value) {
         if (empty($value)) {
             throw new TypeError("Parameter '$name' value cannot be empty");
+        }
+    }
+
+    public static function state(bool $expression, string $message) {
+        if (!$expression) {
+            throw new IllegalStateException($message);
         }
     }
 

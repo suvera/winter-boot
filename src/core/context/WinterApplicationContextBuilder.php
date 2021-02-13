@@ -4,7 +4,9 @@ declare(strict_types=1);
 namespace dev\winterframework\core\context;
 
 use dev\winterframework\cache\CacheManager;
+use dev\winterframework\cache\CacheResolver;
 use dev\winterframework\cache\impl\DefaultCacheManager;
+use dev\winterframework\cache\impl\SimpleCacheResolver;
 use dev\winterframework\cache\impl\SimpleKeyGenerator;
 use dev\winterframework\cache\KeyGenerator;
 use dev\winterframework\core\aop\AopInterceptorRegistry;
@@ -107,8 +109,17 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
             new DefaultErrorController(), ErrorController::class, false
         );
 
+        $cacheManager = new DefaultCacheManager();
         $this->beanProvider->registerInternalBean(
-            new DefaultCacheManager(), CacheManager::class, false
+            $cacheManager, CacheManager::class, false
+        );
+
+        $this->beanProvider->registerInternalBean(
+            new SimpleCacheResolver($cacheManager), CacheResolver::class, false
+        );
+
+        $this->beanProvider->registerInternalBean(
+            new SimpleKeyGenerator(), KeyGenerator::class, false
         );
 
         $this->beanProvider->registerInternalBean(

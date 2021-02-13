@@ -113,6 +113,10 @@ class InMemoryCache implements Cache {
     }
 
     public function put(string $key, mixed $value): void {
+        if (!isset($this->items[$key]) && count($this->items) >= $this->config->maximumSize) {
+            array_shift($this->items);
+        }
+
         $this->items[$key] = new SimpleValueWrapper($value instanceof ValueWrapper ? $value->get() : $value);
     }
 

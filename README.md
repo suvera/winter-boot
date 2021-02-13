@@ -96,7 +96,7 @@ curl -v "http://localhost/calc/add" -d "a=10&b=30"
 
 Documentation ( **--TODO--** )
 
-- [StereoTypes & Dependency Injection]()
+- [StereoTypes & Dependency Injection](docs/dependency_stereo_types.md)
 - [Configuration]()
 - [Logging]()
 - [Application Start/Booting]()

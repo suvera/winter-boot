@@ -1,2 +1,13 @@
 app:
-  name: XYZ Service
+    name: UnitTests
+winter:
+    application:
+        name: UnitTests
+        id: UnitTests
+        version: 1.0.0-DEV
+    namespaces:
+        cacheDisabled: true
+        cacheTime: 1
+    route:
+        cacheDisabled: true
+        cacheTime: 1

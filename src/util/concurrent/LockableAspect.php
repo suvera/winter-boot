@@ -11,9 +11,10 @@ use Throwable;
 
 class LockableAspect implements WinterAspect {
     use Wlf4p;
+
     private Lock $lock;
 
-    public function begin(AopContext $ctx, object $target, array $args) {
+    public function begin(AopContext $ctx, object $target, array $args): void {
         /** @var Lockable $stereoType */
         $stereoType = $ctx->getStereoType();
         $this->lock = DefaultLockManager::get()->createLock($stereoType->name, $stereoType->provider);
@@ -22,27 +23,48 @@ class LockableAspect implements WinterAspect {
         }
     }
 
-    public function beginFailed(AopContext $ctx, object $target, array $args, Throwable $ex) {
+    public function beginFailed(
+        AopContext $ctx,
+        object $target,
+        array $args,
+        Throwable $ex
+    ): void {
         self::logException($ex);
         if (isset($this->lock)) {
             $this->lock->unlock();
         }
     }
 
-    public function commit(AopContext $ctx, object $target, array $args, mixed $result) {
+    public function commit(
+        AopContext $ctx,
+        object $target,
+        array $args,
+        mixed $result
+    ): void {
         if (isset($this->lock)) {
             $this->lock->unlock();
         }
     }
 
-    public function commitFailed(AopContext $ctx, object $target, array $args, mixed $result, Throwable $ex) {
+    public function commitFailed(
+        AopContext $ctx,
+        object $target,
+        array $args,
+        mixed $result,
+        Throwable $ex
+    ): void {
         self::logException($ex);
         if (isset($this->lock)) {
             $this->lock->unlock();
         }
     }
 
-    public function failed(AopContext $ctx, object $target, array $args, Throwable $ex) {
+    public function failed(
+        AopContext $ctx,
+        object $target,
+        array $args,
+        Throwable $ex
+    ): void {
         self::logException($ex);
         if (isset($this->lock)) {
             $this->lock->unlock();

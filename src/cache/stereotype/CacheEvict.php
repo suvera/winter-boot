@@ -15,7 +15,7 @@ class CacheEvict implements AopStereoType {
     private WinterAspect $aspect;
 
     public function __construct(
-        public array|string $cacheNames,
+        public array|string $cacheNames = 'default',
         public string $key = '',
         public string $keyGenerator = '',
         public string $cacheManager = '',
@@ -24,6 +24,17 @@ class CacheEvict implements AopStereoType {
         public bool $allEntries = false,
         public bool $beforeInvocation = false
     ) {
+        if (!is_array($this->cacheNames)) {
+            $this->cacheNames = [$this->cacheNames];
+        }
+        TypeAssert::stringArray($this->cacheNames);
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getCacheNames(): array {
+        return $this->cacheNames;
     }
 
     public function isPerInstance(): bool {

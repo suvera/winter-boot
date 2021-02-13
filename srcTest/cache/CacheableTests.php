@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace test\winterframework\cache;
 
 use dev\winterframework\cache\stereotype\Cacheable;
+use dev\winterframework\cache\stereotype\CacheEvict;
+use dev\winterframework\cache\stereotype\CachePut;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\reflection\ClassResourceScanner;
@@ -30,6 +32,8 @@ class CacheableTests extends TestCase {
 
         $defaultAttrs = self::$scanner->getDefaultStereoTypes();
         $defaultAttrs[] = Cacheable::class;
+        $defaultAttrs[] = CachePut::class;
+        $defaultAttrs[] = CacheEvict::class;
 
         $provider = $ctxData->getBeanProvider();
         $provider->addProviderClass(
@@ -39,7 +43,6 @@ class CacheableTests extends TestCase {
         /** @var Cache001 $bean */
         $bean = $appCtx->beanByClass(Cache001::class);
         $this->assertTrue(is_a($bean::class, Cache001::class, true));
-        echo "\n" . get_class($bean) . "\n";
 
         $this->assertSame(11, $bean->noCacheTest());
         $this->assertSame(12, $bean->noCacheTest());
@@ -48,6 +51,29 @@ class CacheableTests extends TestCase {
         $this->assertSame(11, $bean->cachedTest());
         $this->assertSame(11, $bean->cachedTest());
         $this->assertSame(11, $bean->cachedTest());
+
+        $this->assertSame(12, $bean->cachePutTest());
+        $this->assertSame(13, $bean->cachePutTest());
+        $this->assertSame(14, $bean->cachePutTest());
+        $this->assertSame(15, $bean->cachePutTest());
+
+        $this->assertSame(15, $bean->cachedTest());
+        $this->assertSame(15, $bean->cachedTest());
+
+        $bean->cacheEvictTest();
+        $bean->reset();
+        $this->assertSame(11, $bean->cachedTest());
+        $this->assertSame(11, $bean->cachedTest());
+
+        $this->assertSame(12, $bean->cachePutTest());
+
+        $bean->cacheEvictAllTest();
+        $bean->reset();
+
+        $this->assertSame(11, $bean->cachedTest());
+        $this->assertSame(11, $bean->cachedTest());
+
+        $this->assertSame(12, $bean->cachePutTest());
     }
 
 }

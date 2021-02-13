@@ -21,12 +21,4 @@ class VariableResources extends ArrayList {
         TypeAssert::typeOf($value, VariableResource::class);
         parent::offsetSet($offset, $value);
     }
-
-    public static function ofArray(array $values): VariableResources {
-        return parent::ofArray($values);
-    }
-
-    public static function ofValues(mixed ...$values): VariableResources {
-        return parent::ofArray($values);
-    }
 }

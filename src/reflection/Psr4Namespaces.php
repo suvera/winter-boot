@@ -22,10 +22,6 @@ class Psr4Namespaces extends ArrayList {
         parent::offsetSet($offset, $value);
     }
 
-    public static function ofArray(array $values): Psr4Namespaces {
-        return parent::ofArray($values);
-    }
-
     public static function ofArrayItems(array $values): Psr4Namespaces {
         $obj = new self();
 
@@ -34,9 +30,5 @@ class Psr4Namespaces extends ArrayList {
         }
 
         return $obj;
-    }
-
-    public static function ofValues(mixed ...$values): Psr4Namespaces {
-        return parent::ofArray($values);
     }
 }

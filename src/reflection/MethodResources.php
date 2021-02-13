@@ -36,12 +36,4 @@ class MethodResources extends ArrayList {
     public function getMethod(string $name): ?MethodResource {
         return isset($this->byName[$name]) ? $this->byName[$name] : null;
     }
-
-    public static function ofArray(array $values): MethodResources {
-        return parent::ofArray($values);
-    }
-
-    public static function ofValues(mixed ...$values): MethodResources {
-        return parent::ofArray($values);
-    }
 }

@@ -36,12 +36,4 @@ class UriPath extends ArrayList {
             }, $this->values)
         );
     }
-
-    public static function ofArray(array $values): UriPath {
-        return parent::ofArray($values);
-    }
-
-    public static function ofValues(mixed ...$values): UriPath {
-        return parent::ofArray($values);
-    }
 }

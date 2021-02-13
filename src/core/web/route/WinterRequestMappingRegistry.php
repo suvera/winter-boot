@@ -45,7 +45,9 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
     ) {
         $key = $this->ctxData->getBootApp()->getClass()->getName() . '.reqMap';
         if (ApcCache::isEnabled()) {
-            if (ApcCache::exists($key)) {
+            if (ApcCache::exists($key)
+                && !$this->ctxData->getPropertyContext()->getBool('winter.route.cacheDisabled', false)
+            ) {
                 list(self::$byId, self::$byRegex, self::$byUriMethod) = ApcCache::get($key);
             }
         }
