@@ -6,7 +6,7 @@ namespace dev\winterframework\reflection;
 
 use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\type\AttributeList;
-use ReflectionNamedType;
+use ReflectionUnionType;
 
 class MethodResource {
     private ?ClassResource $returnClass;
@@ -17,16 +17,20 @@ class MethodResource {
 
     private AttributeList $attributes;
 
+    private bool $proxyNeeded = false;
+
     public function getAttribute(string $name): ?object {
         return isset($this->attributes) ? $this->attributes->getByName($name) : null;
     }
 
     public function getReturnNamedType(): ReflectionSafeType {
         if (!isset($this->returnType)) {
-            /** @var ReflectionNamedType $type */
             $type = $this->method->getReturnType();
+
             if ($type == null) {
                 $this->returnType = ReflectionSafeType::getNoType();
+            } else if ($type instanceof ReflectionUnionType) {
+                $this->returnType = ReflectionSafeType::fromUnionType($type);
             } else {
                 $this->returnType = ReflectionSafeType::fromNamedType($type);
             }
@@ -62,5 +66,12 @@ class MethodResource {
         $this->attributes = $attributes;
     }
 
+    public function isProxyNeeded(): bool {
+        return $this->proxyNeeded;
+    }
+
+    public function setProxyNeeded(bool $proxyNeeded): void {
+        $this->proxyNeeded = $proxyNeeded;
+    }
 
 }

@@ -54,7 +54,11 @@ abstract class ArrayList implements Countable, ArrayAccess, IteratorAggregate {
         if ($this->emptyList) {
             throw new OutOfBoundsException('Could not add item to "EmptyList" object');
         }
-        $this->values[] = $value;
+        if (is_null($offset)) {
+            $this->values[] = $value;
+        } else {
+            $this->values[$offset] = $value;
+        }
     }
 
     public static function ofValues(mixed ...$values): static {
@@ -63,7 +67,7 @@ abstract class ArrayList implements Countable, ArrayAccess, IteratorAggregate {
 
     public static function ofArray(array $values): static {
         $obj = new static();
-
+        
         foreach ($values as $value) {
             $obj[] = $value;
         }

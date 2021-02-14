@@ -8,9 +8,8 @@ use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\stereotype\aop\AopStereoType;
 use dev\winterframework\stereotype\aop\WinterAspect;
 use dev\winterframework\type\TypeAssert;
-use dev\winterframework\util\concurrent\LocalLock;
-use dev\winterframework\util\concurrent\Lock;
 use dev\winterframework\util\concurrent\LockableAspect;
+use dev\winterframework\util\concurrent\LockManager;
 
 #[Attribute(Attribute::TARGET_METHOD)]
 class Lockable implements AopStereoType {
@@ -18,9 +17,10 @@ class Lockable implements AopStereoType {
 
     public function __construct(
         public string $name,
-        public string $provider = LocalLock::class
+        public int $ttlSeconds = 0,
+        public int $waitMilliSecs = 0,
+        public string $lockManager = LockManager::class
     ) {
-        TypeAssert::objectOfIsA($this->provider, Lock::class);
     }
 
     public function isPerInstance(): bool {

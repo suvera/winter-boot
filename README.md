@@ -28,9 +28,9 @@ MyApplication::main();
 
 ```
 
-This framework gives advantage to people already know Spring Boot, and want to start over with PHP8.
+This framework gives advantage to people already know Spring Boot, and want to jump into PHP8.
 
-- Dependency Injection is managed by framework with PHP8 Attributes (Annotations)
+- Dependency Injection is managed by the framework with PHP8 Attributes (Annotations)
 
 
 ## Example Service

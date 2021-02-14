@@ -64,22 +64,11 @@ final class ProxyGenerator {
         $code .= "    #[Autowired]\n";
         $code .= "    private static AopInterceptorRegistry \$aopRegistry;\n\n";
 
-        foreach ($class->getMethods() as $method) {
+        foreach ($class->getProxyMethods() as $method) {
             /** @var MethodResource $method */
-            $createProxy = false;
-            foreach ($method->getAttributes() as $attribute) {
-                $name = $attribute::class;
-                if (is_a($name, AopStereoType::class, true)) {
-                    $createProxy = true;
-                    break;
-                }
-            }
+            $code .= $this->generateMethod($method);
 
-            if ($createProxy) {
-                $code .= $this->generateMethod($method);
-
-                $code .= "\n\n";
-            }
+            $code .= "\n\n";
         }
 
         $code .= "}\n";

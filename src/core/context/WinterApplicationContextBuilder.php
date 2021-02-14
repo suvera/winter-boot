@@ -18,6 +18,8 @@ use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\ClassResources;
 use dev\winterframework\reflection\ClassResourceScanner;
 use dev\winterframework\stereotype\WinterBootApplication;
+use dev\winterframework\util\concurrent\DefaultLockManager;
+use dev\winterframework\util\concurrent\LockManager;
 
 abstract class WinterApplicationContextBuilder implements ApplicationContext {
     protected BeanProviderContext $beanProvider;
@@ -124,6 +126,10 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
 
         $this->beanProvider->registerInternalBean(
             new SimpleKeyGenerator(), KeyGenerator::class, false
+        );
+
+        $this->beanProvider->registerInternalBean(
+            new DefaultLockManager(), LockManager::class, false
         );
 
     }

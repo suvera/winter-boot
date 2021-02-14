@@ -11,6 +11,8 @@ class ClassResource {
     private MethodResources $methods;
     private VariableResources $variables;
     private AttributeList $attributes;
+    private bool $proxyNeeded = false;
+    private MethodResources $proxyMethods;
 
     public function getAttribute(string $name): ?object {
         return isset($this->attributes) ? $this->attributes->getByName($name) : null;
@@ -28,6 +30,10 @@ class ClassResource {
         $this->class = $class;
     }
 
+    /**
+     * @return MethodResources|MethodResource[]
+     * @noinspection PhpDocSignatureInspection
+     */
     public function getMethods(): MethodResources {
         return $this->methods;
     }
@@ -50,6 +56,25 @@ class ClassResource {
 
     public function setAttributes(AttributeList $attributes): void {
         $this->attributes = $attributes;
+    }
+
+    public function isProxyNeeded(): bool {
+        return $this->proxyNeeded;
+    }
+
+    public function setProxyNeeded(bool $proxyNeeded): void {
+        $this->proxyNeeded = $proxyNeeded;
+    }
+
+    public function getProxyMethods(): MethodResources {
+        if (!isset($this->proxyMethods)) {
+            $this->proxyMethods = MethodResources::emptyList();
+        }
+        return $this->proxyMethods;
+    }
+
+    public function setProxyMethods(MethodResources $proxyMethods): void {
+        $this->proxyMethods = $proxyMethods;
     }
 
 }

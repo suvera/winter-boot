@@ -3,12 +3,14 @@ declare(strict_types=1);
 
 namespace test\winterframework\core\aop;
 
-use dev\winterframework\core\context\WinterBeanProviderContext;
+use dev\winterframework\core\context\ApplicationContext;
+use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\reflection\ClassResourceScanner;
 use dev\winterframework\util\log\LoggerManager;
 use Monolog\Handler\StreamHandler;
 use Monolog\Test\TestCase;
 use test\winterframework\core\aop\classes\A001Class;
+use test\winterframework\lib\TestUtil;
 
 class AopStereoTypeTests extends TestCase {
 
@@ -20,7 +22,11 @@ class AopStereoTypeTests extends TestCase {
     }
 
     public function testAopStereoType01() {
-        $provider = new WinterBeanProviderContext();
+        /** @var ApplicationContextData $ctxData */
+        /** @var ApplicationContext $appCtx */
+        list($ctxData, $appCtx) = TestUtil::getApplicationContext();
+
+        $provider = $ctxData->getBeanProvider();
         $provider->addProviderClass(self::$scanner->scanDefaultClass(A001Class::class));
 
         /** @var A001Class $bean */

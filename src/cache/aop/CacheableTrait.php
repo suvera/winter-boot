@@ -26,7 +26,7 @@ trait CacheableTrait {
      * @return Cache[]
      */
     protected function getCaches(AopContext $ctx, string $op, object $target): array {
-        $caches = $ctx->getCaches($target, $op);
+        $caches = $ctx->getCtxData($target, $op);
         if (!empty($caches)) {
             return $caches;
         }
@@ -60,7 +60,7 @@ trait CacheableTrait {
             $caches[] = $cache;
         }
 
-        $ctx->setCaches($target, $op, $caches);
+        $ctx->setCtxData($target, $op, $caches);
         return $caches;
     }
 

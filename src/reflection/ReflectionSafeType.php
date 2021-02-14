@@ -1,12 +1,19 @@
-<?php 
+<?php
 declare(strict_types=1);
 
 namespace dev\winterframework\reflection;
 
 use ReflectionNamedType;
+use ReflectionUnionType;
 
 class ReflectionSafeType {
     public static ReflectionSafeType $noType;
+
+    private bool $unionType = false;
+    /**
+     * @var ReflectionSafeType[]
+     */
+    private array $unionTypes = [];
 
     public function __construct(
         private string $name,
@@ -24,6 +31,24 @@ class ReflectionSafeType {
 
     public static function fromNamedType(ReflectionNamedType $type): ReflectionSafeType {
         return new ReflectionSafeType($type->getName(), $type->allowsNull(), $type->isBuiltin());
+    }
+
+    public static function fromUnionType(ReflectionUnionType $type): ReflectionSafeType {
+        $primary = null;
+        foreach ($type->getTypes() as $subType) {
+            $typeObj = new ReflectionSafeType($subType->getName(), $subType->allowsNull(), $subType->isBuiltin());
+            if (is_null($primary)) {
+                $typeObj->unionType = true;
+                $primary = $typeObj;
+            }
+            $primary->unionTypes[] = $typeObj;
+        }
+
+        return $primary;
+    }
+
+    public function isUnionType(): bool {
+        return $this->unionType;
     }
 
     public function isNoType(): bool {

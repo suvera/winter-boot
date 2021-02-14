@@ -66,14 +66,12 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         $this->validateBeanClass($class->getClass());
         $attributes = $class->getAttributes();
 
-        $needProxy = ProxyGenerator::isProxyNeeded($class);
-
         foreach ($attributes as $attribute) {
-            $this->processClassAttribute($class, $attribute, $needProxy);
+            $this->processClassAttribute($class, $attribute);
         }
 
         foreach ($class->getMethods() as $method) {
-            if ($needProxy) {
+            if ($method->isProxyNeeded()) {
                 $this->ctxData->getAopRegistry()->register($class, $method);
             }
             $this->addProviderMethod($class, $method);
@@ -92,9 +90,8 @@ final class WinterBeanProviderContext implements BeanProviderContext {
      *
      * @param ClassResource $class
      * @param object $attribute
-     * @param bool $needProxy
      */
-    private function processClassAttribute(ClassResource $class, object $attribute, bool $needProxy): void {
+    private function processClassAttribute(ClassResource $class, object $attribute): void {
         $attrClass = $attribute::class;
 
         switch ($attrClass) {
@@ -110,7 +107,7 @@ final class WinterBeanProviderContext implements BeanProviderContext {
             case Command::class:
             case WinterBootApplication::class:
                 /** @var Component|Configuration|RestController|Service|WinterBootTest|Command $attribute */
-                $beanProvider = new BeanProvider($class, null, $needProxy);
+                $beanProvider = new BeanProvider($class, null, $class->isProxyNeeded());
                 $beanDef = new Bean($attribute->name);
                 $this->registerBeanProvider($beanProvider, $beanDef);
                 break;
@@ -152,9 +149,8 @@ final class WinterBeanProviderContext implements BeanProviderContext {
             throw new BeansException($method->getReturnType() . ' for method '
                 . ReflectionUtil::getFqName($method));
         }
-        $needProxy = ProxyGenerator::isProxyNeeded($method->getReturnClass());
 
-        $beanProvider = new BeanProvider($class, $method, $needProxy);
+        $beanProvider = new BeanProvider($class, $method, $returnClass->isProxyNeeded());
         $this->registerBeanProvider($beanProvider, $beanDef);
     }
 

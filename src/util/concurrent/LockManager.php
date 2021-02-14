@@ -5,15 +5,21 @@ namespace dev\winterframework\util\concurrent;
 
 interface LockManager {
 
-    public function createLock(
+    public function provideLock(
         string $name,
-        string $provider
+        int $ttl = 0
     ): Lock;
+
+    public function removeLock(Lock|string $lock): bool;
+
+    public function updateLock(Lock|string $lock, int $ttl = 0): bool;
+
+    public function unLock(string|Lock $lock): bool;
 
     /**
      * Get all locks
      *
-     * @return Lock[]
+     * @return Locks
      */
-    public function getLocks(): array;
+    public function getLocks(): Locks;
 }

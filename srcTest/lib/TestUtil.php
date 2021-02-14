@@ -23,6 +23,8 @@ use dev\winterframework\reflection\ClassResources;
 use dev\winterframework\reflection\ClassResourceScanner;
 use dev\winterframework\stereotype\WinterBootApplication;
 use dev\winterframework\type\StringList;
+use dev\winterframework\util\concurrent\DefaultLockManager;
+use dev\winterframework\util\concurrent\LockManager;
 use ReflectionObject;
 use test\winterframework\TestApplication;
 
@@ -87,6 +89,10 @@ class TestUtil {
 
         $contextData->getBeanProvider()->registerInternalBean(
             new SimpleKeyGenerator(), KeyGenerator::class, false
+        );
+
+        $contextData->getBeanProvider()->registerInternalBean(
+            new DefaultLockManager(), LockManager::class, false
         );
 
         return [$contextData, $appCtx];

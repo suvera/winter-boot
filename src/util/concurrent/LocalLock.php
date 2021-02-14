@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace dev\winterframework\util\concurrent;
 
+use dev\winterframework\core\System;
 use dev\winterframework\util\log\Wlf4p;
 use SplFileInfo;
 use SplFileObject;
@@ -22,7 +23,25 @@ class LocalLock implements Lock {
         );
     }
 
-    public function tryLock(): bool {
+    public function tryLock(int $waitForMs = 0): bool {
+        if ($waitForMs < 0) {
+            $waitForMs = 0;
+        }
+        $waitUntil = System::currentTimeMillis() + $waitForMs;
+        while (true) {
+            $locked = $this->doLock();
+            if ($locked) {
+                return true;
+            }
+            usleep(100);
+            if (System::currentTimeMillis() > $waitUntil) {
+                break;
+            }
+        }
+        return false;
+    }
+
+    public function doLock(): bool {
         $my_pid = getmypid();
         $fileObj = null;
 
@@ -38,24 +57,27 @@ class LocalLock implements Lock {
                 }
 
                 if (file_exists("/proc/$pid")) {
-                    throw new LockException('Could not acquire lock as other PID '
+                    self::logDebug('Could not acquire lock as other PID '
                         . $pid
                         . ' already acquired and updated at '
                         . $time
                         . ' for lock ' . $this->getName());
+                    return false;
                 } else {
                     unlink($this->fileInfo->getRealPath());
                 }
             } else {
-                throw new LockException('Could not open lock file for reading '
+                self::logError('Could not open lock file for reading '
                     . $this->fileInfo->getRealPath());
+                return false;
             }
         }
 
         try {
             $fileObj = $this->fileInfo->openFile('x');
         } catch (Throwable $e) {
-            throw new LockException('Could acquire Lock ' . $this->name, 0, $e);
+            self::logException($e);
+            return false;
         }
         if (!$fileObj) {
             return false;
@@ -89,6 +111,9 @@ class LocalLock implements Lock {
 
     public function isDistributed(): bool {
         return false;
+    }
+
+    public function update(int $ttl = 0): void {
     }
 
 }

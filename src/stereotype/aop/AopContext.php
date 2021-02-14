@@ -8,14 +8,14 @@ use dev\winterframework\reflection\ref\RefMethod;
 use WeakMap;
 
 final class AopContext {
-    private WeakMap $cachesByOwner;
+    private WeakMap $ctxDataByOwner;
 
     public function __construct(
         private AopStereoType $stereoType,
         private RefMethod $method,
         private ApplicationContext $appCtx
     ) {
-        $this->cachesByOwner = new WeakMap();
+        $this->ctxDataByOwner = new WeakMap();
     }
 
     public function getStereoType(): AopStereoType {
@@ -30,15 +30,15 @@ final class AopContext {
         return $this->appCtx;
     }
 
-    public function getCaches(object $owner, string $op): array {
-        return $this->cachesByOwner[$owner][$op] ?? [];
+    public function getCtxData(object $owner, string $op): mixed {
+        return $this->ctxDataByOwner[$owner][$op] ?? [];
     }
 
-    public function setCaches(object $owner, string $op, array $caches): void {
-        if (!isset($this->cachesByOwner[$owner][$op])) {
-            $this->cachesByOwner[$owner] = [];
+    public function setCtxData(object $owner, string $op, mixed $caches): void {
+        if (!isset($this->ctxDataByOwner[$owner][$op])) {
+            $this->ctxDataByOwner[$owner] = [];
         }
-        $this->cachesByOwner[$owner][$op] = $caches;
+        $this->ctxDataByOwner[$owner][$op] = $caches;
     }
 
 

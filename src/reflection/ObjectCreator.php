@@ -9,6 +9,7 @@ use dev\winterframework\stereotype\JsonProperty;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionNamedType;
+use ReflectionUnionType;
 use Throwable;
 
 class ObjectCreator {
@@ -48,9 +49,9 @@ class ObjectCreator {
             }
 
             if ($props[$extName]) {
-                /** @var ReflectionNamedType $type */
+                /** @var ReflectionNamedType|ReflectionUnionType $type */
                 $type = $refProp->getType();
-                if ($type != null) {
+                if ($type != null && !($type instanceof ReflectionUnionType)) {
                     if ($type->isBuiltin()) {
                         $refProp->setValue($obj, $props[$extName]);
                     } else if (is_array($props[$extName])) {

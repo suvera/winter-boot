@@ -8,6 +8,7 @@ use dev\winterframework\io\file\DirectoryScanner;
 use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\reflection\ref\RefProperty;
+use dev\winterframework\stereotype\aop\AopStereoType;
 use dev\winterframework\stereotype\StereoType;
 use dev\winterframework\stereotype\StereoTyped;
 use dev\winterframework\type\AttributeList;
@@ -212,6 +213,8 @@ class ClassResourceScanner {
         $res->setMethods($methList);
         $varList = VariableResources::ofValues();
         $res->setVariables($varList);
+        $proxyMethList = MethodResources::ofValues();
+        $res->setProxyMethods($proxyMethList);
 
         $methods = $ref->getMethods();
         foreach ($methods as $methodR) {
@@ -224,10 +227,17 @@ class ClassResourceScanner {
                 $meth->setAttributes(AttributeList::ofArray($methAttrs));
                 $type = $meth->getReturnNamedType();
                 if (!$type->isNoType() && !$type->isBuiltin()) {
-                    echo "\n" . $type->getName() . "\n";
                     $meth->setReturnClass($this->scanClass($type->getName(), $attributes));
                 }
                 $methList[] = $meth;
+
+                foreach ($methAttrs as $methAttr) {
+                    if ($methAttr instanceof AopStereoType) {
+                        $meth->setProxyNeeded(true);
+                        $res->setProxyNeeded(true);
+                        $proxyMethList[] = $meth;
+                    }
+                }
             }
         }
 

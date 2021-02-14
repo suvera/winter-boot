@@ -4,11 +4,12 @@ declare(strict_types=1);
 namespace dev\winterframework\reflection\ref;
 
 use dev\winterframework\exception\WinterException;
+use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionMethod;
-use ReflectionUnionType;
 use ReflectionNamedType;
+use ReflectionUnionType;
 
 /**
  * @method string __toString()
@@ -51,8 +52,8 @@ use ReflectionNamedType;
  * @method mixed getStaticVariables()
  * @method mixed returnsReference()
  * @method bool hasReturnType()
- * @method ReflectionNamedType|ReflectionUnionType getReturnType()
- * @method array getAttributes(string $name = null, int $flags = 0)
+ * @method ReflectionNamedType|ReflectionUnionType|null getReturnType()
+ * @method ReflectionAttribute[] getAttributes(string $name = null, int $flags = 0)
  */
 class RefMethod extends ReflectionAbstract {
 
