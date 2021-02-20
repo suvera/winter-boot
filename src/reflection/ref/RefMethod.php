@@ -9,6 +9,7 @@ use ReflectionClass;
 use ReflectionException;
 use ReflectionMethod;
 use ReflectionNamedType;
+use ReflectionParameter;
 use ReflectionUnionType;
 
 /**
@@ -46,7 +47,7 @@ use ReflectionUnionType;
  * @method string getNamespaceName()
  * @method int getNumberOfParameters()
  * @method int getNumberOfRequiredParameters()
- * @method array getParameters()
+ * @method ReflectionParameter[] getParameters()
  * @method string getShortName()
  * @method mixed getStartLine()
  * @method mixed getStaticVariables()

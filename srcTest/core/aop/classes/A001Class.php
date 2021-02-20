@@ -15,4 +15,23 @@ class A001Class {
         sleep($seconds);
         echo "Sync Method Executed\n";
     }
+
+    #[Lockable(name: 'id_#{id}')]
+    public function syncIdMethod(int $id): void {
+        echo "syncIdMethod($id) Executed\n";
+    }
+
+    #[Lockable(name: 'id_#{id}_#{name}')]
+    public function syncIdNameMethod(int $id, string $name): void {
+        echo "syncIdNameMethod($id, $name) Executed\n";
+    }
+
+    #[Lockable(name: 'id_#{target.getName()}')]
+    public function syncGetterMethod(): void {
+        echo "syncGetterMethod() Executed\n";
+    }
+
+    public function getName(): string {
+        return 'Bruce Banner';
+    }
 }

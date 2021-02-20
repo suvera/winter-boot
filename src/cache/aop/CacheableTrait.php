@@ -15,9 +15,11 @@ use dev\winterframework\cache\stereotype\CachePut;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\stereotype\aop\AopContext;
+use dev\winterframework\stereotype\aop\AopContextExecute;
 use dev\winterframework\type\TypeAssert;
 
 trait CacheableTrait {
+    use AopContextExecute;
 
     /**
      * @param AopContext $ctx
@@ -96,7 +98,7 @@ trait CacheableTrait {
         $appCtx = $ctx->getApplicationContext();
 
         if (!empty($stereo->key)) {
-            return $stereo->key;
+            self::buildNameByContext($stereo->getNameObject(), $ctx, $target, $args);
         }
 
         /** @var KeyGenerator $keyGenerator */

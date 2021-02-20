@@ -22,4 +22,16 @@ interface ApplicationContext {
 
     public function hasBeanByClass(string $class): bool;
 
+    public function getProperty(string $name, mixed $default = null): string|int|float|bool|null;
+
+    public function getPropertyStr(string $name, string $default = null): string;
+
+    public function getPropertyBool(string $name, bool $default = null): bool;
+
+    public function getPropertyInt(string $name, int $default = null): int;
+
+    public function getPropertyFloat(string $name, float $default = null): float;
+
+    public function getProperties(): array;
+
 }

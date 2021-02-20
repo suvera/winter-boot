@@ -8,10 +8,12 @@ use dev\winterframework\cache\aop\CachePutAspect;
 use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\stereotype\aop\AopStereoType;
 use dev\winterframework\stereotype\aop\WinterAspect;
+use dev\winterframework\stereotype\util\NamedComponent;
 use dev\winterframework\type\TypeAssert;
 
 #[Attribute(Attribute::TARGET_METHOD)]
 class CachePut implements AopStereoType {
+    use NamedComponent;
     private WinterAspect $aspect;
 
     public function __construct(
@@ -50,6 +52,7 @@ class CachePut implements AopStereoType {
     public function init(object $ref): void {
         /** @var RefMethod $ref */
         TypeAssert::typeOf($ref, RefMethod::class);
+        $this->initNameObject($this->key);
     }
 
 }

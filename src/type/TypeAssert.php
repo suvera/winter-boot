@@ -148,15 +148,21 @@ final class TypeAssert {
         }
     }
 
-    public static function objectOfIsA(string $value, string $className) {
+    public static function objectOfIsA(string $value, string $className, string $msg = '') {
         if (!is_a($value, $className, true)) {
-            throw new TypeError("Expected data type " . $className . ", but got " . $value);
+            throw new TypeError($msg ? $msg : "Expected data type " . $className . ", but got " . $value);
         }
     }
 
-    public static function notEmpty(string $name, mixed $value) {
+    public static function notEmpty(string $name, mixed $value, string $msg = '') {
+        if (!isset($value) || empty($value)) {
+            throw new TypeError($msg ? $msg : "Parameter '$name' value cannot be empty");
+        }
+    }
+
+    public static function notNull(string $name, mixed $value, string $msg = '') {
         if (empty($value)) {
-            throw new TypeError("Parameter '$name' value cannot be empty");
+            throw new TypeError($msg ? $msg : "Parameter '$name' value cannot be Null");
         }
     }
 

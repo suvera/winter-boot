@@ -386,7 +386,7 @@ There are two types of Exclusive Locks
 
 ```phpt
 
-#[Lockable(name: "order-#[id]", provider: "redisLock")]
+#[Lockable(name: "order-#{id}", provider: "redisLock")]
 public function updateOrderStatus(int $id): void {
 }
 

@@ -10,6 +10,8 @@ use dev\winterframework\reflection\ReflectionUtil;
 
 final class BeanProvider {
     private object $cached;
+    private array $methodArgs = [];
+    private ?object $providerObject = null;
 
     public function __construct(
         private ClassResource $class,
@@ -60,6 +62,30 @@ final class BeanProvider {
             }
         }
         return true;
+    }
+
+    public function hasMethodArgs(): bool {
+        return !empty($this->methodArgs);
+    }
+
+    public function getMethodArgs(): array {
+        return $this->methodArgs;
+    }
+
+    public function setMethodArgs(array $methodArgs): void {
+        $this->methodArgs = $methodArgs;
+    }
+
+    public function hasProviderObject(): bool {
+        return isset($this->providerObject);
+    }
+
+    public function getProviderObject(): ?object {
+        return $this->providerObject;
+    }
+
+    public function setProviderObject(?object $providerObject): void {
+        $this->providerObject = $providerObject;
     }
 
     public function equals(BeanProvider $other): bool {

@@ -22,7 +22,6 @@ class CacheableTests extends TestCase {
 
     public static function setUpBeforeClass(): void {
         self::$scanner = ClassResourceScanner::getDefaultScanner();
-        LoggerManager::getLogger()->pushHandler(new StreamHandler(STDOUT));
     }
 
     public function testCacheable01() {

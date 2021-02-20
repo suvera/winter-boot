@@ -15,6 +15,7 @@ use dev\winterframework\reflection\ClassResourceScanner;
 use dev\winterframework\reflection\MethodResource;
 use dev\winterframework\reflection\proxy\ProxyGenerator;
 use dev\winterframework\reflection\ref\RefKlass;
+use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\reflection\VariableResource;
 use dev\winterframework\stereotype\Autowired;
@@ -457,33 +458,36 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         $this->callObjectMethod($bean, $constructor, $beanProvider);
     }
 
-    /** @noinspection PhpUnusedParameterInspection */
     private function callObjectMethod(
         object $bean,
         ReflectionMethod $method,
         BeanProvider $beanProvider
     ): mixed {
         $args = [];
-        foreach ($method->getParameters() as $parameter) {
-            /** @var ReflectionNamedType $type */
-            $type = $parameter->getType();
+        if ($beanProvider->hasMethodArgs()) {
+            $args = $beanProvider->hasMethodArgs();
+        } else {
+            foreach ($method->getParameters() as $parameter) {
+                /** @var ReflectionNamedType $type */
+                $type = $parameter->getType();
 
-            $this->validateBeanMethodParam($method, $parameter);
+                $this->validateBeanMethodParam($method, $parameter);
 
-            if ($type->isBuiltin()) {
-                continue;
+                if ($type->isBuiltin()) {
+                    continue;
+                }
+
+                $qualifiers = $parameter->getAttributes(Qualifier::class);
+                if (!empty($qualifiers)) {
+                    /** @var Qualifier $attr */
+                    $attr = $qualifiers[0]->newInstance();
+                    $bean = $this->beanByName($attr->name);
+                } else {
+                    $bean = $this->beanByClass($type->getName());
+                }
+
+                $args[$parameter->getName()] = $bean;
             }
-
-            $qualifiers = $parameter->getAttributes(Qualifier::class);
-            if (!empty($qualifiers)) {
-                /** @var Qualifier $attr */
-                $attr = $qualifiers[0]->newInstance();
-                $bean = $this->beanByName($attr->name);
-            } else {
-                $bean = $this->beanByClass($type->getName());
-            }
-
-            $args[$parameter->getName()] = $bean;
         }
 
         try {
@@ -499,7 +503,12 @@ final class WinterBeanProviderContext implements BeanProviderContext {
     ): object {
 
         $method = $beanProvider->getMethod();
-        $providerBean = $this->beanByClass($beanProvider->getClass()->getClass()->getName());
+        if ($beanProvider->hasProviderObject()) {
+            $providerBean = $beanProvider->getProviderObject();
+        } else {
+            $providerBean = $this->beanByClass($beanProvider->getClass()->getClass()->getName());
+        }
+
         $m = $method->getMethod();
 
         $bean = $this->callObjectMethod($providerBean, $m->getDelegate(), $beanProvider);
@@ -600,6 +609,55 @@ final class WinterBeanProviderContext implements BeanProviderContext {
 
         $beanProvider->setCached($bean);
         $this->beanClassFactory[$beanClass][$beanClass] = $beanProvider;
+    }
+
+    /**
+     * Register internal Beans (by Method provider), so that they can be autowired
+     *
+     * @param string $beanName
+     * @param string $beanClassName
+     * @param object $provider
+     * @param string $methodName
+     * @param array $methodArgs
+     * @param bool $overwrite
+     */
+    public function registerInternalBeanMethod(
+        string $beanName,
+        string $beanClassName,
+        object $provider,
+        string $methodName,
+        array $methodArgs = [],
+        bool $overwrite = true
+    ): void {
+
+        $ref = new RefKlass($provider);
+        $class = new ClassResource();
+        $class->setClass($ref);
+
+        $methRes = new MethodResource();
+        $methRes->setMethod(RefMethod::getInstance($class->getClass()->getMethod($methodName)));
+
+        $beanProvider = new BeanProvider($class, $methRes);
+        $beanProvider->setProviderObject($provider);
+        $beanProvider->setMethodArgs($methodArgs);
+
+        if (!empty($beanName)) {
+            if (!$overwrite && $this->hasBeanByName($beanName)) {
+                return;
+            }
+            $this->beanNameFactory[$beanName] = $beanProvider;
+            $beanProvider->addNames($beanName);
+        }
+
+        if (!empty($beanClassName)) {
+            if (!$overwrite && $this->hasBeanByClass($beanClassName)) {
+                return;
+            }
+
+            // Validation here ?
+            unset($this->beanClassFactory[$beanClassName]);
+            $this->beanClassFactory[$beanClassName][$beanClassName] = $beanProvider;
+        }
     }
 
 }

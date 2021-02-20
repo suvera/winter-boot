@@ -21,7 +21,7 @@ final class WinterPropertyContext implements PropertyContext {
         $this->loadProperties();
     }
 
-    public function get(string $name, mixed $default = null): string|int|float|bool|null {
+    public function get(string $name, mixed $default = null): string|int|float|bool|null|array {
         if (array_key_exists($name, $this->data)) {
             $val = $this->data[$name];
 

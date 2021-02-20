@@ -5,7 +5,7 @@ namespace dev\winterframework\core\context;
 
 interface PropertyContext {
 
-    public function get(string $name, mixed $default = null): string|int|float|bool|null;
+    public function get(string $name, mixed $default = null): string|int|float|bool|null|array;
 
     public function getStr(string $name, string $default = null): string;
 

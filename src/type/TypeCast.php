@@ -18,4 +18,14 @@ class TypeCast {
             default => $val,
         };
     }
+
+    public static function toString(mixed $val): ?string {
+        $type = gettype($val);
+
+        return match ($type) {
+            'null' => null,
+            'bool', 'boolean' => $val ? 'true' : 'false',
+            default => strval($val),
+        };
+    }
 }

@@ -20,6 +20,7 @@ use dev\winterframework\reflection\Psr4Namespace;
 use dev\winterframework\reflection\Psr4Namespaces;
 use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\stereotype\cache\EnableCaching;
+use dev\winterframework\stereotype\txn\EnableTransactionManagement;
 use dev\winterframework\stereotype\WinterBootApplication;
 use dev\winterframework\type\StringList;
 use dev\winterframework\type\TypeAssert;
@@ -174,6 +175,16 @@ abstract class WinterApplicationRunner {
                 DirectoryScanner::scanForPhpClasses(
                     dirname(dirname(__DIR__)) . '/cache/stereotype',
                     'dev\\winterframework\\cache\\stereotype'
+                )
+            );
+            $stereoTypes->addAll($cacheTypes);
+        }
+
+        if ($this->bootApp->getAttribute(EnableTransactionManagement::class) != null) {
+            $cacheTypes = array_keys(
+                DirectoryScanner::scanForPhpClasses(
+                    dirname(dirname(__DIR__)) . '/txn/stereotype',
+                    'dev\\winterframework\\txn\\stereotype'
                 )
             );
             $stereoTypes->addAll($cacheTypes);

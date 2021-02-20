@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace test\winterframework;
 
+use dev\winterframework\core\app\WinterWebApplication;
 use dev\winterframework\stereotype\WinterBootApplication;
 
 #[WinterBootApplication(
@@ -12,5 +13,7 @@ use dev\winterframework\stereotype\WinterBootApplication;
     ]
 )]
 class TestApplication {
-
+    public static function main(): void {
+        (new WinterWebApplication())->run(self::class);
+    }
 }

@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace dev\winterframework\reflection;
 
 use dev\winterframework\reflection\ref\RefMethod;
+use dev\winterframework\reflection\support\MethodParameters;
+use dev\winterframework\reflection\support\ParameterType;
 use dev\winterframework\type\AttributeList;
-use ReflectionUnionType;
 
 class MethodResource {
     private ?ClassResource $returnClass;
 
-    private ReflectionSafeType $returnType;
+    private ParameterType $returnType;
 
     private RefMethod $method;
+
+    private MethodParameters $parameters;
 
     private AttributeList $attributes;
 
@@ -23,17 +26,9 @@ class MethodResource {
         return isset($this->attributes) ? $this->attributes->getByName($name) : null;
     }
 
-    public function getReturnNamedType(): ReflectionSafeType {
+    public function getReturnNamedType(): ParameterType {
         if (!isset($this->returnType)) {
-            $type = $this->method->getReturnType();
-
-            if ($type == null) {
-                $this->returnType = ReflectionSafeType::getNoType();
-            } else if ($type instanceof ReflectionUnionType) {
-                $this->returnType = ReflectionSafeType::fromUnionType($type);
-            } else {
-                $this->returnType = ReflectionSafeType::fromNamedType($type);
-            }
+            $this->returnType = ParameterType::fromType($this->method->getReturnType());
         }
         return $this->returnType;
     }
@@ -72,6 +67,14 @@ class MethodResource {
 
     public function setProxyNeeded(bool $proxyNeeded): void {
         $this->proxyNeeded = $proxyNeeded;
+    }
+
+    public function getParameters(): MethodParameters {
+        return $this->parameters;
+    }
+
+    public function setParameters(MethodParameters $parameters): void {
+        $this->parameters = $parameters;
     }
 
 }

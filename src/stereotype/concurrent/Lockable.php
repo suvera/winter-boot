@@ -7,12 +7,14 @@ use Attribute;
 use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\stereotype\aop\AopStereoType;
 use dev\winterframework\stereotype\aop\WinterAspect;
+use dev\winterframework\stereotype\util\NamedComponent;
 use dev\winterframework\type\TypeAssert;
 use dev\winterframework\util\concurrent\LockableAspect;
 use dev\winterframework\util\concurrent\LockManager;
 
 #[Attribute(Attribute::TARGET_METHOD)]
 class Lockable implements AopStereoType {
+    use NamedComponent;
     private WinterAspect $aspect;
 
     public function __construct(
@@ -30,6 +32,7 @@ class Lockable implements AopStereoType {
     public function init(object $ref): void {
         /** @var RefMethod $ref */
         TypeAssert::typeOf($ref, RefMethod::class);
+        $this->initNameObject($this->name);
     }
 
     public function getAspect(): WinterAspect {

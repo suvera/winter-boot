@@ -18,7 +18,6 @@ class AopStereoTypeTests extends TestCase {
 
     public static function setUpBeforeClass(): void {
         self::$scanner = ClassResourceScanner::getDefaultScanner();
-        LoggerManager::getLogger()->pushHandler(new StreamHandler(STDOUT));
     }
 
     public function testAopStereoType01() {
@@ -34,6 +33,12 @@ class AopStereoTypeTests extends TestCase {
 
         $bean->syncMethod(1);
         $this->assertTrue(true);
+
+        $bean->syncIdMethod(1001);
+        $bean->syncIdNameMethod(1002, 'Duke Wayne');
+        $this->assertTrue(true);
+
+        $bean->syncGetterMethod();
     }
 
 }

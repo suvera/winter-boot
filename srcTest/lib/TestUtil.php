@@ -3,32 +3,13 @@ declare(strict_types=1);
 
 namespace test\winterframework\lib;
 
-use dev\winterframework\cache\CacheManager;
-use dev\winterframework\cache\CacheResolver;
-use dev\winterframework\cache\impl\DefaultCacheManager;
-use dev\winterframework\cache\impl\SimpleCacheResolver;
-use dev\winterframework\cache\impl\SimpleKeyGenerator;
-use dev\winterframework\cache\KeyGenerator;
-use dev\winterframework\core\aop\AopInterceptorRegistry;
-use dev\winterframework\core\context\ApplicationContext;
-use dev\winterframework\core\context\ApplicationContextData;
-use dev\winterframework\core\context\ApplicationLogger;
-use dev\winterframework\core\context\WinterApplicationContext;
-use dev\winterframework\core\context\WinterPropertyContext;
-use dev\winterframework\core\web\error\DefaultErrorController;
-use dev\winterframework\core\web\error\ErrorController;
-use dev\winterframework\core\web\format\DefaultResponseRenderer;
-use dev\winterframework\core\web\ResponseRenderer;
-use dev\winterframework\reflection\ClassResources;
-use dev\winterframework\reflection\ClassResourceScanner;
-use dev\winterframework\stereotype\WinterBootApplication;
-use dev\winterframework\type\StringList;
-use dev\winterframework\util\concurrent\DefaultLockManager;
-use dev\winterframework\util\concurrent\LockManager;
+use dev\winterframework\util\log\LoggerManager;
+use Monolog\Handler\StreamHandler;
 use ReflectionObject;
 use test\winterframework\TestApplication;
 
 class TestUtil {
+    protected static bool $loggingEnabled = false;
 
     public static function getProperty(object $obj, string $property): mixed {
         $ref = new ReflectionObject($obj);
@@ -40,62 +21,18 @@ class TestUtil {
     }
 
     public static function getApplicationContext(string $appClass = TestApplication::class): array {
-        $scanner = ClassResourceScanner::getDefaultScanner();
-        $bootApp = $scanner->scanClass(
-            TestApplication::class,
-            StringList::ofValues(WinterBootApplication::class)
-        );
-        /** @var WinterBootApplication $bootConfig */
-        $bootConfig = $bootApp->getAttribute(WinterBootApplication::class);
-        $contextData = new ApplicationContextData();
-        $contextData->setBootApp($bootApp);
-        $contextData->setBootConfig($bootConfig);
-        $contextData->setScanner($scanner);
-        $contextData->setPropertyContext(new WinterPropertyContext(
-            $bootConfig->configDirectory,
-            $bootConfig->profile
-        ));
-        $contextData->setResources(ClassResources::ofValues());
+        if (!self::$loggingEnabled) {
+            LoggerManager::getLogger()->pushHandler(new StreamHandler(STDOUT));
+            self::$loggingEnabled = true;
+        }
 
-        $appCtx = new WinterApplicationContext($contextData);
-        $contextData->getBeanProvider()->registerInternalBean(
-            $appCtx, ApplicationContext::class
-        );
+        $winter = new WinterTestWebApplication();
+        $winter->run($appClass);
 
-        $contextData->getBeanProvider()->registerInternalBean(
-            $contextData->getAopRegistry(), AopInterceptorRegistry::class
-        );
-
-        $contextData->getBeanProvider()->registerInternalBean(
-            new ApplicationLogger(), ApplicationLogger::class
-        );
-
-        $contextData->getBeanProvider()->registerInternalBean(
-            new DefaultResponseRenderer(), ResponseRenderer::class, false
-        );
-
-        $contextData->getBeanProvider()->registerInternalBean(
-            new DefaultErrorController(), ErrorController::class, false
-        );
-
-        $cacheManager = new DefaultCacheManager();
-        $contextData->getBeanProvider()->registerInternalBean(
-            $cacheManager, CacheManager::class, false
-        );
-
-        $contextData->getBeanProvider()->registerInternalBean(
-            new SimpleCacheResolver($cacheManager), CacheResolver::class, false
-        );
-
-        $contextData->getBeanProvider()->registerInternalBean(
-            new SimpleKeyGenerator(), KeyGenerator::class, false
-        );
-
-        $contextData->getBeanProvider()->registerInternalBean(
-            new DefaultLockManager(), LockManager::class, false
-        );
-
-        return [$contextData, $appCtx];
+        return [
+            self::getProperty($winter, 'appCtxData'),
+            self::getProperty($winter, 'applicationContext')
+        ];
     }
 
 }

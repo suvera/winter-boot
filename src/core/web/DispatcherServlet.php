@@ -31,7 +31,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
     }
 
     public function dispatch(): void {
-        $serverPath = $this->ctxData->getPropertyContext()->get('server.context-path');
+        $serverPath = $this->ctxData->getPropertyContext()->get('server.context-path', '/');
         $serverPath = isset($serverPath) ? trim($serverPath, '/') : '';
 
         $request = new HttpRequest();
@@ -188,7 +188,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 $args[$injectableParam->getName()] = $request;
             }
         }
-        
+
         /**
          * STEP - 6 : Execute Method
          */

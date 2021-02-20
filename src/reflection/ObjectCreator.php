@@ -9,6 +9,7 @@ use dev\winterframework\stereotype\JsonProperty;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionNamedType;
+use ReflectionObject;
 use ReflectionUnionType;
 use Throwable;
 
@@ -31,7 +32,13 @@ class ObjectCreator {
         } catch (ReflectionException $e) {
             throw new WinterException('Could not create object of class ' . $class, 0, $e);
         }
+        return self::mapObject($obj, $props, $ref);
+    }
 
+    public static function mapObject(object $obj, string|array $props, ReflectionClass $ref = null): object {
+        if (!$ref) {
+            $ref = new ReflectionObject($obj);
+        }
         foreach ($ref->getProperties() as $refProp) {
             $attrs = $refProp->getAttributes(JsonProperty::class);
             $extName = $refProp->getName();
@@ -43,14 +50,15 @@ class ObjectCreator {
                     $extName = $attr->name;
                 } catch (Throwable $e) {
                     throw new InvalidSyntaxException('Invalid JsonProperty on property '
-                        . $refProp->getName() . ', for class ' . $class, 0, $e
+                        . $refProp->getName() . ', for class ' . $ref->getName(), 0, $e
                     );
                 }
             }
 
-            if ($props[$extName]) {
+            if (isset($props[$extName])) {
                 /** @var ReflectionNamedType|ReflectionUnionType $type */
                 $type = $refProp->getType();
+                $refProp->setAccessible(true);
                 if ($type != null && !($type instanceof ReflectionUnionType)) {
                     if ($type->isBuiltin()) {
                         $refProp->setValue($obj, $props[$extName]);

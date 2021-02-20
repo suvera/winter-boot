@@ -14,6 +14,9 @@ use dev\winterframework\core\web\error\DefaultErrorController;
 use dev\winterframework\core\web\error\ErrorController;
 use dev\winterframework\core\web\format\DefaultResponseRenderer;
 use dev\winterframework\core\web\ResponseRenderer;
+use dev\winterframework\exception\NoUniqueBeanDefinitionException;
+use dev\winterframework\pdbc\DataSource;
+use dev\winterframework\pdbc\datasource\DataSourceBuilder;
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\ClassResources;
 use dev\winterframework\reflection\ClassResourceScanner;
@@ -73,6 +76,31 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         return $this->beanProvider->hasBeanByClass($class);
     }
 
+    public function getProperty(string $name, mixed $default = null): string|int|float|bool|null {
+        return $this->propertyContext->get($name, $default);
+    }
+
+    public function getPropertyStr(string $name, string $default = null): string {
+        return $this->propertyContext->getStr($name, $default);
+    }
+
+    public function getPropertyBool(string $name, bool $default = null): bool {
+        return $this->propertyContext->getBool($name, $default);
+    }
+
+    public function getPropertyInt(string $name, int $default = null): int {
+        return $this->propertyContext->getInt($name, $default);
+    }
+
+    public function getPropertyFloat(string $name, float $default = null): float {
+        return $this->propertyContext->getFloat($name, $default);
+    }
+
+    public function getProperties(): array {
+        return $this->propertyContext->getAll();
+    }
+
+
     /**
      * LOCAL Methods
      * ---------------------------------
@@ -84,6 +112,8 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         $this->processResources();
 
         $this->registerInternals();
+
+        $this->registerDataSources();
 
         if ($this->bootConfig->eager) {
             $this->eagerLoadBeans();
@@ -134,6 +164,37 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
 
     }
 
+    private function registerDataSources(): void {
+        if (!$this->propertyContext->has('datasource')) {
+            return;
+        }
+
+        $ds = $this->propertyContext->get('datasource');
+        if (!is_array($ds) || empty($ds)) {
+            return;
+        }
+
+        $dsBuilder = new DataSourceBuilder($ds);
+        foreach ($dsBuilder->getDataSourceConfig() as $beanName => $config) {
+            if ($this->hasBeanByName($beanName)) {
+                throw new NoUniqueBeanDefinitionException('DataSource creation failed, '
+                    . 'due to no qualifying bean with name '
+                    . "'$beanName' available: expected single matching bean but found multiple "
+                    . DataSource::class
+                );
+            }
+
+            $this->beanProvider->registerInternalBeanMethod(
+                $beanName,
+                $config->isPrimary() ? DataSource::class : '',
+                $dsBuilder,
+                $config->isPrimary() ? 'getPrimaryDataSource' : 'getDataSource',
+                $config->isPrimary() ? [] : ['name' => $beanName],
+                false
+            );
+        }
+    }
+
     private function eagerLoadBeans(): void {
         foreach ($this->beanProvider->getBeanClassFactory() as $beanClass => $list) {
             foreach ($list as $beanSubClass => $beanProvider) {
@@ -143,7 +204,6 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
             }
         }
     }
-
 
     private function processResources(): void {
         $this->processClassResource($this->contextData->getBootApp());

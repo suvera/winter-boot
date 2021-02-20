@@ -5,7 +5,7 @@ namespace dev\winterframework\core\app;
 
 use dev\winterframework\core\context\WinterWebContext;
 
-final class WinterWebApplication extends WinterApplicationRunner implements WinterApplication {
+class WinterWebApplication extends WinterApplicationRunner implements WinterApplication {
 
     protected WinterWebContext $webContext;
 
@@ -15,6 +15,10 @@ final class WinterWebApplication extends WinterApplicationRunner implements Wint
             $this->applicationContext
         );
 
+        $this->serverRequest();
+    }
+
+    protected function serverRequest(): void {
         $this->webContext->getDispatcher()->dispatch();
     }
 

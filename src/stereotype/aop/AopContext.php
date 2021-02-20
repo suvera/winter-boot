@@ -34,12 +34,16 @@ final class AopContext {
         return $this->ctxDataByOwner[$owner][$op] ?? [];
     }
 
+    public function clearCtxData(object $owner, string $op): void {
+        if (isset($this->ctxDataByOwner[$owner]) && isset($this->ctxDataByOwner[$owner][$op])) {
+            //unset($this->ctxDataByOwner[$owner][$op]);
+        };
+    }
+
     public function setCtxData(object $owner, string $op, mixed $caches): void {
         if (!isset($this->ctxDataByOwner[$owner][$op])) {
             $this->ctxDataByOwner[$owner] = [];
         }
         $this->ctxDataByOwner[$owner][$op] = $caches;
     }
-
-
 }

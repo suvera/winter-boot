@@ -9,11 +9,13 @@ use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\stereotype\aop\AopStereoType;
 use dev\winterframework\stereotype\aop\WinterAspect;
+use dev\winterframework\stereotype\util\NamedComponent;
 use dev\winterframework\type\TypeAssert;
 use TypeError;
 
 #[Attribute(Attribute::TARGET_METHOD)]
 class Cacheable implements AopStereoType {
+    use NamedComponent;
     private WinterAspect $aspect;
 
     public function __construct(
@@ -59,6 +61,7 @@ class Cacheable implements AopStereoType {
                 . "and #[CachePut] at same time for method "
                 . ReflectionUtil::getFqName($ref));
         }
+        $this->initNameObject($this->key);
     }
 
 }

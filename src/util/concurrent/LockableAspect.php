@@ -5,6 +5,7 @@ namespace dev\winterframework\util\concurrent;
 
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\stereotype\aop\AopContext;
+use dev\winterframework\stereotype\aop\AopContextExecute;
 use dev\winterframework\stereotype\aop\WinterAspect;
 use dev\winterframework\stereotype\concurrent\Lockable;
 use dev\winterframework\type\TypeAssert;
@@ -13,6 +14,7 @@ use Throwable;
 
 class LockableAspect implements WinterAspect {
     use Wlf4p;
+    use AopContextExecute;
 
     public function begin(AopContext $ctx, object $target, array $args): void {
         /** @var Lockable $stereo */
@@ -20,7 +22,11 @@ class LockableAspect implements WinterAspect {
         $appCtx = $ctx->getApplicationContext();
 
         $lockManager = $this->getLockManger($stereo, $appCtx);
-        $lock = $lockManager->provideLock($stereo->name, $stereo->ttlSeconds);
+
+        $name = self::buildNameByContext($stereo->getNameObject(), $ctx, $target, $args);
+        self::logInfo('Lock name "' . $stereo->name . '", after parsed "' .  $name .'"');
+
+        $lock = $lockManager->provideLock($name, $stereo->ttlSeconds);
         if (!$lock->tryLock()) {
             throw new LockException('Lock cannot be acquired ');
         }
@@ -52,6 +58,7 @@ class LockableAspect implements WinterAspect {
         if (!empty($lock)) {
             $lock->unlock();
         }
+        $ctx->clearCtxData($target, $stereo::class);
     }
 
     public function commit(
@@ -67,6 +74,7 @@ class LockableAspect implements WinterAspect {
         if (!empty($lock)) {
             $lock->unlock();
         }
+        $ctx->clearCtxData($target, $stereo::class);
     }
 
     public function commitFailed(
@@ -84,6 +92,7 @@ class LockableAspect implements WinterAspect {
         if (!empty($lock)) {
             $lock->unlock();
         }
+        $ctx->clearCtxData($target, $stereo::class);
     }
 
     public function failed(
@@ -100,5 +109,6 @@ class LockableAspect implements WinterAspect {
         if (isset($lock)) {
             $lock->unlock();
         }
+        $ctx->clearCtxData($target, $stereo::class);
     }
 }

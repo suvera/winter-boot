@@ -8,6 +8,8 @@ use dev\winterframework\io\file\DirectoryScanner;
 use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\reflection\ref\RefProperty;
+use dev\winterframework\reflection\support\MethodParameter;
+use dev\winterframework\reflection\support\MethodParameters;
 use dev\winterframework\stereotype\aop\AopStereoType;
 use dev\winterframework\stereotype\StereoType;
 use dev\winterframework\stereotype\StereoTyped;
@@ -15,6 +17,7 @@ use dev\winterframework\type\AttributeList;
 use dev\winterframework\type\StringList;
 use dev\winterframework\util\log\Wlf4p;
 use ReflectionAttribute;
+use ReflectionMethod;
 use Throwable;
 use UnexpectedValueException;
 
@@ -229,6 +232,7 @@ class ClassResourceScanner {
                 if (!$type->isNoType() && !$type->isBuiltin()) {
                     $meth->setReturnClass($this->scanClass($type->getName(), $attributes));
                 }
+                $meth->setParameters($this->scanMethodParameters($methodR));
                 $methList[] = $meth;
 
                 foreach ($methAttrs as $methAttr) {
@@ -255,6 +259,16 @@ class ClassResourceScanner {
         }
 
         return $res;
+    }
+
+    private function scanMethodParameters(ReflectionMethod $method): MethodParameters {
+        $m = MethodParameters::ofValues();
+
+        foreach ($method->getParameters() as $p) {
+            $m[] = MethodParameter::fromReflection($p);
+        }
+
+        return $m;
     }
 
     /**

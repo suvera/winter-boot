@@ -9,13 +9,31 @@ final class Arrays {
     public static function flattenByKey(array $array, string $delimiter = '.', string $prefix = ''): array {
         $result = [];
         foreach ($array as $key => $value) {
-            if (is_array($value))
-                $result = array_merge(
-                    $result,
-                    self::flattenByKey($value, $delimiter, $prefix . $key . $delimiter)
-                );
-            else
-                $result[$prefix . $key] = $value;
+            if (is_array($value)) {
+                if (is_int($key)) {
+                    $curKey = substr($prefix, 0, 0 - strlen($delimiter));
+                    if (!isset($result[$curKey])) {
+                        $result[$curKey] = [];
+                    }
+                    $result[$curKey][$key] = self::flattenByKey($value, $delimiter, '');
+                } else {
+                    $result = array_merge(
+                        $result,
+                        self::flattenByKey($value, $delimiter, $prefix . $key . $delimiter)
+                    );
+                }
+
+            } else {
+                if (is_int($key)) {
+                    $curKey = substr($prefix, 0, 0 - strlen($delimiter));
+                    if (!isset($result[$curKey])) {
+                        $result[$curKey] = [];
+                    }
+                    $result[$curKey][$key] = $value;
+                } else {
+                    $result[$prefix . $key] = $value;
+                }
+            }
         }
         return $result;
     }
