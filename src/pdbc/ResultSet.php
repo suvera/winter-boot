@@ -50,11 +50,11 @@ interface ResultSet {
     public function last(): bool;
 
     /**
-     * Retrieves the current row number. The first row is number 1, the second number 2, and so on.
+     * Retrieves the current row
      *
      * @return int
      */
-    public function getRow(): int;
+    public function getRow(): ?array;
 
     /**
      * Moves the cursor to the given row number in this ResultSet object.

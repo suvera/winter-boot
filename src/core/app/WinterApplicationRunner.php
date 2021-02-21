@@ -37,6 +37,7 @@ abstract class WinterApplicationRunner {
     protected ClassResources $resources;
     protected Psr4Namespaces $scanNamespaces;
     protected PropertyContext $propertyCtx;
+    protected StringList $attributesToScan;
 
     public function __construct() {
         $this->scanner = ClassResourceScanner::getDefaultScanner();
@@ -96,6 +97,7 @@ abstract class WinterApplicationRunner {
         $data->setBootConfig($this->bootConfig);
         $data->setResources($this->resources);
         $data->setPropertyContext($this->propertyCtx);
+        $data->setAttributesToScan($this->attributesToScan);
 
         return $data;
     }
@@ -138,15 +140,18 @@ abstract class WinterApplicationRunner {
         if (ApcCache::isEnabled()) {
             //ApcCache::delete($key);
             if (ApcCache::exists($key)
-                && !$this->propertyCtx->getBool('winter.namespaces.cacheDisabled',false)) {
+                && !$this->propertyCtx->getBool('winter.namespaces.cacheDisabled', false)) {
                 $this->resources = ApcCache::get($key);
+                $this->attributesToScan = ApcCache::get($key . '.attrs');
             }
         }
 
         if (!isset($this->resources)) {
+            $this->findAttributesToScan();
+
             $this->resources = $this->scanner->scan(
                 $this->nameSpacesToScan($this->scanNamespaces),
-                $this->attributesToScan(),
+                $this->attributesToScan,
                 $this->bootConfig->autoload,
                 $this->bootConfig->scanExcludeNamespaces
             );
@@ -158,6 +163,8 @@ abstract class WinterApplicationRunner {
                     Winter::NAMESPACE_CACHE_TTL
                 );
                 ApcCache::cache($key, $this->resources, $ttl > 0 ? $ttl : Winter::NAMESPACE_CACHE_TTL);
+                ApcCache::cache($key . '.attrs', $this->attributesToScan,
+                    $ttl > 0 ? $ttl : Winter::NAMESPACE_CACHE_TTL);
             }
         }
         //print_r($this->resources);
@@ -167,8 +174,8 @@ abstract class WinterApplicationRunner {
         return $ns;
     }
 
-    private function attributesToScan(): StringList {
-        $stereoTypes = $this->scanner->getDefaultStereoTypes();
+    private function findAttributesToScan(): void {
+        $this->attributesToScan = $this->scanner->getDefaultStereoTypes();
 
         if ($this->bootApp->getAttribute(EnableCaching::class) != null) {
             $cacheTypes = array_keys(
@@ -177,7 +184,7 @@ abstract class WinterApplicationRunner {
                     'dev\\winterframework\\cache\\stereotype'
                 )
             );
-            $stereoTypes->addAll($cacheTypes);
+            $this->attributesToScan->addAll($cacheTypes);
         }
 
         if ($this->bootApp->getAttribute(EnableTransactionManagement::class) != null) {
@@ -187,10 +194,8 @@ abstract class WinterApplicationRunner {
                     'dev\\winterframework\\txn\\stereotype'
                 )
             );
-            $stereoTypes->addAll($cacheTypes);
+            $this->attributesToScan->addAll($cacheTypes);
         }
-
-        return $stereoTypes;
     }
 
     private function buildApplicationLogger(array $configDirs, ?string $profile = null): void {

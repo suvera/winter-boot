@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace dev\winterframework\pdbc;
 
 use DateTimeInterface;
+use dev\winterframework\pdbc\core\BindVar;
+use dev\winterframework\pdbc\core\BindVars;
 use dev\winterframework\pdbc\types\Blob;
 use dev\winterframework\pdbc\types\Clob;
 
@@ -47,6 +49,12 @@ interface PreparedStatement {
 
     public function setClob(string|int $bind, Clob $value): void;
 
+    public function bindValue(string|int $bind, mixed $value): void;
+
+    public function bindVar(BindVar $bindVar): void;
+
+    public function bindVars(BindVars $bindVars): void;
+
     /**
      * Default methods
      */
@@ -71,7 +79,7 @@ interface PreparedStatement {
     public function setQueryTimeout(int $queryTimeout): void;
 
     public function setCursorName(string $cursor): void;
-    
+
     public function getResultSetType(): int;
 
     public function setFetchDirection(int $fetchDirection): void;

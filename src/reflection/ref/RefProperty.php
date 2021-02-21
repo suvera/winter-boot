@@ -6,6 +6,7 @@ namespace dev\winterframework\reflection\ref;
 
 
 use dev\winterframework\exception\WinterException;
+use ReflectionClass;
 use ReflectionException;
 use ReflectionNamedType;
 use ReflectionProperty;
@@ -13,22 +14,22 @@ use ReflectionUnionType;
 
 /**
  * @method string __toString()
- * @method mixed getName()
+ * @method string getName()
  * @method mixed getValue(object $object = null)
  * @method mixed setValue(mixed $objectOrValue, mixed $value = null)
- * @method mixed isInitialized(object $object = null)
- * @method mixed isPublic()
- * @method mixed isPrivate()
- * @method mixed isProtected()
- * @method mixed isStatic()
- * @method mixed isDefault()
+ * @method bool isInitialized(object $object = null)
+ * @method bool isPublic()
+ * @method bool isPrivate()
+ * @method bool isProtected()
+ * @method bool isStatic()
+ * @method bool isDefault()
  * @method bool isPromoted()
- * @method mixed getModifiers()
- * @method mixed getDeclaringClass()
- * @method mixed getDocComment()
- * @method mixed setAccessible(bool $accessible)
+ * @method int getModifiers()
+ * @method ReflectionClass getDeclaringClass()
+ * @method string getDocComment()
+ * @method void setAccessible(bool $accessible)
  * @method ReflectionUnionType|ReflectionNamedType getType()
- * @method mixed hasType()
+ * @method bool hasType()
  * @method bool hasDefaultValue()
  * @method mixed getDefaultValue()
  * @method array getAttributes(string $name = null, int $flags = 0)

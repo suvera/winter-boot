@@ -17,6 +17,8 @@ use dev\winterframework\core\web\ResponseRenderer;
 use dev\winterframework\exception\NoUniqueBeanDefinitionException;
 use dev\winterframework\pdbc\DataSource;
 use dev\winterframework\pdbc\datasource\DataSourceBuilder;
+use dev\winterframework\pdbc\PdbcTemplate;
+use dev\winterframework\pdbc\pdo\PdoTemplateProvider;
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\ClassResources;
 use dev\winterframework\reflection\ClassResourceScanner;
@@ -193,6 +195,12 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
                 false
             );
         }
+
+        if (!$this->hasBeanByClass(PdbcTemplate::class)
+            && !$this->hasBeanByClass(PdoTemplateProvider::class)) {
+            $this->addClass(PdoTemplateProvider::class);
+        }
+
     }
 
     private function eagerLoadBeans(): void {
@@ -215,6 +223,19 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
 
     private function processClassResource(ClassResource $resource): void {
         $this->beanProvider->addProviderClass($resource);
+    }
+
+    public function addClass(string $class): bool {
+        if ($this->hasBeanByClass($class)) {
+            return false;
+        }
+        $this->processClassResource(
+            $this->scanner->scanClass(
+                $class,
+                $this->contextData->getAttributesToScan()
+            )
+        );
+        return true;
     }
 
 }

@@ -5,27 +5,27 @@ namespace dev\winterframework\reflection;
 
 use dev\winterframework\exception\InvalidSyntaxException;
 use dev\winterframework\exception\WinterException;
+use dev\winterframework\reflection\ref\ReflectionRegistry;
 use dev\winterframework\stereotype\JsonProperty;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionNamedType;
-use ReflectionObject;
 use ReflectionUnionType;
 use Throwable;
 
 class ObjectCreator {
 
+    protected static function getClass(string|object $classOrObj): ReflectionClass {
+        $class = is_object($classOrObj) ? $classOrObj::class : $classOrObj;
+        return ReflectionRegistry::getClass($class);
+    }
+
     public static function createObject(string $class, string|array $props): object {
-        try {
-            $ref = new ReflectionClass($class);
-        } catch (ReflectionException $e) {
-            throw new WinterException('Could not find class ' . $class, 0, $e);
-        }
+        $ref = self::getClass($class);
 
         try {
             if (is_string($props)) {
-                $obj = $ref->newInstance($props);
-                return $obj;
+                return $ref->newInstance($props);
             } else {
                 $obj = $ref->newInstance();
             }
@@ -37,7 +37,7 @@ class ObjectCreator {
 
     public static function mapObject(object $obj, string|array $props, ReflectionClass $ref = null): object {
         if (!$ref) {
-            $ref = new ReflectionObject($obj);
+            $ref = self::getClass($obj);
         }
         foreach ($ref->getProperties() as $refProp) {
             $attrs = $refProp->getAttributes(JsonProperty::class);
@@ -47,7 +47,17 @@ class ObjectCreator {
                 /** @var JsonProperty $attr */
                 try {
                     $attr = $attrs[0]->newInstance();
-                    $extName = $attr->name;
+                    if (is_array($attr->name)) {
+                        foreach ($attr->name as $alias) {
+                            $extName = $alias;
+                            if (isset($props[$alias])) {
+                                break;
+                            }
+                        }
+                    } else {
+                        $extName = $attr->name;
+                    }
+
                 } catch (Throwable $e) {
                     throw new InvalidSyntaxException('Invalid JsonProperty on property '
                         . $refProp->getName() . ', for class ' . $ref->getName(), 0, $e

@@ -8,6 +8,7 @@ use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\ClassResources;
 use dev\winterframework\reflection\ClassResourceScanner;
 use dev\winterframework\stereotype\WinterBootApplication;
+use dev\winterframework\type\StringList;
 
 final class ApplicationContextData {
     private BeanProviderContext $beanProvider;
@@ -16,6 +17,7 @@ final class ApplicationContextData {
     private WinterBootApplication $bootConfig;
     private ClassResource $bootApp;
     private ClassResourceScanner $scanner;
+    private StringList $attributesToScan;
 
     private AopInterceptorRegistry $aopRegistry;
 
@@ -74,4 +76,14 @@ final class ApplicationContextData {
     public function setAopRegistry(AopInterceptorRegistry $aopRegistry): void {
         $this->aopRegistry = $aopRegistry;
     }
+
+    public function getAttributesToScan(): StringList {
+        return $this->attributesToScan;
+    }
+
+    public function setAttributesToScan(StringList $attributesToScan): void {
+        $this->attributesToScan = $attributesToScan;
+    }
+
+
 }

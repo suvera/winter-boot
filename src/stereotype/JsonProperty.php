@@ -10,12 +10,15 @@ use dev\winterframework\type\TypeAssert;
 #[Attribute(Attribute::TARGET_PROPERTY)]
 class JsonProperty implements StereoType {
     public function __construct(
-        public string $name = ''
+        public array|string $name = ''
     ) {
     }
 
     public function init(object $ref): void {
         /** @var RefProperty $ref */
         TypeAssert::typeOf($ref, RefProperty::class);
+        if (empty($this->name)) {
+            $this->name = $ref->getName();
+        }
     }
 }

@@ -25,7 +25,7 @@ class ReflectionUtil {
     public static function getFqmn(ReflectionMethod $method): string {
         $name = $method->getDeclaringClass()->getName();
         $methodName = $method->getName();
-        return "$name\::$methodName()";
+        return "$name::$methodName()";
     }
 
     /**

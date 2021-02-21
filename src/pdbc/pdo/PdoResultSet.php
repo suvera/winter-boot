@@ -197,8 +197,8 @@ class PdoResultSet extends AbstractResultSet {
         throw new SQLException('columnLabel is invalid "' . $column . '"');
     }
 
-    public function getRow(): int {
-        throw new SQLFeatureNotSupportedException('PDO driver does not support this method ' . __METHOD__);
+    public function getRow(): ?array {
+        return $this->row ? $this->row : null;
     }
 
     public function getObject(int|string $column, string $class): ?object {

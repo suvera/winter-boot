@@ -32,6 +32,8 @@ interface ApplicationContext {
 
     public function getPropertyFloat(string $name, float $default = null): float;
 
+    public function addClass(string $class): bool;
+
     public function getProperties(): array;
 
 }

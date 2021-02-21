@@ -23,6 +23,10 @@ abstract class ArrayList implements Countable, ArrayAccess, IteratorAggregate {
         return count($this->values);
     }
 
+    public function clear(): void {
+        $this->values = [];
+    }
+
     public function offsetExists($offset): bool {
         return array_key_exists($offset, $this->values);
     }
@@ -67,7 +71,7 @@ abstract class ArrayList implements Countable, ArrayAccess, IteratorAggregate {
 
     public static function ofArray(array $values): static {
         $obj = new static();
-        
+
         foreach ($values as $value) {
             $obj[] = $value;
         }

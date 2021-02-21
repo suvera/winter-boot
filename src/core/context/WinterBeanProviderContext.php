@@ -481,12 +481,12 @@ final class WinterBeanProviderContext implements BeanProviderContext {
                 if (!empty($qualifiers)) {
                     /** @var Qualifier $attr */
                     $attr = $qualifiers[0]->newInstance();
-                    $bean = $this->beanByName($attr->name);
+                    $beanArg = $this->beanByName($attr->name);
                 } else {
-                    $bean = $this->beanByClass($type->getName());
+                    $beanArg = $this->beanByClass($type->getName());
                 }
 
-                $args[$parameter->getName()] = $bean;
+                $args[$parameter->getName()] = $beanArg;
             }
         }
 

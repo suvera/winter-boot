@@ -3,7 +3,8 @@ declare(strict_types=1);
 
 namespace dev\winterframework\pdbc\pdo;
 
-use DateTimeInterface;
+use dev\winterframework\pdbc\core\BindType;
+use dev\winterframework\pdbc\core\BindVar;
 use dev\winterframework\pdbc\ResultSet;
 use dev\winterframework\pdbc\support\AbstractPreparedStatement;
 use dev\winterframework\pdbc\types\Blob;
@@ -15,9 +16,6 @@ class PdoPreparedStatement extends AbstractPreparedStatement {
     protected PDOStatement $stmt;
     protected ?PdoResultSet $resultSet = null;
     protected array $generatedKeys = [];
-    protected array $parameters = [];
-    protected array $outParameters = [];
-    protected array $outValues = [];
 
     public function __construct(
         protected PdoConnection $connection,
@@ -50,12 +48,6 @@ class PdoPreparedStatement extends AbstractPreparedStatement {
 
     public function isClosed(): bool {
         return !isset($this->stmt);
-    }
-
-    public function clearParameters(): void {
-        $this->parameters = [];
-        $this->outParameters = [];
-        $this->outValues = [];
     }
 
     public function executeQuery(): ResultSet {
@@ -98,65 +90,56 @@ class PdoPreparedStatement extends AbstractPreparedStatement {
     }
 
     protected function bindInParameters(): void {
-        foreach ($this->parameters as $type => $binds) {
-            switch ($type) {
-                case 'bool':
-                    foreach ($binds as $bindKey => $bindVal) {
-                        if (is_null($bindVal)) {
-                            $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_NULL);
-                        } else {
-                            $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_BOOL);
-                        }
-                    }
-                    break;
+        foreach ($this->parameters as $bindKey => $bindVar) {
+            /** @var BindVar $bindVar */
+            $bindVal = $bindVar->getValue();
 
-                case 'null':
-                    foreach ($binds as $bindKey => $bindVal) {
+            switch ($bindVar->getType()) {
+                case BindType::BOOL:
+                    if (is_null($bindVal)) {
                         $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_NULL);
+                    } else {
+                        $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_BOOL);
                     }
                     break;
 
-                case 'int':
-                case 'float':
-                    foreach ($binds as $bindKey => $bindVal) {
-                        if (is_null($bindVal)) {
-                            $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_NULL);
-                        } else {
-                            $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_INT);
-                        }
+                case BindType::NULL:
+                    $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_NULL);
+                    break;
+
+                case BindType::INTEGER:
+                case BindType::FLOAT:
+                    if (is_null($bindVal)) {
+                        $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_NULL);
+                    } else {
+                        $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_INT);
                     }
                     break;
 
-                case 'blob':
-                    foreach ($binds as $bindKey => $bindVal) {
-                        /** @var Blob $bindVal */
-                        $stream = $bindVal->getStreamResource();
-                        $this->stmt->bindParam($bindKey, $stream, PDO::PARAM_LOB);
-                    }
+                case BindType::BLOB:
+                    /** @var Blob $bindVal */
+                    $stream = $bindVal->getStreamResource();
+                    $this->stmt->bindParam($bindKey, $stream, PDO::PARAM_LOB);
                     break;
 
-                case 'clob':
+                case BindType::CLOB:
 
                     $driver = $this->connection->getDriverType();
-                    foreach ($binds as $bindKey => $bindVal) {
-                        /** @var Clob $bindVal */
-                        if ($driver == 'oci') {
-                            $contents = $bindVal->getString();
-                            $this->stmt->bindParam($bindKey, $contents, PDO::PARAM_STR, strlen($contents));
-                        } else {
-                            $contents = $bindVal->getStreamResource();
-                            $this->stmt->bindParam($bindKey, $contents, PDO::PARAM_LOB);
-                        }
+                    /** @var Clob $bindVal */
+                    if ($driver == 'oci') {
+                        $contents = $bindVal->getString();
+                        $this->stmt->bindParam($bindKey, $contents, PDO::PARAM_STR, strlen($contents));
+                    } else {
+                        $contents = $bindVal->getStreamResource();
+                        $this->stmt->bindParam($bindKey, $contents, PDO::PARAM_LOB);
                     }
                     break;
 
                 default:
-                    foreach ($binds as $bindKey => $bindVal) {
-                        if (is_null($bindVal)) {
-                            $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_NULL);
-                        } else {
-                            $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_STR, strlen($bindVal));
-                        }
+                    if (is_null($bindVal)) {
+                        $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_NULL);
+                    } else {
+                        $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_STR, strlen($bindVal));
                     }
                     break;
             }
@@ -199,76 +182,6 @@ class PdoPreparedStatement extends AbstractPreparedStatement {
 
     public function getGeneratedKeys(): array {
         return $this->generatedKeys;
-    }
-
-    /**
-     * -----------------------------------
-     * Setters for Parameters
-     *
-     * @param int|string $bind
-     * @param bool $value
-     */
-    public function setBoolean(int|string $bind, bool $value): void {
-        if (!isset($this->parameters['bool'])) {
-            $this->parameters['bool'] = [];
-        }
-        $this->parameters['bool'][$bind] = $value;
-    }
-
-    public function setInt(int|string $bind, int $value): void {
-        if (!isset($this->parameters['int'])) {
-            $this->parameters['int'] = [];
-        }
-        $this->parameters['int'][$bind] = $value;
-    }
-
-    public function setFloat(int|string $bind, float $value): void {
-        if (!isset($this->parameters['float'])) {
-            $this->parameters['float'] = [];
-        }
-        $this->parameters['float'][$bind] = $value;
-    }
-
-    public function setNull(int|string $bind, int $sqlType = null): void {
-        if (!isset($this->parameters['null'])) {
-            $this->parameters['null'] = [];
-        }
-        $this->parameters['null'][$bind] = null;
-    }
-
-    public function setString(int|string $bind, string $value): void {
-        if (!isset($this->parameters['string'])) {
-            $this->parameters['string'] = [];
-        }
-        $this->parameters['string'][$bind] = $value;
-    }
-
-    public function setDate(int|string $bind, DateTimeInterface|int|string $value): void {
-        if (!isset($this->parameters['date'])) {
-            $this->parameters['date'] = [];
-        }
-        if ($value instanceof DateTimeInterface) {
-            $date = $value->format('Y-m-d H:i:s');
-        } else if (is_numeric($value)) {
-            $date = gmdate('Y-m-d H:i:s', $value);
-        } else {
-            $date = $value;
-        }
-        $this->parameters['date'][$bind] = $date;
-    }
-
-    public function setBlob(int|string $bind, Blob $value): void {
-        if (!isset($this->parameters['blob'])) {
-            $this->parameters['blob'] = [];
-        }
-        $this->parameters['blob'][$bind] = $value;
-    }
-
-    public function setClob(int|string $bind, Clob $value): void {
-        if (!isset($this->parameters['clob'])) {
-            $this->parameters['clob'] = [];
-        }
-        $this->parameters['clob'][$bind] = $value;
     }
 
 }
