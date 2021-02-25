@@ -13,9 +13,9 @@ interface AopInterceptor {
 
     public function getMethod(): MethodResource;
 
-    public function aspectBegin(object $obj, array $args): void;
+    public function aspectBegin(AopExecutionContext $exCtx): void;
 
-    public function aspectFailed(object $obj, array $args, Throwable $e): void;
+    public function aspectFailed(AopExecutionContext $exCtx, Throwable $e): void;
 
-    public function aspectCommit(object $obj, array $args, mixed $result): void;
+    public function aspectCommit(AopExecutionContext $exCtx, mixed $result): void;
 }

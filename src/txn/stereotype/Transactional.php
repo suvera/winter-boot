@@ -5,26 +5,28 @@ namespace dev\winterframework\txn\stereotype;
 
 use Attribute;
 use dev\winterframework\reflection\ref\RefMethod;
-use dev\winterframework\reflection\ReflectionUtil;
+use dev\winterframework\reflection\support\StereoTypeValidations;
 use dev\winterframework\stereotype\aop\AopStereoType;
 use dev\winterframework\stereotype\aop\WinterAspect;
 use dev\winterframework\txn\aop\TransactionalAspect;
 use dev\winterframework\txn\support\DefaultTransactionDefinition;
+use dev\winterframework\txn\Transaction;
 use dev\winterframework\txn\TransactionDefinition;
 use dev\winterframework\type\TypeAssert;
-use TypeError;
 
 #[Attribute(Attribute::TARGET_METHOD)]
 class Transactional implements AopStereoType {
+    use StereoTypeValidations;
+
     private TransactionalAspect $aspect;
     private TransactionDefinition $txnDef;
     private string $name;
 
     public function __construct(
         public string $transactionManager = 'default',
-        public int $propagation = 0,
-        public int $isolation = -1,
-        public int $timeout = -1,
+        public int $propagation = Transaction::PROPAGATION_REQUIRED,
+        public int $isolation = Transaction::ISOLATION_DEFAULT,
+        public int $timeout = Transaction::TIMEOUT_DEFAULT,
         public bool $readOnly = false,
         public array $rollbackFor = [],
         public array $noRollbackFor = [],
@@ -47,10 +49,7 @@ class Transactional implements AopStereoType {
         /** @var RefMethod $ref */
         TypeAssert::typeOf($ref, RefMethod::class);
 
-        if ($ref->isConstructor() || $ref->isDestructor()) {
-            throw new TypeError("#[Transactional] Annotation is not allowed on Constructor/Destructor "
-                . ReflectionUtil::getFqName($ref));
-        }
+        $this->validateAopMethod($ref, 'Transactional');
 
         $this->name = $ref->getName();
     }

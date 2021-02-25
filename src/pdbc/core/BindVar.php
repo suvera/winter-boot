@@ -7,7 +7,7 @@ class BindVar {
 
     public function __construct(
         private string|int $name,
-        private mixed $value,
+        public mixed $value,
         protected int $type = BindType::STRING
     ) {
     }

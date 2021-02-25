@@ -15,6 +15,7 @@ use dev\winterframework\stereotype\StereoType;
 use dev\winterframework\stereotype\StereoTyped;
 use dev\winterframework\type\AttributeList;
 use dev\winterframework\type\StringList;
+use dev\winterframework\type\StringSet;
 use dev\winterframework\util\log\Wlf4p;
 use ReflectionAttribute;
 use ReflectionMethod;
@@ -302,9 +303,9 @@ class ClassResourceScanner {
         return $obj;
     }
 
-    public function getDefaultStereoTypes(): StringList {
+    public function getDefaultStereoTypes(): StringSet {
         if (!isset(self::$defaultStereoTypes)) {
-            self::$defaultStereoTypes = StringList::ofArray(
+            self::$defaultStereoTypes = StringSet::ofArray(
                 array_keys(
                     DirectoryScanner::scanForPhpClasses(
                         dirname(__DIR__) . '/stereotype',

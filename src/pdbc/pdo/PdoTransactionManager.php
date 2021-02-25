@@ -10,41 +10,31 @@ use dev\winterframework\type\TypeAssert;
 
 class PdoTransactionManager extends DataSourceTransactionManager {
 
-    public function __construct(
-        protected PdoDataSource $dataSource
-    ) {
-        parent::__construct($dataSource);
-    }
-
-    public function getDataSource(): PdoDataSource {
-        return $this->dataSource;
-    }
-
-    public function commit(TransactionStatus $status): void {
+    protected function doCommit(TransactionStatus $status): void {
         /** @var PdoTransactionStatus $status */
         TypeAssert::typeOf($status, PdoTransactionStatus::class);
-        $status->getTransaction()->getConnection()->commit();
+        $status->getTransaction()->commit();
     }
 
-    public function getTransaction(TransactionDefinition $definition): PdoTransactionStatus {
+    protected function doGetTransaction(TransactionDefinition $definition): PdoTransactionStatus {
         $conn = $this->getDataSource()->getConnection();
-        $conn->beginTransaction();
 
+        /** @var PdoConnection $conn */
         $txn = new PdoTransactionObject($conn);
+        $txn->setReadOnly($definition->isReadOnly());
 
         /** @noinspection PhpUnnecessaryLocalVariableInspection */
         $status = new PdoTransactionStatus(
-            $txn
+            $txn,
+            true,
+            $definition->isReadOnly()
         );
 
         return $status;
     }
 
-    public function rollback(TransactionStatus $status): void {
-        /** @var PdoTransactionStatus $status */
-        TypeAssert::typeOf($status, PdoTransactionStatus::class);
-
-        $status->getTransaction()->getConnection()->rollback();
+    protected function doRollback(TransactionStatus $status): void {
+        $status->getTransaction()->rollback();
     }
 
 }

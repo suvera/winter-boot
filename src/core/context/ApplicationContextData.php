@@ -8,7 +8,7 @@ use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\ClassResources;
 use dev\winterframework\reflection\ClassResourceScanner;
 use dev\winterframework\stereotype\WinterBootApplication;
-use dev\winterframework\type\StringList;
+use dev\winterframework\type\StringSet;
 
 final class ApplicationContextData {
     private BeanProviderContext $beanProvider;
@@ -17,7 +17,8 @@ final class ApplicationContextData {
     private WinterBootApplication $bootConfig;
     private ClassResource $bootApp;
     private ClassResourceScanner $scanner;
-    private StringList $attributesToScan;
+    private StringSet $attributesToScan;
+    private ShutDownRegistry $shutDownRegistry;
 
     private AopInterceptorRegistry $aopRegistry;
 
@@ -77,12 +78,20 @@ final class ApplicationContextData {
         $this->aopRegistry = $aopRegistry;
     }
 
-    public function getAttributesToScan(): StringList {
+    public function getAttributesToScan(): StringSet {
         return $this->attributesToScan;
     }
 
-    public function setAttributesToScan(StringList $attributesToScan): void {
+    public function setAttributesToScan(StringSet $attributesToScan): void {
         $this->attributesToScan = $attributesToScan;
+    }
+
+    public function getShutDownRegistry(): ShutDownRegistry {
+        return $this->shutDownRegistry;
+    }
+
+    public function setShutDownRegistry(ShutDownRegistry $shutDownRegistry): void {
+        $this->shutDownRegistry = $shutDownRegistry;
     }
 
 

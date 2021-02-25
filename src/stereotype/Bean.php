@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace dev\winterframework\stereotype;
 
 use Attribute;
+use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\type\TypeAssert;
@@ -66,6 +67,19 @@ class Bean implements StereoType {
                 . ReflectionUtil::getFqName($ref));
         }
 
+        $retClass = $retType->getName();
+        if ($this->initMethod || $this->destroyMethod) {
+            $retRefClass = RefKlass::getInstance($retClass);
+
+            if ($this->initMethod) {
+                $this->checkMethodExists($retRefClass, $this->initMethod, 'initMethod');
+            }
+            if ($this->destroyMethod) {
+                $this->checkMethodExists($retRefClass, $this->destroyMethod, 'destroyMethod');
+            }
+        }
+
+
         $attributes = $ref->getAttributes();
         if (!empty($attributes)) {
             foreach ($attributes as $attribute) {
@@ -81,6 +95,27 @@ class Bean implements StereoType {
         }
 
         $this->refOwner = $ref;
-        $this->returnType = $retType->getName();
+        $this->returnType = $retClass;
+    }
+
+    private function checkMethodExists(RefKlass $ref, string $methodName, string $type): void {
+        if (!$ref->hasMethod($methodName)) {
+            throw new TypeError("Method Annotated with #[Bean] does not have "
+                . "'$type' method '$methodName' defined in return class "
+                . ReflectionUtil::getFqName($ref));
+        }
+
+        $method = $ref->getMethod($methodName);
+        if (!$method->isPublic()) {
+            throw new TypeError("Method Annotated with #[Bean]  "
+                . "'$type' method '$methodName' is not defined as 'public' in return class "
+                . ReflectionUtil::getFqName($ref));
+        }
+
+        if ($method->getNumberOfRequiredParameters() > 0) {
+            throw new TypeError("Method Annotated with #[Bean]  "
+                . "'$type' method '$methodName' must not contain required arguments "
+                . ReflectionUtil::getFqName($ref));
+        }
     }
 }

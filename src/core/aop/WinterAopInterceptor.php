@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 namespace dev\winterframework\core\aop;
 
+use dev\winterframework\core\aop\ex\AopStopExecution;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\reflection\ClassResource;
@@ -71,22 +72,48 @@ class WinterAopInterceptor implements AopInterceptor {
         return $this->method;
     }
 
-    public function aspectBegin(object $obj, array $args): void {
+    public function aspectBegin(AopExecutionContext $exCtx): void {
+        $skipAll = false;
         foreach ($this->aopContexts as $idx => $aopCtx) {
+            if ($skipAll) {
+                $exCtx->addSkippedAspect($idx);
+                continue;
+            }
+            $hasException = false;
+
             try {
-                $this->aspects[$idx]->begin($aopCtx, $obj, $args);
+                $this->aspects[$idx]->begin($aopCtx, $exCtx);
             } catch (Throwable $e) {
-                $this->aspectBeginFailed($idx, $obj, $args, $e);
+                $exCtx->setBeginFailed();
+                $exCtx->setException($e);
+
+                $hasException = true;
+                $this->aspectBeginFailed($idx, $exCtx, $e);
                 throw $e;
+            }
+
+            if ($exCtx->isStopExecution()) {
+                if (!$hasException) {
+                    $this->aspectBeginFailed($idx, $exCtx, new AopStopExecution('execution stopped explicitly'));
+                }
+                break;
+            } else if ($exCtx->isSkipExecutionMe()) {
+
+                $exCtx->addSkippedAspect($idx);
+                $exCtx->setExecutionOk();
+
+            } else if ($exCtx->isSkipExecutionOthers()) {
+                $skipAll = true;
+                $exCtx->setExecutionOk();
             }
         }
         $this->curState = self::BEGIN;
     }
 
-    private function aspectBeginFailed(int $idx, object $obj, array $args, Throwable $e): void {
+    private function aspectBeginFailed(int $idx, AopExecutionContext $exCtx, Throwable $e): void {
         for ($i = $idx; $i >= 0; $i--) {
             try {
-                $this->aspects[$idx]->beginFailed($this->aopContexts[$i], $obj, $args, $e);
+                $this->aspects[$idx]->beginFailed($this->aopContexts[$i], $exCtx, $e);
             } catch (Throwable $e) {
                 self::logException($e, 'Aspect beginFailed handler call failed, for Type "'
                     . get_class($this->aopContexts[$idx]->getStereoType()) . '" on Method '
@@ -98,10 +125,15 @@ class WinterAopInterceptor implements AopInterceptor {
         $this->curState = self::BEGIN_FAILED;
     }
 
-    public function aspectFailed(object $obj, array $args, Throwable $e): void {
+    public function aspectFailed(AopExecutionContext $exCtx, Throwable $e): void {
         foreach ($this->aopContexts as $idx => $aopCtx) {
+
+            if ($exCtx->isSkippedAspect($idx)) {
+                continue;
+            }
+
             try {
-                $this->aspects[$idx]->failed($aopCtx, $obj, $args, $e);
+                $this->aspects[$idx]->failed($aopCtx, $exCtx, $e);
             } catch (Throwable $e) {
                 self::logException($e, 'Aspect fail handler call failed, for Type "'
                     . get_class($aopCtx->getStereoType()) . '" on Method '
@@ -112,16 +144,22 @@ class WinterAopInterceptor implements AopInterceptor {
         $this->curState = self::FAILED;
     }
 
-    public function aspectCommit(object $obj, array $args, mixed $result): void {
+    public function aspectCommit(AopExecutionContext $exCtx, mixed $result): void {
         foreach ($this->aspects as $i => $aspect) {
 
+            if ($exCtx->isSkippedAspect($i)) {
+                continue;
+            }
+
             try {
-                $aspect->commit($this->aopContexts[$i], $obj, $args, $result);
+                $aspect->commit($this->aopContexts[$i], $exCtx, $result);
             } catch (Throwable $e) {
+                $exCtx->setCommitFailed();
+                $exCtx->setException($e);
+
                 $this->aspectCommitFailed(
                     $i,
-                    $obj,
-                    $args,
+                    $exCtx,
                     $result,
                     $e
                 );
@@ -132,12 +170,11 @@ class WinterAopInterceptor implements AopInterceptor {
 
     private function aspectCommitFailed(
         int $idx,
-        object $obj,
-        array $args,
+        AopExecutionContext $exCtx,
         mixed $result,
         Throwable $e
     ): void {
-        $this->aspects[$idx]->commitFailed($this->aopContexts[$idx], $obj, $args, $result, $e);
+        $this->aspects[$idx]->commitFailed($this->aopContexts[$idx], $exCtx, $result, $e);
     }
 
 }

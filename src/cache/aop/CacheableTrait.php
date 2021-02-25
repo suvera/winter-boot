@@ -12,6 +12,7 @@ use dev\winterframework\cache\KeyGenerator;
 use dev\winterframework\cache\stereotype\Cacheable;
 use dev\winterframework\cache\stereotype\CacheEvict;
 use dev\winterframework\cache\stereotype\CachePut;
+use dev\winterframework\core\aop\AopExecutionContext;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\stereotype\aop\AopContext;
@@ -24,11 +25,11 @@ trait CacheableTrait {
     /**
      * @param AopContext $ctx
      * @param string $op
-     * @param object $target
+     * @param AopExecutionContext $exCtx
      * @return Cache[]
      */
-    protected function getCaches(AopContext $ctx, string $op, object $target): array {
-        $caches = $ctx->getCtxData($target, $op);
+    protected function getCaches(AopContext $ctx, string $op, AopExecutionContext $exCtx): array {
+        $caches = $exCtx->getVariable($op);
         if (!empty($caches)) {
             return $caches;
         }
@@ -42,7 +43,7 @@ trait CacheableTrait {
             $cacheNames = $stereo->getCacheNames();
         } else {
             $cacheResolver = $this->getCacheResolver($stereo, $appCtx);
-            $cacheNames = $cacheResolver->getCacheNames($ctx, $target);
+            $cacheNames = $cacheResolver->getCacheNames($ctx, $exCtx->getObject());
             $cacheManager = $cacheResolver->getCacheManager();
         }
 
@@ -62,7 +63,7 @@ trait CacheableTrait {
             $caches[] = $cache;
         }
 
-        $ctx->setCtxData($target, $op, $caches);
+        $exCtx->setVariable($op, $caches);
         return $caches;
     }
 
@@ -90,15 +91,19 @@ trait CacheableTrait {
 
     protected function generateKey(
         AopContext $ctx,
-        object $target,
-        array $args
+        AopExecutionContext $exCtx
     ): string {
         /** @var Cacheable|CacheEvict|CachePut $stereo */
         $stereo = $ctx->getStereoType();
         $appCtx = $ctx->getApplicationContext();
 
         if (!empty($stereo->key)) {
-            self::buildNameByContext($stereo->getNameObject(), $ctx, $target, $args);
+            return self::buildNameByContext(
+                $stereo->getNameObject(),
+                $ctx,
+                $exCtx->getObject(),
+                $exCtx->getArguments()
+            );
         }
 
         /** @var KeyGenerator $keyGenerator */
@@ -106,6 +111,6 @@ trait CacheableTrait {
             : $appCtx->beanByName($stereo->keyGenerator);
         TypeAssert::typeOf($keyGenerator, KeyGenerator::class);
 
-        return $keyGenerator->generate($ctx, $target, $args);
+        return $keyGenerator->generate($ctx, $exCtx->getObject(), $exCtx->getArguments());
     }
 }

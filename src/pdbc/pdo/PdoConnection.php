@@ -181,4 +181,8 @@ class PdoConnection extends AbstractConnection {
         throw new SQLException('Driver does not support this function ' . __METHOD__);
     }
 
+    public function isSavepointAllowed(): bool {
+        return false;
+    }
+
 }

@@ -209,4 +209,14 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
         }
     }
 
+    public function getAll(): array {
+        $arr = [];
+        foreach (self::$byUriMethod as $normalized => $methods) {
+            $arr[$normalized] = array_keys($methods);
+        }
+
+        return $arr;
+    }
+
+
 }

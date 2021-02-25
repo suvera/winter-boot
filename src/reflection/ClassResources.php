@@ -21,6 +21,11 @@ class ClassResources extends ArrayList {
     protected function __construct() {
     }
 
+    public function clear(): void {
+        parent::clear();
+        $this->byAttributes = [];
+    }
+
     public function offsetGet($offset): ?ClassResource {
         return parent::offsetGet($offset);
     }
@@ -28,13 +33,16 @@ class ClassResources extends ArrayList {
     public function offsetSet($offset, $value): void {
         /** @var ClassResource $value */
         TypeAssert::typeOf($value, ClassResource::class);
+
+        $offset = $value->getClass()->getName();
+
         parent::offsetSet($offset, $value);
         foreach ($value->getAttributes() as $attribute) {
             $attrType = $attribute::class;
             if (!isset($this->byAttributes[$attrType])) {
                 $this->byAttributes[$attrType] = [];
             }
-            $this->byAttributes[$attrType][] = $attribute;
+            $this->byAttributes[$attrType][] = $value;
         }
     }
 

@@ -7,6 +7,7 @@ namespace dev\winterframework\core\app;
 use dev\winterframework\core\apc\ApcCache;
 use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\core\context\PropertyContext;
+use dev\winterframework\core\context\ShutDownRegistry;
 use dev\winterframework\core\context\WinterApplicationContext;
 use dev\winterframework\core\context\WinterPropertyContext;
 use dev\winterframework\enums\Winter;
@@ -23,6 +24,7 @@ use dev\winterframework\stereotype\cache\EnableCaching;
 use dev\winterframework\stereotype\txn\EnableTransactionManagement;
 use dev\winterframework\stereotype\WinterBootApplication;
 use dev\winterframework\type\StringList;
+use dev\winterframework\type\StringSet;
 use dev\winterframework\type\TypeAssert;
 use dev\winterframework\util\log\LoggerManager;
 use dev\winterframework\util\PropertyLoader;
@@ -37,7 +39,7 @@ abstract class WinterApplicationRunner {
     protected ClassResources $resources;
     protected Psr4Namespaces $scanNamespaces;
     protected PropertyContext $propertyCtx;
-    protected StringList $attributesToScan;
+    protected StringSet $attributesToScan;
 
     public function __construct() {
         $this->scanner = ClassResourceScanner::getDefaultScanner();
@@ -70,7 +72,11 @@ abstract class WinterApplicationRunner {
     protected function buildBootApp(string $appClass): ClassResource {
         $resource = $this->scanner->scanClass(
             $appClass,
-            StringList::ofValues(WinterBootApplication::class)
+            StringList::ofValues(
+                WinterBootApplication::class,
+                EnableCaching::class,
+                EnableTransactionManagement::class
+            )
         );
 
         if ($resource == null) {
@@ -81,7 +87,9 @@ abstract class WinterApplicationRunner {
     }
 
     protected function startBootApp(): void {
-        $this->applicationContext->beanByClass($this->bootApp->getClass()->getName());
+        $appClass = $this->bootApp->getClass()->getName();
+        $this->applicationContext->addClass($appClass);
+        $this->applicationContext->beanByClass($appClass);
         $this->runBootApp();
     }
 
@@ -98,6 +106,7 @@ abstract class WinterApplicationRunner {
         $data->setResources($this->resources);
         $data->setPropertyContext($this->propertyCtx);
         $data->setAttributesToScan($this->attributesToScan);
+        $data->setShutDownRegistry(new ShutDownRegistry());
 
         return $data;
     }
@@ -192,6 +201,17 @@ abstract class WinterApplicationRunner {
                 DirectoryScanner::scanForPhpClasses(
                     dirname(dirname(__DIR__)) . '/txn/stereotype',
                     'dev\\winterframework\\txn\\stereotype'
+                )
+            );
+            $this->attributesToScan->addAll($cacheTypes);
+        }
+
+        $propCtx = $this->propertyCtx;
+        if ($propCtx->getBool('management.endpoints.enabled', false)) {
+            $cacheTypes = array_keys(
+                DirectoryScanner::scanForPhpClasses(
+                    dirname(dirname(__DIR__)) . '/actuator/stereotype',
+                    'dev\\winterframework\\actuator\\stereotype'
                 )
             );
             $this->attributesToScan->addAll($cacheTypes);

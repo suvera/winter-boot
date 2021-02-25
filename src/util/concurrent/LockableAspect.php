@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace dev\winterframework\util\concurrent;
 
+use dev\winterframework\core\aop\AopExecutionContext;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\stereotype\aop\AopContext;
 use dev\winterframework\stereotype\aop\AopContextExecute;
@@ -16,71 +17,72 @@ class LockableAspect implements WinterAspect {
     use Wlf4p;
     use AopContextExecute;
 
-    public function begin(AopContext $ctx, object $target, array $args): void {
+    public function begin(AopContext $ctx, AopExecutionContext $exCtx): void {
         /** @var Lockable $stereo */
         $stereo = $ctx->getStereoType();
         $appCtx = $ctx->getApplicationContext();
 
         $lockManager = $this->getLockManger($stereo, $appCtx);
 
-        $name = self::buildNameByContext($stereo->getNameObject(), $ctx, $target, $args);
-        self::logInfo('Lock name "' . $stereo->name . '", after parsed "' .  $name .'"');
+        $name = self::buildNameByContext(
+            $stereo->getNameObject(),
+            $ctx,
+            $exCtx->getObject(),
+            $exCtx->getArguments()
+        );
+        self::logInfo('Lock name "' . $stereo->name . '", after parsed "' . $name . '"');
 
         $lock = $lockManager->provideLock($name, $stereo->ttlSeconds);
         if (!$lock->tryLock()) {
             throw new LockException('Lock cannot be acquired ');
         }
-        $ctx->setCtxData($target, $stereo::class, $lock);
+        $exCtx->setVariable($stereo::class, $lock);
     }
 
     private function getLockManger(
         Lockable $stereo,
         ApplicationContext $appCtx
     ): LockManager {
-        $cacheManager = empty($stereo->cacheManager) ? $appCtx->beanByClass(LockManager::class)
-            : $appCtx->beanByName($stereo->cacheManager);
-        TypeAssert::typeOf($cacheManager, LockManager::class);
+        $lockManager = empty($stereo->lockManager) ? $appCtx->beanByClass(LockManager::class)
+            : $appCtx->beanByName($stereo->lockManager);
 
-        return $cacheManager;
+        TypeAssert::typeOf($lockManager, LockManager::class);
+
+        return $lockManager;
     }
 
     public function beginFailed(
         AopContext $ctx,
-        object $target,
-        array $args,
+        AopExecutionContext $exCtx,
         Throwable $ex
     ): void {
         /** @var Lockable $stereo */
         $stereo = $ctx->getStereoType();
         self::logException($ex);
 
-        $lock = $ctx->getCtxData($target, $stereo::class);
+        $lock = $exCtx->getVariable($stereo::class);
         if (!empty($lock)) {
             $lock->unlock();
         }
-        $ctx->clearCtxData($target, $stereo::class);
     }
 
     public function commit(
         AopContext $ctx,
-        object $target,
-        array $args,
+        AopExecutionContext $exCtx,
         mixed $result
     ): void {
         /** @var Lockable $stereo */
         $stereo = $ctx->getStereoType();
 
-        $lock = $ctx->getCtxData($target, $stereo::class);
+        $lock = $exCtx->getVariable($stereo::class);
         if (!empty($lock)) {
             $lock->unlock();
         }
-        $ctx->clearCtxData($target, $stereo::class);
     }
 
     public function commitFailed(
         AopContext $ctx,
-        object $target,
-        array $args,
+        AopExecutionContext $exCtx,
         mixed $result,
         Throwable $ex
     ): void {
@@ -88,27 +90,24 @@ class LockableAspect implements WinterAspect {
         $stereo = $ctx->getStereoType();
         self::logException($ex);
 
-        $lock = $ctx->getCtxData($target, $stereo::class);
+        $lock = $exCtx->getVariable($stereo::class);
         if (!empty($lock)) {
             $lock->unlock();
         }
-        $ctx->clearCtxData($target, $stereo::class);
     }
 
     public function failed(
         AopContext $ctx,
-        object $target,
-        array $args,
+        AopExecutionContext $exCtx,
         Throwable $ex
     ): void {
         /** @var Lockable $stereo */
         $stereo = $ctx->getStereoType();
         self::logException($ex);
 
-        $lock = $ctx->getCtxData($target, $stereo::class);
+        $lock = $exCtx->getVariable($stereo::class);
         if (isset($lock)) {
             $lock->unlock();
         }
-        $ctx->clearCtxData($target, $stereo::class);
     }
 }

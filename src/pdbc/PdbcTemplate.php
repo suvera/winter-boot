@@ -18,8 +18,8 @@ interface PdbcTemplate {
 
     public function execute(
         string $sql,
-        array|BindVars $bindVars,
-        PreparedStatementCallback $action
+        array|BindVars $bindVars = [],
+        PreparedStatementCallback $action = null
     ): mixed;
 
     public function query(

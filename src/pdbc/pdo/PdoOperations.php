@@ -22,12 +22,17 @@ abstract class PdoOperations {
 
     protected function doExecute(
         string $sql,
-        BindVars|array $bindVars,
-        PreparedStatementCallback $action
+        BindVars|array $bindVars = [],
+        PreparedStatementCallback $action = null
     ): mixed {
+
         $stmt = $this->dataSource->getConnection()->prepareStatement($sql);
         $this->applyBindVars($stmt, $bindVars);
-        $ret = $action->doInPreparedStatement($stmt);
+        if ($action) {
+            $ret = $action->doInPreparedStatement($stmt);
+        } else {
+            $ret = $stmt->execute();
+        }
         $stmt->close();
         return $ret;
     }

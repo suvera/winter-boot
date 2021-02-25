@@ -5,8 +5,9 @@ namespace dev\winterframework\type;
 
 use Countable;
 use IteratorAggregate;
+use JsonSerializable;
 
-interface ImmutableCollection extends Countable, IteratorAggregate {
+interface ImmutableCollection extends Countable, IteratorAggregate, JsonSerializable {
     public function toArray(): array;
 
     public function isEmpty(): bool;

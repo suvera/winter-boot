@@ -13,4 +13,6 @@ interface RequestMappingRegistry {
     public function find(string $path, string $method): ?MatchedRequestMapping;
 
     public function delete(string $path): void;
+
+    public function getAll(): array;
 }

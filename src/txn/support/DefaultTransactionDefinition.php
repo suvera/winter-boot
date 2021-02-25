@@ -3,16 +3,17 @@ declare(strict_types=1);
 
 namespace dev\winterframework\txn\support;
 
+use dev\winterframework\txn\Transaction;
 use dev\winterframework\txn\TransactionDefinition;
 
 class DefaultTransactionDefinition implements TransactionDefinition {
-    private int $timeout = -1;
+    private int $timeout = Transaction::TIMEOUT_DEFAULT;
     private bool $readOnly = false;
     private string $name;
 
     public function __construct(
-        private int $propagationBehavior = 0,
-        private int $isolationLevel = -1,
+        private int $propagationBehavior = Transaction::PROPAGATION_REQUIRED,
+        private int $isolationLevel = Transaction::ISOLATION_DEFAULT,
     ) {
     }
 

@@ -34,6 +34,9 @@ class RequestMapping implements StereoType {
 
     private RefKlass|RefMethod $refOwner;
 
+    private string $beanName = '';
+    private string $beanClass = '';
+
     /**
      * @var RequestParam[]
      */
@@ -170,6 +173,22 @@ class RequestMapping implements StereoType {
      */
     public function getRequestParams(): array {
         return $this->requestParams;
+    }
+
+    public function getBeanName(): string {
+        return $this->beanName;
+    }
+
+    public function setBeanName(string $beanName): void {
+        $this->beanName = $beanName;
+    }
+
+    public function getBeanClass(): string {
+        return $this->beanClass;
+    }
+
+    public function setBeanClass(string $beanClass): void {
+        $this->beanClass = $beanClass;
     }
 
     public function getRefOwner(): RefMethod|RefKlass {

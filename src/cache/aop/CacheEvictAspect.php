@@ -4,7 +4,8 @@ declare(strict_types=1);
 namespace dev\winterframework\cache\aop;
 
 use dev\winterframework\cache\stereotype\CacheEvict;
-use dev\winterframework\core\aop\AopResultsFound;
+use dev\winterframework\core\aop\AopExecutionContext;
+use dev\winterframework\core\aop\ex\AopStopExecution;
 use dev\winterframework\stereotype\aop\AopContext;
 use dev\winterframework\stereotype\aop\WinterAspect;
 use dev\winterframework\util\log\Wlf4p;
@@ -15,42 +16,40 @@ class CacheEvictAspect implements WinterAspect {
     use Wlf4p;
     use CacheableTrait;
 
-    public function begin(AopContext $ctx, object $target, array $args): void {
-        $this->getCaches($ctx, self::OPERATION, $target);
+    public function begin(AopContext $ctx, AopExecutionContext $exCtx): void {
+        $this->getCaches($ctx, self::OPERATION, $exCtx);
 
         /** @var CacheEvict $stereo */
         $stereo = $ctx->getStereoType();
         if (!$stereo->beforeInvocation) {
             return;
         }
-        $this->evictCaches($stereo, $ctx, $target, $args);
+        $this->evictCaches($stereo, $ctx, $exCtx);
     }
 
     public function beginFailed(
         AopContext $ctx,
-        object $target,
-        array $args,
+        AopExecutionContext $exCtx,
         Throwable $ex
     ): void {
-        if (!($ex instanceof AopResultsFound)) {
+        if (!($ex instanceof AopStopExecution)) {
             self::logException($ex);
         }
     }
 
-    public function commit(AopContext $ctx, object $target, array $args, mixed $result): void {
+    public function commit(AopContext $ctx, AopExecutionContext $exCtx, mixed $result): void {
         /** @var CacheEvict $stereo */
         $stereo = $ctx->getStereoType();
         if ($stereo->beforeInvocation) {
             return;
         }
 
-        $this->evictCaches($stereo, $ctx, $target, $args);
+        $this->evictCaches($stereo, $ctx, $exCtx);
     }
 
     public function commitFailed(
         AopContext $ctx,
-        object $target,
-        array $args,
+        AopExecutionContext $exCtx,
         mixed $result,
         Throwable $ex
     ): void {
@@ -59,15 +58,14 @@ class CacheEvictAspect implements WinterAspect {
 
     public function failed(
         AopContext $ctx,
-        object $target,
-        array $args,
+        AopExecutionContext $exCtx,
         Throwable $ex
     ): void {
         self::logException($ex);
     }
 
-    private function evictCaches(CacheEvict $stereo, AopContext $ctx, object $target, array $args): void {
-        $caches = $this->getCaches($ctx, self::OPERATION, $target);
+    private function evictCaches(CacheEvict $stereo, AopContext $ctx, AopExecutionContext $exCtx): void {
+        $caches = $this->getCaches($ctx, self::OPERATION, $exCtx);
 
         $key = null;
         foreach ($caches as $cache) {
@@ -75,7 +73,7 @@ class CacheEvictAspect implements WinterAspect {
                 $cache->clear();
             } else {
                 if ($key == null) {
-                    $key = $this->generateKey($ctx, $target, $args);
+                    $key = $this->generateKey($ctx, $exCtx);
                 }
                 $cache->evict($key);
             }

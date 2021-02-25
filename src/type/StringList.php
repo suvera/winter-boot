@@ -5,7 +5,7 @@ declare(strict_types=1);
 
 namespace dev\winterframework\type;
 
-final class StringList extends ArrayList {
+class StringList extends ArrayList {
 
     public function offsetGet($offset): ?string {
         return parent::offsetGet($offset);

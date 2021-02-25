@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace dev\winterframework\core\context;
 
+use dev\winterframework\actuator\stereotype\HealthInformer;
+use dev\winterframework\actuator\stereotype\InfoInformer;
 use dev\winterframework\enums\Allowable;
 use dev\winterframework\exception\BeansDependencyException;
 use dev\winterframework\exception\BeansException;
@@ -113,6 +115,18 @@ final class WinterBeanProviderContext implements BeanProviderContext {
                 $this->registerBeanProvider($beanProvider, $beanDef);
                 break;
 
+            case HealthInformer::class:
+            case InfoInformer::class:
+                if ($this->ctxData->getAttributesToScan()->offsetExists($attrClass)
+                    && !$this->hasBeanByClass($class->getClass()->getName())
+                ) {
+                    /** @var HealthInformer|InfoInformer $attribute */
+                    $beanProvider = new BeanProvider($class, null, $class->isProxyNeeded());
+                    $beanDef = new Bean();
+                    $this->registerBeanProvider($beanProvider, $beanDef);
+                }
+                break;
+
             default:
                 // ignore
                 break;
@@ -176,8 +190,15 @@ final class WinterBeanProviderContext implements BeanProviderContext {
             $this->registerBeanProviderClassAliases($beanProvider, $beanProvider->getClass()->getClass());
         }
 
+        $beanProvider->setInitMethod($beanDef->initMethod);
+        $beanProvider->setDestroyMethod($beanDef->destroyMethod);
+
         $this->beanClassFactory[$className][$className] = $beanProvider;
         $beanProvider->addNames($className);
+
+        if ($beanProvider->hasDestroyMethod()) {
+            $this->ctxData->getShutDownRegistry()->registerBeanProvider($beanProvider);
+        }
     }
 
     private function registerBeanProviderClassAliases(
@@ -315,6 +336,12 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         } else {
             $bean = $this->buildInstanceForClass($beanProvider);
         }
+
+        if ($beanProvider->hasInitMethod()) {
+            $initMethod = $beanProvider->getInitMethod();
+            $bean->$initMethod();
+        }
+
         $beanProvider->setCached($bean);
 
         $this->removeFromCircularDependency($beanProvider);
@@ -353,7 +380,12 @@ final class WinterBeanProviderContext implements BeanProviderContext {
             eval(ProxyGenerator::getDefault()->generateClass($beanProvider->getClass()));
         }
 
-        return $this->scanner->scanDefaultClass($className);
+        $clsRes = $this->appCtx->addClass($className);
+
+        $clsRes->getAttributes()->addAll($beanProvider->getClass()->getAttributes()->getArray());
+        $clsRes->getVariables()->addAll($beanProvider->getClass()->getVariables()->getArray());
+
+        return $clsRes;
     }
 
     /**

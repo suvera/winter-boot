@@ -19,11 +19,11 @@ myApp:
 
 datasource:
     -   name: default
-        url: "pdbc:sqlite:/opt/databases/mydb.sq3"
+        url: "sqlite::memory:"
         username:
         password:
         validationQuery: SELECT 'Databse Connected'
-        driverClass: dev\\winterframework\\pdbc\\pdo\\PdoDataSource
+        driverClass: dev\winterframework\pdbc\pdo\PdoDataSource
         connection:
             persistent: true
             errorMode: ERRMODE_EXCEPTION
@@ -31,3 +31,26 @@ datasource:
             connectionTimeoutSecs: 30
             autoCommit: true
             defaultrowprefetch: 100
+
+management:
+    endpoints:
+        enabled: true
+    endpoint:
+        beans:
+            enabled: true,
+            path: "acme/beans"
+        configprops:
+            enabled: true,
+            path: "acme/configprops"
+        env:
+            enabled: true,
+            path: "acme/env"
+        health:
+            enabled: true,
+            path: "acme/health"
+        info:
+            enabled: true,
+            path: "acme/info"
+        mappings:
+            enabled: true,
+            path: "acme/mappings"

@@ -24,6 +24,10 @@ class LocalLock implements Lock {
     }
 
     public function tryLock(int $waitForMs = 0): bool {
+        if ($this->isLocked()) {
+            return true;
+        }
+
         if ($waitForMs < 0) {
             $waitForMs = 0;
         }
@@ -41,7 +45,7 @@ class LocalLock implements Lock {
         return false;
     }
 
-    public function doLock(): bool {
+    private function doLock(): bool {
         $my_pid = getmypid();
         $fileObj = null;
 

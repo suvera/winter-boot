@@ -89,7 +89,13 @@ class DispatcherServlet implements HttpRequestDispatcher {
 
         $mapping = $route->getMapping();
         $method = $mapping->getRefOwner();
-        $controller = $this->appCtx->beanByClass($method->getDeclaringClass()->getName());
+        if ($mapping->getBeanName() != '') {
+            $controller = $this->appCtx->beanByName($mapping->getBeanName());
+        } else if ($mapping->getBeanClass() != '') {
+            $controller = $this->appCtx->beanByClass($mapping->getBeanClass());
+        } else {
+            $controller = $this->appCtx->beanByClass($method->getDeclaringClass()->getName());
+        }
         $vars = $mapping->getRequestParams();
         $pathVars = $mapping->getAllowedPathVariables();
         $bodyMap = $mapping->getRequestBody();

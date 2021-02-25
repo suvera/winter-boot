@@ -7,14 +7,10 @@
 Inspired by Spring Boot, So, you can build PHP applications in that style.
 
 **Application Startup:**
+
 ```phpt
 
-#[WinterBootApplication(
-    configDirectory: [__DIR__ . "/config"],
-    scanNamespaces: [
-        ["org\\company\\myApp",   __DIR__."/myApp/src"]
-    ]
-)]
+#[WinterBootApplication]
 class MyApplication {
 
     public static function main() {
@@ -31,7 +27,6 @@ MyApplication::main();
 This framework gives advantage to people already know Spring Boot, and want to jump into PHP8.
 
 - Dependency Injection is managed by the framework with PHP8 Attributes (Annotations)
-
 
 ## Example Service
 
@@ -81,6 +76,7 @@ Check out the example application here [MyApp](examples/MyApp)
 - Example [Config YML's](examples/MyApp/config)
 
 **MyAPP API URLs:**
+
 ```
 curl -v "http://localhost/hello/world"
 
@@ -89,18 +85,20 @@ curl -v "http://localhost/calc/add" -d "a=10&b=30"
 
 ```
 
-
 # Documentation
 
 ----
 
-Documentation ( **--TODO--** )
+Documentation
 
 - [StereoTypes & Dependency Injection](docs/dependency_stereo_types.md)
-- [Configuration]()
-- [Logging]()
+- [Configuration](docs/configuration.md)
+- [Logging](docs/logging.md)
 - [Application Start/Booting]()
-- [REST Controller]()
-- [Custom StereoTypes & Aspect Oriented Magic]()
-- [Extending Framework]()
+- [REST Controller](docs/rest_api.md)
+- [Caching](docs/caching.md)
+- [Custom StereoTypes & Aspect Oriented Magic](docs/custom_aop.md)
+- [Transaction Management](docs/transactions.md)
+- [Actuator](docs/actuator.md)
+- [Locking](docs/locking.md)
 

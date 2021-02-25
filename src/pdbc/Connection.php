@@ -57,6 +57,8 @@ interface Connection {
 
     public function rollback(Savepoint $savepoint = null): void;
 
+    public function isSavepointAllowed(): bool;
+
     public function setSavepoint(string $name = null): Savepoint;
 
     public function releaseSavepoint(Savepoint $savepoint): void;

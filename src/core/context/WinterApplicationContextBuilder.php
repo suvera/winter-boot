@@ -214,8 +214,6 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
     }
 
     private function processResources(): void {
-        $this->processClassResource($this->contextData->getBootApp());
-
         foreach ($this->resources as $resource) {
             $this->processClassResource($resource);
         }
@@ -225,17 +223,20 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         $this->beanProvider->addProviderClass($resource);
     }
 
-    public function addClass(string $class): bool {
-        if ($this->hasBeanByClass($class)) {
-            return false;
+    public function addClass(string $class): ClassResource {
+        if ($this->resources->offsetGet($class) != null) {
+            return $this->resources->offsetGet($class);
         }
-        $this->processClassResource(
-            $this->scanner->scanClass(
-                $class,
-                $this->contextData->getAttributesToScan()
-            )
+        $clsResource = $this->scanner->scanClass(
+            $class,
+            $this->contextData->getAttributesToScan()
         );
-        return true;
+        $this->resources[] = $clsResource;
+
+        if (!$this->hasBeanByClass($class)) {
+            $this->processClassResource($clsResource);
+        }
+        return $clsResource;
     }
 
 }

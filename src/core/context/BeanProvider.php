@@ -12,6 +12,8 @@ final class BeanProvider {
     private object $cached;
     private array $methodArgs = [];
     private ?object $providerObject = null;
+    private ?string $initMethod = null;
+    private ?string $destroyMethod = null;
 
     public function __construct(
         private ClassResource $class,
@@ -43,6 +45,30 @@ final class BeanProvider {
 
     public function getMethod(): ?MethodResource {
         return $this->method;
+    }
+
+    public function getInitMethod(): ?string {
+        return $this->initMethod;
+    }
+
+    public function hasInitMethod(): bool {
+        return isset($this->initMethod) && strlen($this->initMethod) > 0;
+    }
+
+    public function setInitMethod(?string $initMethod): void {
+        $this->initMethod = $initMethod;
+    }
+
+    public function getDestroyMethod(): ?string {
+        return $this->destroyMethod;
+    }
+
+    public function hasDestroyMethod(): bool {
+        return isset($this->destroyMethod) && strlen($this->destroyMethod) > 0;
+    }
+
+    public function setDestroyMethod(?string $destroyMethod): void {
+        $this->destroyMethod = $destroyMethod;
     }
 
     public function addNames(string ...$names): void {

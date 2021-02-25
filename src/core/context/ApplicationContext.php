@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace dev\winterframework\core\context;
 
+use dev\winterframework\reflection\ClassResource;
+
 interface ApplicationContext {
     const FACTORY_BEAN_PREFIX = "&";
 
@@ -32,7 +34,7 @@ interface ApplicationContext {
 
     public function getPropertyFloat(string $name, float $default = null): float;
 
-    public function addClass(string $class): bool;
+    public function addClass(string $class): ClassResource;
 
     public function getProperties(): array;
 

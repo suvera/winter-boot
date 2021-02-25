@@ -49,7 +49,13 @@ final class ProxyGenerator {
         $code .= 'use dev\\winterframework\\core\\aop\\AopInterceptorRegistry;' . "\n";
         $code .= 'use dev\\winterframework\\util\\log\\Wlf4p;' . "\n";
         $code .= 'use dev\\winterframework\\stereotype\\Autowired;' . "\n";
-        $code .= 'use dev\\winterframework\\core\\aop\\AopResultsFound;' . "\n";
+
+        $code .= 'use dev\\winterframework\\core\\aop\\AopExecutionContext;' . "\n";
+
+        //$code .= 'use Throwable;' . "\n";
+        $code .= 'use dev\\winterframework\\core\\aop\\ex\\AopStopExecution;' . "\n";
+        $code .= 'use dev\\winterframework\\core\\aop\\ex\\AopSkipExecutionForOthers;' . "\n";
+        $code .= 'use dev\\winterframework\\core\\aop\\ex\\AopSkipExecutionForMe;' . "\n";
 
         $code .= "\n";
 
@@ -130,7 +136,6 @@ final class ProxyGenerator {
         $code .= implode(', ', $params) . ')';
 
         $return = 'return;';
-        $returnBegin = $return;
         $resultId = '';
         $retType = $method->getReturnNamedType();
         if (!$retType->isNoType()) {
@@ -139,7 +144,6 @@ final class ProxyGenerator {
             if (!$retType->isVoidType()) {
                 $return = 'return $result;';
                 $resultId = ' $result =';
-                $returnBegin = 'return $e->getResult();';
             }
         }
 
@@ -157,26 +161,38 @@ final class ProxyGenerator {
         \$result = null;
         
         \$interceptor = self::\$aopRegistry->get("$className", "$methodName");
-        try {
-            \$interceptor->aspectBegin(\$this, \$args);
-        } catch (\Throwable \$e) {
-            if (\$e instanceof AopResultsFound) {
-                $returnBegin
-            }
-            \$interceptor->aspectFailed(\$this, \$args, \$e);
+        \$executionCtx = new AopExecutionContext(\$this, \$args); 
+        
+        \$interceptor->aspectBegin(\$executionCtx);
+        \$executionCtx->setBeginDone();
+        
+        if (\$executionCtx->isStopExecution()) {
+           $resultId \$executionCtx->getResult();
             $return
         }
         
         try {
-           $resultId parent::$methodName(...\$args);
-        } catch (\Throwable \$e) {
-            \$interceptor->aspectFailed(\$this, \$args, \$e);
+          $resultId parent::$methodName(...\$args);
+           
+           \$executionCtx->setSuccess();
+           \$executionCtx->setResult(\$result);
+           
+        } catch (Throwable \$e) {
+            \$executionCtx->setException(\$e);
+            \$executionCtx->setFailed();
+            
+            \$interceptor->aspectFailed(\$executionCtx, \$e);
             $return
         }
-
+        
         try {
-            \$interceptor->aspectCommit(\$this, \$args, \$result);
-        } catch (\Throwable \$e) {
+            \$interceptor->aspectCommit(\$executionCtx, \$result);
+            \$executionCtx->setSuccess();
+            
+        } catch (Throwable \$e) {
+            \$executionCtx->setException(\$e);
+            \$executionCtx->setCommitFailed();
+            
             self::logException(\$e);
         }
         $return

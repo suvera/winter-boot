@@ -7,6 +7,7 @@ use Attribute;
 use dev\winterframework\cache\aop\CacheableAspect;
 use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\reflection\ReflectionUtil;
+use dev\winterframework\reflection\support\StereoTypeValidations;
 use dev\winterframework\stereotype\aop\AopStereoType;
 use dev\winterframework\stereotype\aop\WinterAspect;
 use dev\winterframework\stereotype\util\NamedComponent;
@@ -15,6 +16,7 @@ use TypeError;
 
 #[Attribute(Attribute::TARGET_METHOD)]
 class Cacheable implements AopStereoType {
+    use StereoTypeValidations;
     use NamedComponent;
     private WinterAspect $aspect;
 
@@ -54,6 +56,8 @@ class Cacheable implements AopStereoType {
     public function init(object $ref): void {
         /** @var RefMethod $ref */
         TypeAssert::typeOf($ref, RefMethod::class);
+
+        $this->validateAopMethod($ref, 'Cacheable');
 
         $cacheable = $ref->getAttributes(CachePut::class);
         if (!empty($cacheable)) {

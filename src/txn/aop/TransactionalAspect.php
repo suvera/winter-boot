@@ -3,15 +3,21 @@ declare(strict_types=1);
 
 namespace dev\winterframework\txn\aop;
 
+use dev\winterframework\core\aop\AopExecutionContext;
+use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\stereotype\aop\AopContext;
 use dev\winterframework\stereotype\aop\WinterAspect;
 use dev\winterframework\txn\PlatformTransactionManager;
 use dev\winterframework\txn\stereotype\Transactional;
 use dev\winterframework\txn\TransactionStatus;
 use dev\winterframework\type\TypeAssert;
+use dev\winterframework\util\ExceptionUtils;
+use dev\winterframework\util\log\Wlf4p;
 use Throwable;
 
 class TransactionalAspect implements WinterAspect {
+    use Wlf4p;
+
     const OPERATION = 'Transactional';
 
     private function getTransactionManager(
@@ -20,7 +26,7 @@ class TransactionalAspect implements WinterAspect {
         /** @var Transactional $stereo */
         $stereo = $ctx->getStereoType();
         $appCtx = $ctx->getApplicationContext();
-        $transactionManager = empty($stereo->transactionManager) ?
+        $transactionManager = (empty($stereo->transactionManager) || $stereo->transactionManager == 'default') ?
             $appCtx->beanByClass(PlatformTransactionManager::class)
             : $appCtx->beanByName($stereo->transactionManager);
         TypeAssert::typeOf($transactionManager, PlatformTransactionManager::class);
@@ -30,25 +36,27 @@ class TransactionalAspect implements WinterAspect {
 
     public function begin(
         AopContext $ctx,
-        object $target,
-        array $args
+        AopExecutionContext $exCtx,
     ): void {
         /** @var Transactional $stereo */
         $stereo = $ctx->getStereoType();
 
+        self::logInfo('Transaction started on method ' . ReflectionUtil::getFqName($ctx->getMethod()));
+
         $txnMgr = $this->getTransactionManager($ctx);
         $txnStatus = $txnMgr->getTransaction($stereo->getTransactionDefinition());
-        $ctx->setCtxData($target, self::OPERATION, $txnStatus);
+        $exCtx->setVariable(self::OPERATION, $txnStatus);
     }
 
     public function beginFailed(
         AopContext $ctx,
-        object $target,
-        array $args,
+        AopExecutionContext $exCtx,
         Throwable $ex
     ): void {
+        self::logException($ex);
+
         /** @var TransactionStatus $txnStatus */
-        $txnStatus = $ctx->getCtxData($target, self::OPERATION);
+        $txnStatus = $exCtx->getVariable(self::OPERATION);
         if (empty($txnStatus)) {
             return;
         }
@@ -58,12 +66,13 @@ class TransactionalAspect implements WinterAspect {
 
     public function commit(
         AopContext $ctx,
-        object $target,
-        array $args,
+        AopExecutionContext $exCtx,
         mixed $result
     ): void {
+        self::logInfo('Trying to commit Transaction on method '
+            . ReflectionUtil::getFqName($ctx->getMethod()));
         /** @var TransactionStatus $txnStatus */
-        $txnStatus = $ctx->getCtxData($target, self::OPERATION);
+        $txnStatus = $exCtx->getVariable(self::OPERATION);
         $txnMgr = $this->getTransactionManager($ctx);
 
         if ($txnStatus->isRollbackOnly()) {
@@ -75,13 +84,14 @@ class TransactionalAspect implements WinterAspect {
 
     public function commitFailed(
         AopContext $ctx,
-        object $target,
-        array $args,
+        AopExecutionContext $exCtx,
         mixed $result,
         Throwable $ex
     ): void {
+        self::logException($ex);
+
         /** @var TransactionStatus $txnStatus */
-        $txnStatus = $ctx->getCtxData($target, self::OPERATION);
+        $txnStatus = $exCtx->getVariable(self::OPERATION);
         $txnMgr = $this->getTransactionManager($ctx);
 
         $txnMgr->rollback($txnStatus);
@@ -89,18 +99,43 @@ class TransactionalAspect implements WinterAspect {
 
     public function failed(
         AopContext $ctx,
-        object $target,
-        array $args,
+        AopExecutionContext $exCtx,
         Throwable $ex
     ): void {
+        /** @var Transactional $stereo */
+        $stereo = $ctx->getStereoType();
+
+        self::logException($ex);
+
         /** @var TransactionStatus $txnStatus */
-        $txnStatus = $ctx->getCtxData($target, self::OPERATION);
+        $txnStatus = $exCtx->getVariable(self::OPERATION);
         if (empty($txnStatus)) {
             return;
         }
         $txnMgr = $this->getTransactionManager($ctx);
+        
+        if (empty($stereo->rollbackFor)) {
+            $rollBack = true;
+        } else {
+            $rollBack = false;
+            foreach ($stereo->rollbackFor as $cls) {
+                if (ExceptionUtils::containsException($ex, $cls)) {
+                    $rollBack = true;
+                    break;
+                }
+            }
+        }
+        foreach ($stereo->noRollbackFor as $cls) {
+            if (ExceptionUtils::containsException($ex, $cls)) {
+                self::logInfo('NoRollback setup for exception ' . $cls . ', hence not rolling back!');
+                $rollBack = false;
+                break;
+            }
+        }
 
-        $txnMgr->rollback($txnStatus);
+        if ($rollBack) {
+            $txnMgr->rollback($txnStatus);
+        }
     }
 
 }

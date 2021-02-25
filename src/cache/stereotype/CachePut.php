@@ -6,6 +6,7 @@ namespace dev\winterframework\cache\stereotype;
 use Attribute;
 use dev\winterframework\cache\aop\CachePutAspect;
 use dev\winterframework\reflection\ref\RefMethod;
+use dev\winterframework\reflection\support\StereoTypeValidations;
 use dev\winterframework\stereotype\aop\AopStereoType;
 use dev\winterframework\stereotype\aop\WinterAspect;
 use dev\winterframework\stereotype\util\NamedComponent;
@@ -13,7 +14,9 @@ use dev\winterframework\type\TypeAssert;
 
 #[Attribute(Attribute::TARGET_METHOD)]
 class CachePut implements AopStereoType {
+    use StereoTypeValidations;
     use NamedComponent;
+
     private WinterAspect $aspect;
 
     public function __construct(
@@ -52,6 +55,9 @@ class CachePut implements AopStereoType {
     public function init(object $ref): void {
         /** @var RefMethod $ref */
         TypeAssert::typeOf($ref, RefMethod::class);
+
+        $this->validateAopMethod($ref, 'CachePut');
+
         $this->initNameObject($this->key);
     }
 

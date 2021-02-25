@@ -19,6 +19,9 @@ class Options extends ArrayList {
 
     public function offsetSet($offset, $value): void {
         TypeAssert::typeOf($value, Option::class);
+        /** @var $value Option */
+        $offset = $value->getId();
+        
         parent::offsetSet($offset, $value);
     }
 }

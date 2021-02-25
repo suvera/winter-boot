@@ -27,6 +27,10 @@ abstract class ArrayList implements Countable, ArrayAccess, IteratorAggregate {
         $this->values = [];
     }
 
+    public function getArray(): array {
+        return $this->values;
+    }
+
     public function offsetExists($offset): bool {
         return array_key_exists($offset, $this->values);
     }

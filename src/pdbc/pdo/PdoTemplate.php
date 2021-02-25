@@ -16,8 +16,8 @@ class PdoTemplate extends PdoOperations implements PdbcTemplate {
 
     public function execute(
         string $sql,
-        array|BindVars $bindVars,
-        PreparedStatementCallback $action
+        array|BindVars $bindVars = [],
+        PreparedStatementCallback $action = null
     ): mixed {
         return $this->doExecute($sql, $bindVars, $action);
     }

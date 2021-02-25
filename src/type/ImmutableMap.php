@@ -71,4 +71,8 @@ class ImmutableMap implements ImmutableCollection {
         return array_key_exists($index, $this->values) ? $this->values[$index] : $defaultValue;
     }
 
+    public function jsonSerialize(): array {
+        return $this->values;
+    }
+
 }

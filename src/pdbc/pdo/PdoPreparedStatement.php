@@ -7,8 +7,6 @@ use dev\winterframework\pdbc\core\BindType;
 use dev\winterframework\pdbc\core\BindVar;
 use dev\winterframework\pdbc\ResultSet;
 use dev\winterframework\pdbc\support\AbstractPreparedStatement;
-use dev\winterframework\pdbc\types\Blob;
-use dev\winterframework\pdbc\types\Clob;
 use PDO;
 use PDOStatement;
 
@@ -16,6 +14,7 @@ class PdoPreparedStatement extends AbstractPreparedStatement {
     protected PDOStatement $stmt;
     protected ?PdoResultSet $resultSet = null;
     protected array $generatedKeys = [];
+    private array $tmpValues = [];
 
     public function __construct(
         protected PdoConnection $connection,
@@ -83,63 +82,67 @@ class PdoPreparedStatement extends AbstractPreparedStatement {
     }
 
     protected function doExecute(): bool {
+        $this->tmpValues = [];
         $this->bindInParameters();
         $this->bindOutParameters();
 
-        return $this->stmt->execute();
+        $ret = $this->stmt->execute();
+        $this->tmpValues = [];
+        return $ret;
     }
 
     protected function bindInParameters(): void {
         foreach ($this->parameters as $bindKey => $bindVar) {
             /** @var BindVar $bindVar */
-            $bindVal = $bindVar->getValue();
 
             switch ($bindVar->getType()) {
                 case BindType::BOOL:
-                    if (is_null($bindVal)) {
-                        $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_NULL);
+                    if (is_null($bindVar->value)) {
+                        $this->stmt->bindParam($bindKey, $bindVar->value, PDO::PARAM_NULL);
                     } else {
-                        $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_BOOL);
+                        $this->stmt->bindParam($bindKey, $bindVar->value, PDO::PARAM_BOOL);
                     }
                     break;
 
                 case BindType::NULL:
-                    $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_NULL);
+                    $this->stmt->bindParam($bindKey, $bindVar->value, PDO::PARAM_NULL);
                     break;
 
                 case BindType::INTEGER:
                 case BindType::FLOAT:
-                    if (is_null($bindVal)) {
-                        $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_NULL);
+                    if (is_null($bindVar->value)) {
+                        $this->stmt->bindParam($bindKey, $bindVar->value, PDO::PARAM_NULL);
                     } else {
-                        $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_INT);
+                        $this->stmt->bindParam($bindKey, $bindVar->value, PDO::PARAM_INT);
                     }
                     break;
 
                 case BindType::BLOB:
-                    /** @var Blob $bindVal */
-                    $stream = $bindVal->getStreamResource();
-                    $this->stmt->bindParam($bindKey, $stream, PDO::PARAM_LOB);
+                    $tmpRow = count($this->tmpValues);
+                    $this->tmpValues[] = $bindVar->value->getStreamResource();
+                    $this->stmt->bindParam($bindKey, $this->tmpValues[$tmpRow], PDO::PARAM_LOB);
                     break;
 
                 case BindType::CLOB:
 
                     $driver = $this->connection->getDriverType();
-                    /** @var Clob $bindVal */
+                    $tmpRow = count($this->tmpValues);
                     if ($driver == 'oci') {
-                        $contents = $bindVal->getString();
-                        $this->stmt->bindParam($bindKey, $contents, PDO::PARAM_STR, strlen($contents));
+                        $this->tmpValues[] = $bindVar->value->getString();
+                        $this->stmt->bindParam($bindKey, $this->tmpValues[$tmpRow],
+                            PDO::PARAM_STR, strlen($this->tmpValues[$tmpRow]));
                     } else {
-                        $contents = $bindVal->getStreamResource();
-                        $this->stmt->bindParam($bindKey, $contents, PDO::PARAM_LOB);
+                        $this->tmpValues[] = $bindVar->value->getStreamResource();
+                        $this->stmt->bindParam($bindKey, $this->tmpValues[$tmpRow], PDO::PARAM_LOB);
                     }
                     break;
 
                 default:
-                    if (is_null($bindVal)) {
-                        $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_NULL);
+                    if (is_null($bindVar->value)) {
+                        $this->stmt->bindParam($bindKey, $bindVar->value, PDO::PARAM_NULL);
                     } else {
-                        $this->stmt->bindParam($bindKey, $bindVal, PDO::PARAM_STR, strlen($bindVal));
+                        $this->stmt->bindParam($bindKey, $bindVar->value,
+                            PDO::PARAM_STR, strlen($bindVar->value));
                     }
                     break;
             }

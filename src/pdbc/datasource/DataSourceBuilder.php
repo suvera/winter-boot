@@ -11,6 +11,7 @@ use dev\winterframework\type\TypeAssert;
 use dev\winterframework\util\log\Wlf4p;
 use ReflectionClass;
 use Throwable;
+use WeakMap;
 
 class DataSourceBuilder {
     use Wlf4p;
@@ -26,9 +27,12 @@ class DataSourceBuilder {
      */
     private array $dsConfig = [];
 
+    private WeakMap $dsObjectMap;
+
     public function __construct(
         array $dataSources
     ) {
+        $this->dsObjectMap = new WeakMap();
         $this->init($dataSources);
     }
 
@@ -128,12 +132,16 @@ class DataSourceBuilder {
     }
 
     private function buildDataSource(DataSourceConfig $ds): DataSource {
+        if (isset($this->dsObjectMap[$ds])) {
+            return $this->dsObjectMap[$ds];
+        }
         $driver = $ds->getDriverClass();
 
         self::logInfo("creating DataSource of type $driver");
         $obj = new $driver($ds);
 
         TypeAssert::typeOf($obj, DataSource::class);
+        $this->dsObjectMap[$ds] = $obj;
         return $obj;
     }
 
