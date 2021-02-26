@@ -21,7 +21,6 @@ class CacheableAspect implements WinterAspect {
         $key = $this->generateKey($ctx, $exCtx);
         self::logInfo(self::OPERATION . ': Cache checking for KEY: ' . $key);
 
-        //echo "\n" . self:: OPERATION . " - Cache Key: $key\n";
         foreach ($caches as $cache) {
             if ($cache->has($key)) {
                 self::logInfo(self::OPERATION . ': cache value found in the "'

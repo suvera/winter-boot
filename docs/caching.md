@@ -63,7 +63,7 @@ cacheNames | Yes | "default" | Cache names
 key |  | default to Method Name | Key to cache this value
 keyGenerator |  | default to framework Managed | Bean derived from KeyGenerator interface
 cacheManager |  | default to framework Managed | Bean derived from CacheManager interface
-cacheResolver |  | default to framework Managed | Bean derived from KeyResolver interface
+cacheResolver |  | default to framework Managed | Bean derived from CacheResolver interface
 
 ### Cache Container
 

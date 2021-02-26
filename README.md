@@ -35,10 +35,10 @@ This framework gives advantage to people already know Spring Boot, and want to j
 class UserServiceImpl implements UserService {
 
     #[Autowired]
-    private PdoTemplate $pdo;
+    private PdbcTemplate $pdbc;
 
     public function createUser(string $name, string $email) {
-        $this->pdo->insert(/* ... */);
+        $this->pdbc->update(/* ... */);
     }
 }
 
@@ -94,7 +94,7 @@ Documentation
 - [StereoTypes & Dependency Injection](docs/dependency_stereo_types.md)
 - [Configuration](docs/configuration.md)
 - [Logging](docs/logging.md)
-- [Application Start/Booting]()
+- [Application Start/Booting](docs/application_starter.md)
 - [REST Controller](docs/rest_api.md)
 - [Caching](docs/caching.md)
 - [Custom StereoTypes & Aspect Oriented Magic](docs/custom_aop.md)

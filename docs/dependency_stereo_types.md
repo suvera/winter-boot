@@ -157,25 +157,3 @@ see above example.
 Starter class must be defined with **#[WinterBootApplication]** attribute.
 
 see (Application Starter)[application_starter.md] for more details
-
-# Caching
-
-----
-
-Caching related attributes
-
-## 1. EnableCaching
-
-This is a class-level attribute.
-
-When you annotate your Application class with #[EnableCaching] annotation, this scan the beans for the presence of caching annotations on public methods. If such an annotation is found, a proxy is automatically created to intercept the method call and handle the caching behavior accordingly.
-
-#### Example:
-
-```phpt
-
-#[EnableCaching]
-class MyApplication {
-}
-
-```
