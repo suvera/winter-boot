@@ -2,6 +2,7 @@
 
 Winter managed bean dependencies are just handled by Annotations (Attributes).
 
+
 ## 1. Autowired
 
 Any class property annotated with **#[Autowired]** will be injected by the framework.
@@ -24,9 +25,61 @@ class FooService {
 $obj = $appCtx->beanByClass(FooService::class);
 
 var_dump($obj->bar);
+```
 
+### Application Context
+
+**ApplicationContext** object itself Autowirable in any bean.
+
+```phpt
+
+#[Component]
+class Test {
+
+    #[Autowired]
+    private ApplicationContext $appCtx;
+}
 
 ```
+
+**ApplicationContext** gives ability to use internal logic to access any framework managed beans.
+
+```phpt
+
+$appCtx = $this->appCtx;
+
+
+// for named services, components and beans
+$obj = $appCtx->beanByName("name of the bean");
+
+
+// access object by Class Name
+$obj = $appCtx->beanByClass("class name");
+
+
+// access object by Class + Bean Name (useful with interface that has multiple implementations)
+$obj = $appCtx->beanByNameClass("bean name", "class name");
+
+
+// Check if bean object exist by Bean Name
+$exist = $appCtx->hasBeanByName("name of the bean");
+
+
+// Check if bean object exist by Class Name
+$exist = $appCtx->hasBeanByClass("class name");
+
+
+// ACCESS Application propreties.
+
+$appCtx->getProperty(string $name, mixed $default = null); // return string|int|float|bool|null
+$appCtx->getPropertyStr(string $name, string $default = null); // string
+$appCtx->getPropertyBool(string $name, bool $default = null); //  bool
+$appCtx->getPropertyInt(string $name, int $default = null); // int
+$appCtx->getPropertyFloat(string $name, float $default = null); // float
+$appCtx->getProperties(); // array
+
+```
+
 
 ## 2. Service
 

@@ -18,7 +18,8 @@ class RequestBody implements StereoType {
 
     public function __construct(
         public string $name = '',
-        public bool $required = true
+        public bool $required = true,
+        public bool $disableParsing = false
     ) {
     }
 

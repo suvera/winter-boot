@@ -72,7 +72,7 @@ abstract class WinterApplicationRunner {
     protected function buildBootApp(string $appClass): ClassResource {
         $resource = $this->scanner->scanClass(
             $appClass,
-            StringList::ofValues(
+            StringSet::ofValues(
                 WinterBootApplication::class,
                 EnableCaching::class,
                 EnableTransactionManagement::class

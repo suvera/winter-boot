@@ -6,6 +6,8 @@ declare(strict_types=1);
 namespace dev\winterframework\web\http;
 
 
+use dev\winterframework\web\MediaType;
+
 class ResponseEntity {
 
     private HttpHeaders $headers;
@@ -64,6 +66,18 @@ class ResponseEntity {
 
     public function withContentLength(int $headerValue): self {
         $this->headers->setContentLength($headerValue);
+        return $this;
+    }
+
+    public function withJson(mixed $body): self {
+        $this->headers->setContentType(MediaType::APPLICATION_JSON);
+        $this->setBody($body);
+        return $this;
+    }
+
+    public function withXml(mixed $body): self {
+        $this->headers->setContentType(MediaType::APPLICATION_XML);
+        $this->setBody($body);
         return $this;
     }
 

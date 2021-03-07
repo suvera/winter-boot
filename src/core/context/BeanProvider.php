@@ -118,6 +118,24 @@ final class BeanProvider {
         return ($other->getClass() === $this->getClass() && $other->getMethod() === $this->getMethod());
     }
 
+    public function equals2(BeanProvider $other): bool {
+        $classEquals = ($other->getClass()->getClass()->getName() === $this->getClass()->getClass()->getName());
+
+        if (!$classEquals) {
+            return false;
+        }
+
+        if ($other->getMethod() == null && $this->getMethod() == null) {
+            return true;
+        } else if ($other->getMethod() == null && $this->getMethod() != null) {
+            return false;
+        } else if ($other->getMethod() != null && $this->getMethod() == null) {
+            return false;
+        }
+
+        return ($other->getMethod()->getMethod()->getName() !== $this->getMethod()->getMethod()->getName());
+    }
+
     public function toString(): string {
         if ($this->method) {
             return ReflectionUtil::getFqName($this->method);

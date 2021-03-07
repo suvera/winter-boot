@@ -51,16 +51,20 @@ class MyController {
     private UserService $userService;
 
 
-    #[RequestMapping(path: "/api/v2/createUser", method: [RequestMethod::POST]]
+    #[RequestMapping(path: "/api/v2/users", method: [RequestMethod::POST]]
     public function createUser(
         #[RequestParam] string $name,
         #[RequestParam] string $email
-    ) {
+    ): ResponseEntity {
         $this->userService->createUser($name, $email);
         
-        return $someJson;
+        return ResponseEntity::ok()->withJson($someJsonArray);
     }
 }
+
+
+# curl command
+curl "http://localhost/api/v2/users" -d "name=Abc&email=mail"
 
 ```
 
@@ -78,11 +82,8 @@ Check out the example application here [MyApp](examples/MyApp)
 **MyAPP API URLs:**
 
 ```
-curl -v "http://localhost/hello/world"
-
-
-curl -v "http://localhost/calc/add" -d "a=10&b=30"
-
+curl "http://localhost/hello/world"
+curl "http://localhost/calc/add" -d "a=10&b=30"
 ```
 
 # Documentation
@@ -101,4 +102,5 @@ Documentation
 - [Transaction Management](docs/transactions.md)
 - [Actuator](docs/actuator.md)
 - [Locking](docs/locking.md)
+- [Json and XML](docs/json_xml.md)
 

@@ -57,4 +57,10 @@ class ClassResources extends ArrayList {
     public function get1stClassByAttribute(string $attrCls): ?ClassResource {
         return isset($this->byAttributes[$attrCls]) ? $this->byAttributes[$attrCls][0] : null;
     }
+
+    public function merge(self $other): void {
+        foreach ($other as $row) {
+            $this[] = $row;
+        }
+    }
 }

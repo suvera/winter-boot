@@ -77,10 +77,9 @@ class ReflectionUtil {
             return '';
         }
 
-        /** @var ReflectionNamedType $type */
+        /** @var ReflectionNamedType|ReflectionUnionType $type */
         $type = $param->getType();
-
-        return $type->getName();
+        return self::getTypeString($type);
     }
 
     public static function getReturnType(ReflectionMethod $method): string {
@@ -88,13 +87,29 @@ class ReflectionUtil {
             return '';
         }
 
-        /** @var ReflectionNamedType $type */
+        /** @var ReflectionNamedType|ReflectionUnionType $type */
         $type = $method->getReturnType();
+        return self::getTypeString($type);
+    }
+
+    public static function getTypeString(ReflectionNamedType|ReflectionUnionType $type): string {
         if ($type == null) {
             return '';
-        } else {
-            return $type->getName();
         }
+
+        if ($type instanceof ReflectionUnionType) {
+            $mixType = '';
+            foreach ($type->getTypes() as $subType) {
+                if (!empty($mixType)) {
+                    $mixType .= '|';
+                }
+                $mixType .= $subType->getName();
+            }
+
+            return $mixType;
+        }
+
+        return $type->getName();
     }
 
     /**

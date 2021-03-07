@@ -12,7 +12,7 @@ use dev\winterframework\core\context\WinterBeanProviderContext;
 use dev\winterframework\core\context\WinterPropertyContext;
 use dev\winterframework\reflection\ClassResourceScanner;
 use dev\winterframework\stereotype\WinterBootApplication;
-use dev\winterframework\type\StringList;
+use dev\winterframework\type\StringSet;
 use dev\winterframework\util\log\LoggerManager;
 use Exception;
 use Monolog\Handler\StreamHandler;
@@ -46,7 +46,7 @@ class WinterBeanProviderContextTests extends TestCase {
 
         $bootApp = self::$scanner->scanClass(
             TestApplication::class,
-            StringList::ofValues(WinterBootApplication::class)
+            StringSet::ofValues(WinterBootApplication::class)
         );
         /** @var WinterBootApplication $bootConfig */
         $bootConfig = $bootApp->getAttribute(WinterBootApplication::class);

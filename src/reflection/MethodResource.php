@@ -53,6 +53,10 @@ class MethodResource {
         $this->method = $method;
     }
 
+    /**
+     * @return AttributeList|object[]
+     * @noinspection PhpDocSignatureInspection
+     */
     public function getAttributes(): AttributeList {
         return $this->attributes;
     }

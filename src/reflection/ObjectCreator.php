@@ -5,15 +5,16 @@ namespace dev\winterframework\reflection;
 
 use dev\winterframework\exception\InvalidSyntaxException;
 use dev\winterframework\exception\WinterException;
+use dev\winterframework\paxb\XmlObjectMapper;
 use dev\winterframework\reflection\ref\ReflectionRegistry;
+use dev\winterframework\reflection\ref\RefProperty;
 use dev\winterframework\stereotype\JsonProperty;
 use ReflectionClass;
 use ReflectionException;
-use ReflectionNamedType;
-use ReflectionUnionType;
 use Throwable;
 
 class ObjectCreator {
+    use ObjectPropertySetter;
 
     protected static function getClass(string|object $classOrObj): ReflectionClass {
         $class = is_object($classOrObj) ? $classOrObj::class : $classOrObj;
@@ -24,7 +25,7 @@ class ObjectCreator {
         $ref = self::getClass($class);
 
         try {
-            if (is_string($props)) {
+            if (is_scalar($props)) {
                 return $ref->newInstance($props);
             } else {
                 $obj = $ref->newInstance();
@@ -39,25 +40,39 @@ class ObjectCreator {
         if (!$ref) {
             $ref = self::getClass($obj);
         }
+
         foreach ($ref->getProperties() as $refProp) {
             $attrs = $refProp->getAttributes(JsonProperty::class);
             $extName = $refProp->getName();
 
             if (count($attrs) > 0) {
+                $gotValue = false;
                 /** @var JsonProperty $attr */
                 try {
                     $attr = $attrs[0]->newInstance();
+                    $attr->init(RefProperty::getInstance($refProp));
                     if (is_array($attr->name)) {
                         foreach ($attr->name as $alias) {
                             $extName = $alias;
-                            if (isset($props[$alias])) {
-                                break;
+                            if (array_key_exists($extName, $props)) {
+                                if (isset($props[$extName]) || $attr->isNillable()) {
+                                    $gotValue = true;
+                                    break;
+                                }
                             }
                         }
                     } else {
                         $extName = $attr->name;
                     }
 
+                    if (!$gotValue && $attr->isRequired() && !isset($props[$extName])) {
+                        throw new InvalidSyntaxException('Property "' . $refProp->getName()
+                            . '" is Required, at class ' . $ref->getName()
+                        );
+                    }
+
+                } catch (InvalidSyntaxException $ex) {
+                    throw $ex;
                 } catch (Throwable $e) {
                     throw new InvalidSyntaxException('Invalid JsonProperty on property '
                         . $refProp->getName() . ', for class ' . $ref->getName(), 0, $e
@@ -66,22 +81,16 @@ class ObjectCreator {
             }
 
             if (isset($props[$extName])) {
-                /** @var ReflectionNamedType|ReflectionUnionType $type */
-                $type = $refProp->getType();
-                $refProp->setAccessible(true);
-                if ($type != null && !($type instanceof ReflectionUnionType)) {
-                    if ($type->isBuiltin()) {
-                        $refProp->setValue($obj, $props[$extName]);
-                    } else if (is_array($props[$extName])) {
-                        $refProp->setValue($obj, self::createObject($type->getName(), $props[$extName]));
-                    }
-                } else {
-                    $refProp->setValue($obj, $props[$extName]);
-                }
-
+                self::doSetObjectProperty($refProp, $obj, $props[$extName]);
             }
         }
 
         return $obj;
+    }
+
+    public static function createObjectXml(string $className, string $xml): object {
+        $mapper = new XmlObjectMapper();
+
+        return $mapper->readValue($xml, $className);
     }
 }

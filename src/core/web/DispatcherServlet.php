@@ -7,10 +7,12 @@ namespace dev\winterframework\core\web;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\core\System;
+use dev\winterframework\core\web\error\DefaultErrorController;
 use dev\winterframework\core\web\error\ErrorController;
 use dev\winterframework\core\web\route\RequestMappingRegistry;
 use dev\winterframework\exception\WinterException;
 use dev\winterframework\reflection\ObjectCreator;
+use dev\winterframework\stereotype\web\RequestBody;
 use dev\winterframework\util\log\Wlf4p;
 use dev\winterframework\web\http\HttpRequest;
 use dev\winterframework\web\http\HttpStatus;
@@ -23,6 +25,8 @@ use Throwable;
 class DispatcherServlet implements HttpRequestDispatcher {
     use Wlf4p;
 
+    private ErrorController $errorController;
+
     public function __construct(
         private RequestMappingRegistry $mappingRegistry,
         private ApplicationContextData $ctxData,
@@ -30,7 +34,37 @@ class DispatcherServlet implements HttpRequestDispatcher {
     ) {
     }
 
+    private function initErrorController(): void {
+        $errorController = null;
+        try {
+            $errorController = $this->appCtx->beanByName('errorController');
+            if (!($errorController instanceof ErrorController)) {
+                self::logDebug('Bean named "errorController" does not implement ErrorController');
+                $errorController = null;
+            }
+        } /** @noinspection PhpUnusedLocalVariableInspection */
+        catch (Throwable $e) {
+            // ignore this error
+        }
+        try {
+            $errorController = $this->appCtx->beanByClass(ErrorController::class);
+            if (!($errorController instanceof ErrorController)) {
+                self::logDebug('Bean object does not implement ErrorController');
+                $errorController = null;
+            }
+        } catch (Throwable $e) {
+            self::logDebug('No controller has implemented ErrorController', [$e]);
+        }
+
+        if ($errorController == null) {
+            $errorController = $this->appCtx->beanByClass(DefaultErrorController::class);
+        }
+        /** @var ErrorController $errorController */
+        $this->errorController = $errorController;
+    }
+
     public function dispatch(): void {
+        $this->initErrorController();
         $serverPath = $this->ctxData->getPropertyContext()->get('server.context-path', '/');
         $serverPath = isset($serverPath) ? trim($serverPath, '/') : '';
 
@@ -48,28 +82,27 @@ class DispatcherServlet implements HttpRequestDispatcher {
 
         if ($matchedRoute === null) {
             self::logError('Could not find Requested URI [' . $request->getMethod() . ']' . $uri);
-            /** @var ErrorController $errorController */
-            $errorController = $this->appCtx->beanByClass(ErrorController::class);
-            $errorController->handleError(
+            $this->handleError(
                 HttpStatus::$NOT_FOUND,
                 new WinterException('Could not find Requested URI ['
                     . $request->getMethod() . ']' . $uri)
             );
-            System::exit();
         }
 
         try {
             $this->routeRequest($matchedRoute, $request);
         } catch (Throwable $t) {
             self::logException($t);
-            /** @var ErrorController $errorController */
-            $errorController = $this->appCtx->beanByClass(ErrorController::class);
-            $errorController->handleError(
+            $this->handleError(
                 HttpStatus::$INTERNAL_SERVER_ERROR,
                 $t
             );
-            System::exit();
         }
+    }
+
+    private function handleError(HttpStatus $status, Throwable $t = null): void {
+        $this->errorController->handleError($status, $t);
+        System::exit();
     }
 
     /**
@@ -81,9 +114,6 @@ class DispatcherServlet implements HttpRequestDispatcher {
         MatchedRequestMapping $route,
         HttpRequest $request
     ): void {
-
-        /** @var ErrorController $errorController */
-        $errorController = $this->appCtx->beanByClass(ErrorController::class);
         /** @var ResponseRenderer $renderer */
         $renderer = $this->appCtx->beanByClass(ResponseRenderer::class);
 
@@ -116,7 +146,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
             }
 
             if (!$success) {
-                $errorController->handleError(
+                $this->handleError(
                     HttpStatus::$BAD_REQUEST,
                     new WinterException('Bad Request: expected request types ['
                         . implode(', ', $consumes)
@@ -146,7 +176,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
                     : $request->getPostParam($var->name);
 
             if ($var->required && !isset($args[$var->getVariableName()])) {
-                $errorController->handleError(
+                $this->handleError(
                     HttpStatus::$BAD_REQUEST,
                     new WinterException('Bad Request: parameter "'
                         . $var->name
@@ -160,20 +190,15 @@ class DispatcherServlet implements HttpRequestDispatcher {
          * STEP - 4 : Map Request BODY to Object
          */
         if ($bodyMap) {
-            if (str_contains($contentType, MediaType::APPLICATION_FORM_URLENCODED)
-                || str_contains($contentType, MediaType::MULTIPART_FORM_DATA)) {
 
-                $args[$bodyMap->getVariableName()] = ObjectCreator::createObject(
-                    $bodyMap->getVariableType(), $_POST
+            try {
+                $args[$bodyMap->getVariableName()] = $this->parseBody($request, $bodyMap, $contentType);
+            } catch (Throwable $e) {
+                self::logError('Could not understand the request - with error '
+                    . $e::class . ': ' . $e->getMessage() . ', file: ' . $e->getFile()
+                    . ', line: ' . $e->getLine()
                 );
-            } else if (empty($contentType) || str_contains($contentType, MediaType::APPLICATION_JSON)) {
-                $args[$bodyMap->getVariableName()] = ObjectCreator::createObject(
-                    $bodyMap->getVariableType(), json_decode($request->getRawBody(), true)
-                );
-            } else {
-                $args[$bodyMap->getVariableName()] = ObjectCreator::createObject(
-                    $bodyMap->getVariableType(), $request->getRawBody()
-                );
+                $this->handleError(HttpStatus::$BAD_REQUEST);
             }
         }
 
@@ -196,7 +221,14 @@ class DispatcherServlet implements HttpRequestDispatcher {
         }
 
         /**
-         * STEP - 6 : Execute Method
+         * STEP - 6.1 : pre-intercept Controller
+         */
+        if ($controller instanceof ControllerInterceptor) {
+            $controller->preHandle($request, $method->getDelegate());
+        }
+
+        /**
+         * STEP - 6.2 : Execute Method
          */
         $out = $method->invokeArgs($controller, $args);
 
@@ -206,7 +238,60 @@ class DispatcherServlet implements HttpRequestDispatcher {
             $entity = ResponseEntity::ok()->setBody($out);
         }
 
+        /**
+         * STEP - 6.3 : post-intercept Controller
+         */
+        if ($controller instanceof ControllerInterceptor) {
+            $controller->postHandle($request, $entity, $method->getDelegate());
+        }
+
         $renderer->renderAndExit($entity);
+    }
+
+    /**
+     * Parse Body
+     *
+     * @param HttpRequest $request
+     * @param RequestBody $body
+     * @param string $contentType
+     * @return object|null
+     * @throws
+     */
+    protected function parseBody(
+        HttpRequest $request,
+        RequestBody $body,
+        string $contentType
+    ): ?object {
+
+        if (str_contains($contentType, MediaType::APPLICATION_FORM_URLENCODED)
+            || str_contains($contentType, MediaType::MULTIPART_FORM_DATA)) {
+
+            return ObjectCreator::createObject(
+                $body->getVariableType(), $_POST
+            );
+
+        } else if (!$body->disableParsing
+            && (empty($contentType) || str_contains($contentType, MediaType::APPLICATION_JSON))) {
+
+            $row = json_decode($request->getRawBody(), true, 128, JSON_THROW_ON_ERROR);
+            self::logInfo('JSON Body: ' . $request->getRawBody());
+
+            return ObjectCreator::createObject(
+                $body->getVariableType(), $row
+            );
+        } else if (!$body->disableParsing && (str_contains($contentType, MediaType::APPLICATION_XML)
+                || str_contains($contentType, MediaType::TEXT_XML))) {
+
+            self::logInfo('XML Body: ' . $request->getRawBody());
+
+            return ObjectCreator::createObjectXml(
+                $body->getVariableType(), $request->getRawBody()
+            );
+        }
+
+        return ObjectCreator::createObject(
+            $body->getVariableType(), $request->getRawBody()
+        );
     }
 
 }

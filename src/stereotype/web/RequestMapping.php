@@ -319,7 +319,7 @@ class RequestMapping implements StereoType {
             $param = RefParameter::getInstance($paramA);
             $attrs = $param->getAttributes(RequestBody::class);
             if (count($attrs) > 0) {
-                if (!is_null($this->requestBody)) {
+                if (isset($this->requestBody)) {
                     throw new InvalidSyntaxException(
                         'Argument ' . $param->getName() . ' defined in method ' . $ref->getName()
                         . ' has Multiple Attribute definitions (RequestBody).'

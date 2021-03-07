@@ -122,3 +122,33 @@ public function sayHello2(
 }
 
 ```
+
+
+# Error Handling
+
+----
+
+Define a error controller
+
+
+It can be done in multiple ways
+
+### Approach - 1
+```phpt
+
+#[Component('errorController')]
+class MyErrorControllerImpl implements ErrorController {
+}
+```
+
+### Approach - 2
+```phpt
+
+#[Bean('errorController')]
+public function getErrorController(): ErrorController {
+    return new MyErrorControllerImpl();
+}
+```
+
+
+# 

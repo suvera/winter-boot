@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace dev\winterframework\reflection\support;
 
+use DateTime;
+use DateTimeInterface;
 use ReflectionNamedType;
 use ReflectionType;
 use ReflectionUnionType;
@@ -25,7 +27,7 @@ class ParameterType {
 
     public static function getNoType(): ParameterType {
         if (!isset(self::$noType)) {
-            self::$noType = new ParameterType('', false, false);
+            self::$noType = new ParameterType('', true, false);
         }
         return self::$noType;
     }
@@ -53,6 +55,9 @@ class ParameterType {
                 $primary = $typeObj;
             }
             $primary->unionTypes[] = $typeObj;
+            if ($subType->allowsNull()) {
+                $primary->allowsNull = true;
+            }
         }
 
         return $primary;
@@ -80,6 +85,58 @@ class ParameterType {
 
     public function getName(): string {
         return $this->name;
+    }
+
+    public function hasType(string $type): bool {
+        if ($this->isNoType() || $this->getName() === $type || $this->getName() === 'mixed') {
+            return true;
+        }
+        if ($this->isUnionType()) {
+            foreach ($this->unionTypes as $subType) {
+                if ($subType->getName() === $type || $subType->getName() === 'mixed') {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public function getClassType(): string {
+        if ($this->isNoType()) {
+            return '';
+        }
+        if ($this->isUnionType()) {
+            foreach ($this->unionTypes as $subType) {
+                if (!$subType->isBuiltin()) {
+                    return $subType->getName();
+                }
+            }
+        } else if (!$this->isBuiltin()) {
+            return $this->getName();
+        }
+        return '';
+    }
+
+    public function getClassTypes(): array {
+        if ($this->isNoType()) {
+            return [];
+        }
+        if ($this->isUnionType()) {
+            $ret = [];
+            foreach ($this->unionTypes as $subType) {
+                if (!$subType->isBuiltin()) {
+                    $ret[] = $subType->getName();
+                }
+            }
+            return $ret;
+        } else if (!$this->isBuiltin()) {
+            return [$this->getName()];
+        }
+        return [];
+    }
+
+    public function isDateTimeType(): bool {
+        return $this->hasType(DateTimeInterface::class) || $this->hasType(DateTime::class);
     }
 
     public function isBuiltin(): bool {

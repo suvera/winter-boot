@@ -6,7 +6,6 @@ namespace dev\winterframework\core\context;
 
 use dev\winterframework\actuator\stereotype\HealthInformer;
 use dev\winterframework\actuator\stereotype\InfoInformer;
-use dev\winterframework\enums\Allowable;
 use dev\winterframework\exception\BeansDependencyException;
 use dev\winterframework\exception\BeansException;
 use dev\winterframework\exception\ClassNotFoundException;
@@ -208,55 +207,16 @@ final class WinterBeanProviderContext implements BeanProviderContext {
 
         $aliases = [];
         $className = $aliasable->getName();
-        $parentClass = $aliasable->getParentClass();
         $interfaces = $aliasable->getInterfaces();
 
         if (substr($className, -4) == 'Impl') {
-            $interface = substr($className, 0, -4);
-            if (is_a($className, $interface, true)
-                && interface_exists($interface, true)) {
-                $aliases[$interface] = $interface;
-            }
-        }
-
-        $aliasableList = WinterInternalBeanAlias::getClassAliases();
-        $parentList = [];
-        if (isset($parentClass) && $parentClass) {
-            $parentList[] = $parentClass;
-        }
-        if (isset($interfaces)) {
             foreach ($interfaces as $interface) {
-                $parentList[] = $interface;
-            }
-        }
-
-        foreach ($parentList as $parent) {
-            if (isset($aliasableList[$parent->getName()])) {
-                $def = $aliasableList[$parent->getName()];
-
-                $intAliases = $def['aliases'];
-                $intAliases = empty($intAliases) ? [$parent->getName()] : $intAliases;
-
-                foreach ($intAliases as $alias) {
-                    if (isset($this->beanClassFactory[$alias])
-                        && $def['allowMultiple'] === Allowable::DISALLOW
-                    ) {
-                        $ex = '';
-                        foreach ($this->beanClassFactory[$alias] as $cls => $beanPvdr) {
-                            $ex .= ReflectionUtil::getFqName($beanPvdr->getClass()) . " \n";
-                        }
-                        throw new WinterException('Class ' . $alias
-                            . ' has extended/implemented by multiple Beans. '
-                            . "\n" . $className . " \n" . $ex
-                        );
-                    }
-                    $aliases[$alias] = $alias;
-                }
+                $aliases[$interface->getName()] = $interface->getName();
             }
         }
 
         foreach ($aliases as $alias) {
-            $this->beanClassFactory[$alias][$alias] = $beanProvider;
+            $this->beanClassFactory[$alias][$className] = $beanProvider;
             $beanProvider->addNames($alias);
         }
     }

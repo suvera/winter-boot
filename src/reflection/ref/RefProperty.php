@@ -11,6 +11,7 @@ use ReflectionException;
 use ReflectionNamedType;
 use ReflectionProperty;
 use ReflectionUnionType;
+use ReflectionAttribute;
 
 /**
  * @method string __toString()
@@ -32,7 +33,7 @@ use ReflectionUnionType;
  * @method bool hasType()
  * @method bool hasDefaultValue()
  * @method mixed getDefaultValue()
- * @method array getAttributes(string $name = null, int $flags = 0)
+ * @method ReflectionAttribute[] getAttributes(string $name = null, int $flags = 0)
  */
 class RefProperty extends ReflectionAbstract {
 

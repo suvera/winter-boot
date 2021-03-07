@@ -18,6 +18,10 @@ class ClassResource {
         return isset($this->attributes) ? $this->attributes->getByName($name) : null;
     }
 
+    public function getAttributesBy(string $name): array {
+        return isset($this->attributes) ? $this->attributes->getByNames($name) : [];
+    }
+
     public function getMethod(string $name): ?MethodResource {
         return $this->methods->getMethod($name);
     }
@@ -42,6 +46,10 @@ class ClassResource {
         $this->methods = $methods;
     }
 
+    /**
+     * @return VariableResources|VariableResource[]
+     * @noinspection PhpDocSignatureInspection
+     */
     public function getVariables(): VariableResources {
         return $this->variables;
     }

@@ -1,4 +1,5 @@
 <?php
+/** @noinspection DuplicatedCode */
 /** @noinspection PhpUnused */
 declare(strict_types=1);
 
@@ -14,7 +15,6 @@ use dev\winterframework\stereotype\aop\AopStereoType;
 use dev\winterframework\stereotype\StereoType;
 use dev\winterframework\stereotype\StereoTyped;
 use dev\winterframework\type\AttributeList;
-use dev\winterframework\type\StringList;
 use dev\winterframework\type\StringSet;
 use dev\winterframework\util\log\Wlf4p;
 use ReflectionAttribute;
@@ -25,7 +25,7 @@ use UnexpectedValueException;
 class ClassResourceScanner {
     use Wlf4p;
 
-    private static StringList $defaultStereoTypes;
+    private static StringSet $defaultStereoTypes;
 
     private static ClassResourceScanner $instance;
     /**
@@ -76,11 +76,11 @@ class ClassResourceScanner {
     }
 
     /*
-     * Scan a Class for default Attributes
+     * Scan a Class for Attributes
      */
     public function scanClass(
         string $fqns,
-        StringList $attributes
+        StringSet $attributes
     ): ?ClassResource {
         try {
             $ref = new RefKlass($fqns);
@@ -89,12 +89,102 @@ class ClassResourceScanner {
             return null;
         }
 
-        $lookForAttrs = [];
-        foreach ($attributes as $attribute) {
-            $lookForAttrs[$attribute] = $attribute;
+        return $this->buildClassResource($ref, $attributes);
+    }
+
+    /*
+     * Scan a Class recursively
+     */
+    public function scanClassRecursive(
+        string $fqns,
+        StringSet $attributes,
+        ClassResources $resources = null
+    ): ClassResources {
+
+        if (is_null($resources)) {
+            $resources = ClassResources::ofValues();
+        }
+        try {
+            $ref = new RefKlass($fqns);
+        } catch (Throwable $e) {
+            self::logException($e);
+            return $resources;
         }
 
-        return $this->buildClassResource($ref, $lookForAttrs, $attributes);
+        $res = $this->buildClassResource($ref, $attributes);
+        if (is_null($res)) {
+            return $resources;
+        }
+
+        $resources[] = $res;
+
+        foreach ($res->getVariables() as $variable) {
+            /** @var VariableResource $variable */
+            if ($variable->getAttributes()->count() === 0) {
+                continue;
+            }
+
+            foreach ($variable->getAttributes() as $attribute) {
+                if ($attribute instanceof ScanClassProvider) {
+                    foreach ($attribute->provideClasses() as $provided) {
+                        if (!isset($resources[$provided])) {
+                            $this->scanClassRecursive($provided, $attributes, $resources);
+                        }
+                    }
+                }
+            }
+
+            $type = $variable->getParameterType();
+            if ($type->isNoType() || $type->isBuiltin()) {
+                continue;
+            }
+
+            if (!$resources->offsetExists($type->getName())) {
+                if (!isset($resources[$type->getName()])) {
+                    $this->scanClassRecursive($type->getName(), $attributes, $resources);
+                }
+            }
+        }
+
+        foreach ($res->getMethods() as $method) {
+            /** @var MethodResource $method */
+            if ($method->getAttributes()->count() === 0) {
+                continue;
+            }
+
+            foreach ($method->getAttributes() as $attribute) {
+                if ($attribute instanceof ScanClassProvider) {
+                    foreach ($attribute->provideClasses() as $provided) {
+                        if (!isset($resources[$provided])) {
+                            $this->scanClassRecursive($provided, $attributes, $resources);
+                        }
+                    }
+                }
+            }
+
+            $type = $method->getReturnNamedType();
+            if ($type->isNoType() || $type->isBuiltin()) {
+                continue;
+            }
+
+            if (!$resources->offsetExists($type->getName())) {
+                if (!isset($resources[$type->getName()])) {
+                    $this->scanClassRecursive($type->getName(), $attributes, $resources);
+                }
+            }
+        }
+
+        foreach ($res->getAttributes() as $attribute) {
+            if ($attribute instanceof ScanClassProvider) {
+                foreach ($attribute->provideClasses() as $provided) {
+                    if (!isset($resources[$provided])) {
+                        $this->scanClassRecursive($provided, $attributes, $resources);
+                    }
+                }
+            }
+        }
+
+        return $resources;
     }
 
     /*
@@ -102,7 +192,7 @@ class ClassResourceScanner {
      */
     public function scan(
         Psr4Namespaces $namespaces,
-        StringList $attributes,
+        StringSet $attributes,
         bool $autoload = false,
         array $excludeNamespaces = [],
     ): ClassResources {
@@ -117,17 +207,13 @@ class ClassResourceScanner {
 
     private function doScan(
         Psr4Namespaces $namespaces,
-        StringList $attributes,
+        StringSet $attributes,
         bool $autoload = false,
         array $excludeNamespaces = [],
         bool $excludeClsWithoutAttrs = false
     ): ClassResources {
         $resources = ClassResources::ofValues();
 
-        $lookForAttrs = [];
-        foreach ($attributes as $attribute) {
-            $lookForAttrs[$attribute] = $attribute;
-        }
         $files = [];
         foreach ($namespaces as $namespace) {
             /** @var Psr4Namespace $namespace */
@@ -147,7 +233,6 @@ class ClassResourceScanner {
          */
         $stereoTypes = $this->findStereoTypes($files, $autoload);
         foreach ($stereoTypes as $stereoType) {
-            $lookForAttrs[$stereoType] = $stereoType;
             $attributes[] = $stereoType;
         }
 
@@ -158,7 +243,6 @@ class ClassResourceScanner {
             $res = $this->buildClassFileResource(
                 $fqns,
                 $file,
-                $lookForAttrs,
                 $attributes,
                 $autoload,
                 $excludeClsWithoutAttrs
@@ -175,8 +259,7 @@ class ClassResourceScanner {
     private function buildClassFileResource(
         string $fqns,
         string $file,
-        array $lookForAttrs,
-        StringList $attributes,
+        StringSet $attributes,
         bool $autoload = false,
         bool $excludeClsWithoutAttrs = false
     ): ?ClassResource {
@@ -188,7 +271,6 @@ class ClassResourceScanner {
             $ref = new RefKlass($fqns);
             return $this->buildClassResource(
                 $ref,
-                $lookForAttrs,
                 $attributes,
                 $excludeClsWithoutAttrs
             );
@@ -200,11 +282,10 @@ class ClassResourceScanner {
 
     private function buildClassResource(
         RefKlass $ref,
-        array $lookForAttrs,
-        StringList $attributes,
+        StringSet $attributes,
         bool $excludeClsWithoutAttrs = false
     ): ?ClassResource {
-        $attrList = $this->scanAttributes($ref->getAttributes(), $ref, $lookForAttrs);
+        $attrList = $this->scanAttributes($ref->getAttributes(), $ref, $attributes);
 
         if ($excludeClsWithoutAttrs && count($attrList) <= 0) {
             return null;
@@ -223,7 +304,7 @@ class ClassResourceScanner {
         $methods = $ref->getMethods();
         foreach ($methods as $methodR) {
             $method = RefMethod::getInstance($methodR);
-            $methAttrs = $this->scanAttributes($method->getAttributes(), $method, $lookForAttrs);
+            $methAttrs = $this->scanAttributes($method->getAttributes(), $method, $attributes);
 
             if ($methAttrs) {
                 $meth = new MethodResource();
@@ -249,11 +330,12 @@ class ClassResourceScanner {
         $vars = $ref->getProperties();
         foreach ($vars as $varA) {
             $var = RefProperty::getInstance($varA);
-            $varAttrs = $this->scanAttributes($var->getAttributes(), $var, $lookForAttrs);
+            $varAttrs = $this->scanAttributes($var->getAttributes(), $var, $attributes);
 
             if ($varAttrs) {
                 $variable = new VariableResource();
                 $variable->setVariable($var);
+                $variable->getParameterType();
                 $variable->setAttributes(AttributeList::ofArray($varAttrs));
                 $varList[] = $variable;
             }
@@ -275,13 +357,13 @@ class ClassResourceScanner {
     /**
      * @param array|ReflectionAttribute[] $attrs
      * @param object $target
-     * @param array $lookForAttrs
+     * @param StringSet $attributes
      * @return array
      */
-    private function scanAttributes(array $attrs, object $target, array $lookForAttrs): array {
+    private function scanAttributes(array $attrs, object $target, StringSet $attributes): array {
         $attrList = [];
         foreach ($attrs as $attr) {
-            if (isset($lookForAttrs[$attr->getName()])) {
+            if (isset($attributes[$attr->getName()])) {
                 $attrList[] = $this->buildAttribute($attr, $target);
             }
         }

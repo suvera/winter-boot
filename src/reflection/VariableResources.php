@@ -18,7 +18,9 @@ class VariableResources extends ArrayList {
     }
 
     public function offsetSet($offset, $value): void {
+        /** @var VariableResource $value */
         TypeAssert::typeOf($value, VariableResource::class);
+        $offset = $value->getVariable()->getName();
         parent::offsetSet($offset, $value);
     }
 }
