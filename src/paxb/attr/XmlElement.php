@@ -20,8 +20,6 @@ class XmlElement implements XmlStereoType, ScanClassProvider {
 
     private RefProperty $refOwner;
 
-    protected XmlElementWrapper $wrapper;
-
     protected ParameterType $elementType;
 
     public function __construct(
@@ -69,14 +67,6 @@ class XmlElement implements XmlStereoType, ScanClassProvider {
         return isset($this->wrapper);
     }
 
-    public function getWrapper(): ?XmlElementWrapper {
-        return isset($this->wrapper) ? $this->wrapper : null;
-    }
-
-    public function setWrapper(XmlElementWrapper $wrapper): void {
-        $this->wrapper = $wrapper;
-    }
-
     public function isList(): bool {
         return $this->list;
     }
@@ -111,14 +101,21 @@ class XmlElement implements XmlStereoType, ScanClassProvider {
             $ref,
             'XmlElement',
             'Xml',
-            [XmlStereoType::class],
-            [XmlElementWrapper::class]
+            [XmlStereoType::class]
         );
 
         $this->refOwner = $ref;
 
         if ($this->name == '') {
             $this->name = $this->findName($ref);
+        }
+
+        $type = ParameterType::fromType($ref->getType());
+        if ($type->allowsNull()) {
+            $this->nillable = true;
+        }
+        if (!$ref->hasDefaultValue() && !$type->allowsNull()) {
+            $this->required = true;
         }
     }
 

@@ -96,7 +96,7 @@ Documentation
 - [Configuration](docs/configuration.md)
 - [Logging](docs/logging.md)
 - [Application Start/Booting](docs/application_starter.md)
-- [REST Controller](docs/rest_api.md)
+- [REST API Development](docs/rest_api.md)
 - [Caching](docs/caching.md)
 - [Custom StereoTypes & Aspect Oriented Magic](docs/custom_aop.md)
 - [Transaction Management](docs/transactions.md)

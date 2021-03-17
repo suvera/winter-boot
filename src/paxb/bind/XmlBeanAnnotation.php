@@ -22,5 +22,5 @@ class XmlBeanAnnotation {
     public function getResource(): VariableResource|MethodResource {
         return $this->resource;
     }
-    
+
 }

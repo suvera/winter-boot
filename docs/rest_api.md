@@ -50,6 +50,17 @@ public function getUser(#[PathVariable] string $id): ResponseEntity {
 
 ```
 
+### Similar Attributes
+
+**1. #[DeleteMapping]**
+
+**2. #[GetMapping]**
+
+**3. #[PatchMapping]**
+
+**4. #[PostMapping]**
+
+**5. #[PutMapping]**
 
 
 ## 3. RequestParam
@@ -61,7 +72,7 @@ i.e. $_GET and $_POST values.
 
 ```phpt
 
-#[RequestMapping(path: "/divide", method: [RequestMethod::POST])]
+#[PostMapping(path: "/divide")]
 public function divide(
     #[RequestParam] int $a,
     #[RequestParam] int $b,
@@ -70,6 +81,29 @@ public function divide(
 }
 
 ```
+
+#### Attribute Options
+
+Attribute **#[RequestParam]** has more options.
+
+Name | Required | Default Value | Description
+------------ | ------------ | ------------ | ------------
+name | Yes | | Name of the Request Parameter
+required |  | true | Parameter is mandatory
+source |  | 'request' | Source of this parameter value, could be one of ['request', 'get', 'post', 'cookie', 'header']
+defaultValue |  |  | Default Value
+
+
+**source** values can be one of following values
+
+source | Description
+------------ | ------------
+request | Value can be from url QUERY and POST
+get | Value is from url QUERY
+post | Value is from POST
+cookie | Value is from http Cookie
+header | Value is from Http header
+
 
 
 ## 4. RequestBody
@@ -82,7 +116,7 @@ Using this you can map whole JSON body to a Class.
 
 ```phpt
 
-#[RequestMapping(path: "/calc/add", method: [RequestMethod::POST])]
+#[PostMapping(path: "/calc/add")]
 public function sum(
     #[RequestBody] AddRequest $request
 ): int {
@@ -114,7 +148,7 @@ Attribute **#[PathVariable]** indicates that a method parameter should be bound 
 
 ```phpt
 
-#[RequestMapping(path: "/hello/{name}", method: [RequestMethod::GET])]
+#[GetMapping(path: "/hello/{name}")]
 public function sayHello2(
     #[PathVariable] string $name
 ): string {

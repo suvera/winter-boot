@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace dev\winterframework\paxb\bind;
 
-use dev\winterframework\paxb\attr\XmlElement;
-use dev\winterframework\paxb\attr\XmlElementWrapper;
 use dev\winterframework\reflection\ClassResource;
 
 class XmlBeanAnnotations {
@@ -44,10 +42,6 @@ class XmlBeanAnnotations {
 
     protected function process(): void {
 
-        $wrappers = [
-            XmlElement::class => XmlElementWrapper::class
-        ];
-
         foreach ($this->classResource->getMethods() as $method) {
 
             $local = [];
@@ -60,15 +54,6 @@ class XmlBeanAnnotations {
                     $local[$attrCls] = [
                         new XmlBeanAnnotation($attribute, $method)
                     ];
-                }
-            }
-            foreach ($wrappers as $child => $wrappedBy) {
-                if (isset($local[$child]) && isset($local[$wrappedBy])) {
-                    /** @var XmlElementWrapper $wrapAnnot */
-                    $wrapAnnot = $local[$wrappedBy][0]->getAnnotation();
-                    /** @var XmlElement $childAnnot */
-                    $childAnnot = $local[$child][0]->getAnnotation();
-                    $childAnnot->setWrapper($wrapAnnot);
                 }
             }
             $this->mergeToAttributes($local);

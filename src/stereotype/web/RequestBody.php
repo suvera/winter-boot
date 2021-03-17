@@ -9,6 +9,7 @@ use dev\winterframework\reflection\ref\RefParameter;
 use dev\winterframework\stereotype\StereoType;
 use dev\winterframework\type\TypeAssert;
 use ReflectionNamedType;
+use ReflectionUnionType;
 
 #[Attribute(Attribute::TARGET_PARAMETER)]
 class RequestBody implements StereoType {
@@ -49,19 +50,34 @@ class RequestBody implements StereoType {
 
         $this->variableName = $ref->getName();
 
-        /** @var ReflectionNamedType $type */
+        /** @var ReflectionNamedType|ReflectionUnionType $type */
         $type = $ref->getType();
 
-        if ($type->isBuiltin()) {
+        if ($type instanceof ReflectionUnionType) {
             throw new InvalidSyntaxException(
-                'Parameter annotated with #[RequestBody] must have TypeHinted with a custom class, param: '
-                . $ref->getName() . ' defined in method '
+                'Parameter annotated with #[RequestBody] '
+                . ' cannot be Union Type '
+                . ', must have TypeHinted with a custom class (or string), '
+                . 'param: ' . $ref->getName() . ' defined in method '
                 . $ref->getDeclaringFunction()->getName()
             );
         }
 
         $this->variableType = $type->getName();
-        if (!class_exists($this->variableType)) {
+        if ($this->variableType === 'mixed') {
+            $this->variableType = 'string';
+        }
+
+        if ($type->isBuiltin() && $this->variableType !== 'string') {
+            throw new InvalidSyntaxException(
+                'Parameter annotated with #[RequestBody] must have '
+                . 'TypeHinted with a custom class (or string), '
+                . 'param: ' . $ref->getName() . ' defined in method '
+                . $ref->getDeclaringFunction()->getName()
+            );
+        }
+
+        if ($this->variableType !== 'string' && !class_exists($this->variableType)) {
             throw new InvalidSyntaxException(
                 'Could not load/find the class '
                 . $this->variableType

@@ -26,6 +26,10 @@ class MethodResource {
         return isset($this->attributes) ? $this->attributes->getByName($name) : null;
     }
 
+    public function getAttributeByNames(string ...$names): array {
+        return isset($this->attributes) ? $this->attributes->getByNames(...$names) : [];
+    }
+
     public function getReturnNamedType(): ParameterType {
         if (!isset($this->returnType)) {
             $this->returnType = ParameterType::fromType($this->method->getReturnType());
@@ -58,7 +62,7 @@ class MethodResource {
      * @noinspection PhpDocSignatureInspection
      */
     public function getAttributes(): AttributeList {
-        return $this->attributes;
+        return isset($this->attributes) ? $this->attributes : AttributeList::emptyList();
     }
 
     public function setAttributes(AttributeList $attributes): void {

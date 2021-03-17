@@ -96,11 +96,12 @@ final class WinterBeanProviderContext implements BeanProviderContext {
     private function processClassAttribute(ClassResource $class, object $attribute): void {
         $attrClass = $attribute::class;
 
-        switch ($attrClass) {
-            case RequestMapping::class:
-                // Not a Bean
-                break;
+        if ($attribute instanceof RequestMapping) {
+            // Not a Bean
+            return;
+        }
 
+        switch ($attrClass) {
             case Component::class:
             case Configuration::class:
             case RestController::class:

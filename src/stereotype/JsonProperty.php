@@ -5,6 +5,7 @@ namespace dev\winterframework\stereotype;
 
 use Attribute;
 use dev\winterframework\reflection\ref\RefProperty;
+use dev\winterframework\reflection\support\ParameterType;
 use dev\winterframework\type\TypeAssert;
 
 #[Attribute(Attribute::TARGET_PROPERTY)]
@@ -33,6 +34,14 @@ class JsonProperty implements StereoType {
         TypeAssert::typeOf($ref, RefProperty::class);
         if (empty($this->name)) {
             $this->name = $ref->getName();
+        }
+
+        $type = ParameterType::fromType($ref->getType());
+        if ($type->allowsNull()) {
+            $this->nillable = true;
+        }
+        if (!$ref->hasDefaultValue() && !$type->allowsNull()) {
+            $this->required = true;
         }
     }
 }

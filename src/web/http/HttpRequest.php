@@ -1,4 +1,4 @@
-<?php 
+<?php
 declare(strict_types=1);
 
 namespace dev\winterframework\web\http;
@@ -21,6 +21,7 @@ class HttpRequest {
         $this->queryParams = isset($_GET) ? $_GET : [];
         $this->postParams = isset($_POST) ? $_POST : [];
         $this->headers = new HttpHeaders();
+        $this->loadHeaders();
         $this->cookies = isset($_COOKIE) ? $_COOKIE : [];
 
         $this->method = isset($_SERVER['REQUEST_METHOD']) ? strtoupper($_SERVER['REQUEST_METHOD']) : '';
@@ -28,7 +29,7 @@ class HttpRequest {
 
         $body = file_get_contents('php://input');
         $this->body = is_string($body) ? $body : '';
-        
+
         $this->contentType = isset($_SERVER['CONTENT_TYPE']) ? $_SERVER['CONTENT_TYPE'] : '';
 
         $files = isset($_FILES) ? $_FILES : [];
@@ -54,6 +55,21 @@ class HttpRequest {
 
         }
         $this->files = $uploaded;
+    }
+
+    private function loadHeaders(): void {
+        if (!function_exists('getallheaders')) {
+            foreach ($_SERVER as $name => $value) {
+                if (substr($name, 0, 5) == 'HTTP_') {
+                    $ucWord = ucwords(strtolower(str_replace('_', ' ', substr($name, 5))));
+                    $this->headers->add(str_replace(' ', '-', $ucWord), $value);
+                }
+            }
+        } else {
+            foreach (getallheaders() as $name => $value) {
+                $this->headers->add($name, $value);
+            }
+        }
     }
 
     public function getHeaders(): HttpHeaders {

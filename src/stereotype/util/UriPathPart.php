@@ -8,7 +8,7 @@ namespace dev\winterframework\stereotype\util;
 use dev\winterframework\exception\InvalidSyntaxException;
 
 class UriPathPart {
-    const REGEX_STR = '[a-zA-Z_0-9\-\:\;\$\=\+\&\%]+';
+    const REGEX_STR = '[a-zA-Z_0-9\-\.\:\;\$\=\+\&\%]+';
     const REGEX_INT = '[0-9]+';
     const REGEX_FLOAT = '[0-9]+\.[0-9]+';
     const REGEX_BOOL = '(true|false)';

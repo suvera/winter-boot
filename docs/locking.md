@@ -53,6 +53,16 @@ public function  getRedisLockManager(): LockManager {
 
 ```
 
+### **Symfony Framework**
+
+Symfony Framework has Lock component that supports many backend stores.
+
+- https://symfony.com/doc/current/components/lock.html
+
+
+
+## Attribute Options
+
 Attribute **#[Lockable]** has more options.
 
 Name | Required | Default Value | Description

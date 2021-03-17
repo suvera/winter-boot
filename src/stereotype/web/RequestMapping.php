@@ -49,13 +49,25 @@ class RequestMapping implements StereoType {
 
     private string $id;
 
+    public string|array $path = '';
+    public array $method = [];
+    public ?string $name = null;
+    public ?array $consumes = null;
+    public ?array $produces = null;
+
+
     public function __construct(
-        public string|array $path = '',
-        public array $method = [],
-        public ?string $name = null,
-        public ?array $consumes = null,
-        public ?array $produces = null
+        string|array $path = '',
+        array $method = [],
+        ?string $name = null,
+        ?array $consumes = null,
+        ?array $produces = null
     ) {
+        $this->path = $path;
+        $this->method = $method;
+        $this->name = $name;
+        $this->consumes = $consumes;
+        $this->produces = $produces;
     }
 
     public function init(object $ref): void {
@@ -359,4 +371,5 @@ class RequestMapping implements StereoType {
             $this->requestParams[] = $attr;
         }
     }
+
 }

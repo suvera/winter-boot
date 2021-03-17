@@ -89,11 +89,11 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
         MethodResource $method
     ): void {
 
-        $attribute = $method->getAttribute(RequestMapping::class);
-
-        if ($attribute !== null) {
-            /** @var RequestMapping $attribute */
-            $this->put($attribute);
+        $attributes = $method->getAttributes();
+        foreach ($attributes as $attribute) {
+            if ($attribute instanceof RequestMapping) {
+                $this->put($attribute);
+            }
         }
     }
 

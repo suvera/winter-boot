@@ -55,9 +55,15 @@ final class TypeAssert {
         }
     }
 
-    public static function isScalar(string $typeName) {
+    public static function isScalarName(string $typeName, string $prefix = '') {
         if (!isset(self::$SCALAR_TYPES[$typeName])) {
-            throw new TypeError("Expected data type Scalar, but got " . $typeName);
+            throw new TypeError($prefix . "Expected data type Scalar, but got " . $typeName);
+        }
+    }
+
+    public static function isScalarOrArrayName(string $typeName, string $prefix = '') {
+        if ($typeName !== 'array' && !isset(self::$SCALAR_TYPES[$typeName])) {
+            throw new TypeError($prefix . "Expected data type Scalar or Array, but got " . $typeName);
         }
     }
 
@@ -171,5 +177,4 @@ final class TypeAssert {
             throw new IllegalStateException($message);
         }
     }
-
 }

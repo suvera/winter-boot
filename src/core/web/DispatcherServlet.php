@@ -10,9 +10,12 @@ use dev\winterframework\core\System;
 use dev\winterframework\core\web\error\DefaultErrorController;
 use dev\winterframework\core\web\error\ErrorController;
 use dev\winterframework\core\web\route\RequestMappingRegistry;
+use dev\winterframework\exception\NullPointerException;
 use dev\winterframework\exception\WinterException;
 use dev\winterframework\reflection\ObjectCreator;
 use dev\winterframework\stereotype\web\RequestBody;
+use dev\winterframework\stereotype\web\RequestParam;
+use dev\winterframework\util\JsonUtil;
 use dev\winterframework\util\log\Wlf4p;
 use dev\winterframework\web\http\HttpRequest;
 use dev\winterframework\web\http\HttpStatus;
@@ -171,19 +174,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
          * STEP - 3 : Validate Requested Parameters
          */
         foreach ($vars as $var) {
-            $args[$var->getVariableName()] =
-                $request->hasQueryParam($var->name) ? $request->getQueryParam($var->name)
-                    : $request->getPostParam($var->name);
-
-            if ($var->required && !isset($args[$var->getVariableName()])) {
-                $this->handleError(
-                    HttpStatus::$BAD_REQUEST,
-                    new WinterException('Bad Request: parameter "'
-                        . $var->name
-                        . '" is required.'
-                    )
-                );
-            }
+            $args[$var->getVariableName()] = $this->getRequestParamValue($request, $var);
         }
 
         /**
@@ -249,49 +240,150 @@ class DispatcherServlet implements HttpRequestDispatcher {
     }
 
     /**
-     * Parse Body
+     * ----
+     * Parse Body and Map to object
      *
      * @param HttpRequest $request
      * @param RequestBody $body
      * @param string $contentType
-     * @return object|null
+     * @return object|string|null
      * @throws
      */
     protected function parseBody(
         HttpRequest $request,
         RequestBody $body,
         string $contentType
-    ): ?object {
+    ): object|string|null {
+
+
+        $rawBody = $request->getRawBody();
+        $varType = $body->getVariableType();
+        if ($varType === 'string') {
+            return $rawBody;
+        }
 
         if (str_contains($contentType, MediaType::APPLICATION_FORM_URLENCODED)
             || str_contains($contentType, MediaType::MULTIPART_FORM_DATA)) {
 
-            return ObjectCreator::createObject(
-                $body->getVariableType(), $_POST
-            );
+            try {
+                return ObjectCreator::createObject($varType, $_POST);
+            } catch (Throwable $e) {
+                self::logException($e);
+
+                $this->handleError(
+                    HttpStatus::$BAD_REQUEST,
+                    new WinterException('Bad Request: Unexpected data passed')
+                );
+            }
 
         } else if (!$body->disableParsing
             && (empty($contentType) || str_contains($contentType, MediaType::APPLICATION_JSON))) {
 
-            $row = json_decode($request->getRawBody(), true, 128, JSON_THROW_ON_ERROR);
-            self::logInfo('JSON Body: ' . $request->getRawBody());
+            self::logInfo('JSON Body: ' . $rawBody);
 
-            return ObjectCreator::createObject(
-                $body->getVariableType(), $row
-            );
+            $row = [];
+            try {
+                $row = JsonUtil::decodeArray($rawBody);
+            } catch (Throwable $e) {
+                self::logException($e);
+
+                $this->handleError(
+                    HttpStatus::$BAD_REQUEST,
+                    new WinterException('Bad Request: Invalid JSON, ' . $e->getMessage())
+                );
+            }
+
+            try {
+                return ObjectCreator::createObject($varType, $row);
+            } catch (Throwable $e) {
+                self::logException($e);
+
+                $this->handleError(
+                    HttpStatus::$BAD_REQUEST,
+                    new WinterException('Bad Request: Wrong JSON data passed')
+                );
+            }
+
         } else if (!$body->disableParsing && (str_contains($contentType, MediaType::APPLICATION_XML)
                 || str_contains($contentType, MediaType::TEXT_XML))) {
 
-            self::logInfo('XML Body: ' . $request->getRawBody());
+            self::logInfo('XML Body: ' . $rawBody);
 
-            return ObjectCreator::createObjectXml(
-                $body->getVariableType(), $request->getRawBody()
+            try {
+                return ObjectCreator::createObjectXml($varType, $rawBody);
+            } catch (Throwable $e) {
+                self::logException($e);
+
+                $this->handleError(
+                    HttpStatus::$BAD_REQUEST,
+                    new WinterException('Bad Request: Wrong XML data passed')
+                );
+            }
+        }
+
+        try {
+            return ObjectCreator::createObject($varType, $rawBody);
+        } catch (Throwable $e) {
+            self::logException($e);
+
+            $this->handleError(
+                HttpStatus::$BAD_REQUEST,
+                new WinterException('Bad Request: Unexpected data passed')
+            );
+        }
+        return null;
+    }
+
+    /**
+     * ---------
+     * Find and Map the requested parameter to controller argument
+     *
+     * @param HttpRequest $request
+     * @param RequestParam $var
+     * @return mixed
+     */
+    private function getRequestParamValue(HttpRequest $request, RequestParam $var): mixed {
+        $type = $var->getVariableType();
+
+        $value = match ($var->getSource()) {
+            'get' => $request->getQueryParam($var->name),
+            'post' => $request->getPostParam($var->name),
+            'cookie' => $request->getCookie($var->name),
+            'header' => $type->hasType('array') ?
+                $request->getHeader($var->name) : $request->getFirstHeader($var->name),
+            default => $request->hasQueryParam($var->name) ?
+                $request->getQueryParam($var->name) : $request->getPostParam($var->name),
+        };
+
+        if ($var->required && is_null($value)) {
+            $this->handleError(
+                HttpStatus::$BAD_REQUEST,
+                new WinterException('Bad Request: ' . $var->getRequiredText())
             );
         }
 
-        return ObjectCreator::createObject(
-            $body->getVariableType(), $request->getRawBody()
-        );
+        try {
+            return $type->castValue(
+                $value,
+                0,
+                $var->defaultValue
+            );
+        } catch (NullPointerException $ex) {
+            self::logException($ex);
+
+            $this->handleError(
+                HttpStatus::$BAD_REQUEST,
+                new WinterException('Bad Request: ' . $var->getRequiredText())
+            );
+        } catch (Throwable $e) {
+            self::logException($e);
+
+            $this->handleError(
+                HttpStatus::$BAD_REQUEST,
+                new WinterException('Bad Request: ' . $var->getInvalidText())
+            );
+        }
+        return null;
     }
 
 }

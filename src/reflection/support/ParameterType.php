@@ -5,9 +5,15 @@ namespace dev\winterframework\reflection\support;
 
 use DateTime;
 use DateTimeInterface;
+use dev\winterframework\exception\NullPointerException;
+use dev\winterframework\io\ObjectMapper;
+use dev\winterframework\reflection\ObjectCreator;
+use dev\winterframework\reflection\ref\RefKlass;
 use ReflectionNamedType;
 use ReflectionType;
 use ReflectionUnionType;
+use Throwable;
+use TypeError;
 
 class ParameterType {
     public static ParameterType $noType;
@@ -21,7 +27,7 @@ class ParameterType {
     public function __construct(
         private string $name,
         private bool $allowsNull,
-        private bool $isBuiltin,
+        private bool $isBuiltin
     ) {
     }
 
@@ -32,7 +38,9 @@ class ParameterType {
         return self::$noType;
     }
 
-    public static function fromType(ReflectionNamedType|ReflectionUnionType|ReflectionType|null $type): ParameterType {
+    public static function fromType(
+        ReflectionNamedType|ReflectionUnionType|ReflectionType|null $type
+    ): ParameterType {
         if ($type == null) {
             return self::getNoType();
         } else if ($type instanceof ReflectionUnionType) {
@@ -141,5 +149,147 @@ class ParameterType {
 
     public function isBuiltin(): bool {
         return $this->isBuiltin;
+    }
+
+    public function castValue(
+        mixed $value,
+        int $source = 0,
+        mixed $defaultValue = null
+    ): mixed {
+        if (is_null($value)) {
+            if (!$this->allowsNull() && is_null($defaultValue)) {
+                throw new NullPointerException('Property "'
+                    . $this->name . '" cannot be nullable '
+                );
+            }
+            return $defaultValue;
+        }
+
+        /**
+         * Handle Integer
+         */
+        if (is_int($value)) {
+            if ($this->hasType("int")) {
+                return $value;
+            } else if ($this->hasType("string")) {
+                return strval($value);
+            }
+            $this->throwTypeError('INTEGER');
+        }
+
+        /**
+         * Handle Float
+         */
+        if (is_float($value)) {
+            if ($this->hasType("float")) {
+                return $value;
+            } else if ($this->hasType("string")) {
+                return strval($value);
+            }
+            $this->throwTypeError('FLOAT');
+        }
+
+        /**
+         * Handle Boolean
+         */
+        if (is_bool($value)) {
+            if ($this->hasType("bool")) {
+                return $value;
+            }
+            $this->throwTypeError('BOOLEAN');
+        }
+
+        /**
+         * Handle String
+         */
+        if (is_string($value)) {
+
+            $valLower = strtolower($value);
+
+            if ($this->hasType("string")) {
+                return $value;
+
+            } else if ($this->hasType("bool") && ($valLower === 'true' || $valLower === 'false')) {
+                return ($valLower === 'true');
+
+            } else if (is_numeric($value)) {
+                $value = $value + 0;
+                if (is_float($value) && $this->hasType("float")) {
+                    return $value;
+
+                } else if ($this->hasType("int")) {
+                    return $value;
+
+                }
+            } else if ($this->isDateTimeType()) {
+                try {
+                    return new DateTime($value);
+                } /** @noinspection PhpUnusedLocalVariableInspection */
+                catch (Throwable $e) {
+                    // do nothing
+                }
+            }
+            $this->throwTypeError('STRING');
+        }
+
+        /**
+         * Handle Array
+         */
+        if (is_array($value)) {
+            if ($this->hasType("array")) {
+                return $value;
+
+            }
+
+            $classTypes = $this->getClassTypes();
+            foreach ($classTypes as $classType) {
+                $cls = RefKlass::getInstance($classType);
+                if ($cls->isInstantiable()) {
+                    if ($source == ObjectMapper::SOURCE_JSON || $source == ObjectMapper::SOURCE_ARRAY) {
+                        return ObjectCreator::createObject($classType, $value);
+                    }
+                }
+            }
+            $this->throwTypeError('ARRAY');
+        }
+
+        /**
+         * Handle Object
+         */
+        if (is_object($value)) {
+            if ($this->hasType("object")) {
+                return $value;
+            }
+
+            $classTypes = $this->getClassTypes();
+            foreach ($classTypes as $classType) {
+                if ($value instanceof $classType) {
+                    return $value;
+                }
+            }
+            $this->throwTypeError('OBJECT');
+        }
+
+        /**
+         * Handle Resource
+         */
+        if (is_resource($value)) {
+            if ($this->hasType("mixed")) {
+                return $value;
+            }
+            $this->throwTypeError('RESOURCE');
+        }
+
+        // is_callable() - ignored
+        $this->throwTypeError('unknown');
+        return null;
+    }
+
+    private function throwTypeError(
+        string $type = ''
+    ): void {
+        throw new TypeError('Parameter "' . $this->name
+            . '" cannot be assigned to "' . $type . '"'
+        );
     }
 }
