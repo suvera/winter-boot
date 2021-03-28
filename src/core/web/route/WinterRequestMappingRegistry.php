@@ -13,6 +13,8 @@ use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\MethodResource;
 use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\stereotype\RestController;
+use dev\winterframework\stereotype\util\UriPath;
+use dev\winterframework\stereotype\util\UriPathPart;
 use dev\winterframework\stereotype\web\RequestMapping;
 use dev\winterframework\util\log\Wlf4p;
 
@@ -37,6 +39,11 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
     /**
      * @var array
      */
+    private static array $fullTextIndex = [];
+
+    /**
+     * @var array
+     */
     private static array $cachedPaths = [];
 
     public function __construct(
@@ -48,7 +55,8 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
             if (ApcCache::exists($key)
                 && !$this->ctxData->getPropertyContext()->getBool('winter.route.cacheDisabled', false)
             ) {
-                list(self::$byId, self::$byRegex, self::$byUriMethod) = ApcCache::get($key);
+                list(self::$byId, self::$byRegex, self::$byUriMethod, self::$fullTextIndex)
+                    = ApcCache::get($key);
             }
         }
         if (empty(self::$byId)) {
@@ -62,7 +70,7 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
             );
             ApcCache::cache(
                 $key,
-                [self::$byId, self::$byRegex, self::$byUriMethod],
+                [self::$byId, self::$byRegex, self::$byUriMethod, self::$fullTextIndex],
                 $ttl > 0 ? $ttl : Winter::ROUTE_CACHE_TTL
             );
         }
@@ -141,8 +149,8 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
                             }
 
                             $otherMapping = $otherMappings[$method];
-                            foreach ($otherMapping->getUriPaths() as $uriPath) {
-                                $otherNormalized = $uriPath->getNormalized();
+                            foreach ($otherMapping->getUriPaths() as $uriPath2) {
+                                $otherNormalized = $uriPath2->getNormalized();
                                 if (preg_match($fullRegex, $otherNormalized)) {
                                     throw new DuplicatePathException("Duplicate Path '$normalized' "
                                         . 'detected at '
@@ -160,6 +168,45 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
                 self::$byUriMethod[$normalized][$method] = $mapping;
                 self::logInfo('Route [' . $method . '] "' . $normalized . '" registered.');
             }
+            $this->addToFullTextIndex($uriPath, $mapping, $fullRegex);
+        }
+    }
+
+    private function addToFullTextIndex(
+        UriPath $uriPath,
+        RequestMapping $mapping,
+        string $fullRegex
+    ): void {
+        foreach ($mapping->method as $method) {
+            if (!isset(self::$fullTextIndex[$method])) {
+                self::$fullTextIndex[$method] = [];
+            }
+            $hasParts = false;
+            $ref = &self::$fullTextIndex[$method];
+
+            //echo "FullRegex: $fullRegex \n";
+            foreach ($uriPath->getArray() as $pathPart) {
+                /** @var $pathPart UriPathPart */
+                if ($pathPart->isPathVariable()) {
+                    $part = '/^' . $pathPart->getRegex() . '$/';
+                } else {
+                    $part = $pathPart->getPart();
+                }
+
+                if (!isset($ref[$part])) {
+                    $ref[$part] = [];
+                }
+                $ref = &$ref[$part];
+                $hasParts = true;
+            }
+
+            if (!$hasParts) {
+                $ref[''] = [
+                    '<mapping>' => [$mapping, $fullRegex]
+                ];
+            } else {
+                $ref['<mapping>'] = [$mapping, $fullRegex];
+            }
         }
     }
 
@@ -173,17 +220,46 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
             return new MatchedRequestMapping($m['obj'], $m['matches']);
         }
 
-        foreach (self::$byRegex as $regex => $mappings) {
-            $matches = [];
-            if (isset($mappings[$method]) && preg_match($regex, $path, $matches)) {
-                self::$cachedPaths[$path][$method] = [
-                    'obj' => $mappings[$method],
-                    'regex' => $regex,
-                    'matches' => $matches
-                ];
+        if (!isset(self::$fullTextIndex[$method])) {
+            return null;
+        }
 
-                return new MatchedRequestMapping(self::$cachedPaths[$path][$method]['obj'], $matches);
+        $path = preg_replace('/\/+/', '/', $path);
+        $pathParts = explode('/', $path);
+        $textIndex = self::$fullTextIndex[$method];
+        $matches = [];
+
+        foreach ($pathParts as $part) {
+            if (isset($textIndex[$part])) {
+                $textIndex = $textIndex[$part];
+            } else {
+                $found = false;
+                foreach ($textIndex as $regex => $others) {
+                    $newMatches = [];
+                    if (strlen($regex) > 0
+                        && $regex[0] === '/'
+                        && preg_match($regex, $part, $newMatches)
+                    ) {
+                        $textIndex = $textIndex[$regex];
+                        $matches = array_merge($matches, $newMatches);
+                        $found = true;
+                        break;
+                    }
+                }
+                if (!$found) {
+                    return null;
+                }
             }
+        }
+
+        if (isset($textIndex['<mapping>'])) {
+            self::$cachedPaths[$path][$method] = [
+                'obj' => $textIndex['<mapping>'][0],
+                'regex' => $textIndex['<mapping>'][1],
+                'matches' => $matches
+            ];
+
+            return new MatchedRequestMapping(self::$cachedPaths[$path][$method]['obj'], $matches);
         }
 
         return null;

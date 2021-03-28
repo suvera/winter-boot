@@ -26,6 +26,10 @@ class UriPathPart {
         $this->parsePath();
     }
 
+    public function getPart(): string {
+        return $this->part;
+    }
+
     private function parsePath() {
         $len = strlen($this->part);
 
@@ -64,15 +68,17 @@ class UriPathPart {
         }
 
         $regex = '(?<' . $this->part . '>';
+        $regex .= $this->getTypeRegex();
+        return $regex . ')';
+    }
 
-        $regex .= match ($this->type) {
+    public function getTypeRegex(): string {
+        return match ($this->type) {
             'int' => self::REGEX_INT,
             'float' => self::REGEX_FLOAT,
             'bool' => self::REGEX_BOOL,
             default => self::REGEX_STR,
         };
-
-        return $regex . ')';
     }
 
     public function getNormalized(): string {
