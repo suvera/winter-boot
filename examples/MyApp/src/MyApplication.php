@@ -9,7 +9,7 @@ use dev\winterframework\stereotype\WinterBootApplication;
 #[WinterBootApplication(
     configDirectory: [__DIR__ . "/../config"],
     scanNamespaces: [
-        ['examples\MyApp', __DIR__ . '']
+        ['examples\\MyApp', __DIR__ . '']
     ]
 )]
 class MyApplication {

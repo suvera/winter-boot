@@ -32,6 +32,12 @@ datasource:
             autoCommit: true
             defaultrowprefetch: 100
 
+modules:
+    - module: "Abc"
+      enabled: true
+    - module: "Xyz"
+      enabled: true
+
 management:
     endpoints:
         enabled: true

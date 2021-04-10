@@ -24,6 +24,7 @@ use dev\winterframework\stereotype\Bean;
 use dev\winterframework\stereotype\cli\Command;
 use dev\winterframework\stereotype\Component;
 use dev\winterframework\stereotype\Configuration;
+use dev\winterframework\stereotype\Module;
 use dev\winterframework\stereotype\Qualifier;
 use dev\winterframework\stereotype\RestController;
 use dev\winterframework\stereotype\Service;
@@ -109,9 +110,17 @@ final class WinterBeanProviderContext implements BeanProviderContext {
             case WinterBootTest::class:
             case Command::class:
             case WinterBootApplication::class:
-                /** @var Component|Configuration|RestController|Service|WinterBootTest|Command $attribute */
+            case Module::class:
+                /**
+                 * @var Component|Configuration|RestController|Service $attribute
+                 * @var WinterBootTest|Command|Module $attribute
+                 */
                 $beanProvider = new BeanProvider($class, null, $class->isProxyNeeded());
                 $beanDef = new Bean($attribute->name);
+                if ($attrClass == Module::class) {
+                    $beanDef->initMethod = $attribute->initMethod ?: null;
+                    $beanDef->destroyMethod = $attribute->destroyMethod ?: null;
+                }
                 $this->registerBeanProvider($beanProvider, $beanDef);
                 break;
 

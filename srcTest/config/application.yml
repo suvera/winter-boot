@@ -50,3 +50,9 @@ datasource:
             timeoutSecs: 30
             autoCommit: true
             rowsPrefetch: 100
+
+modules:
+    - module: "\\test\\winterframework\\modules\\mtk\\MtkModule"
+      enabled: true
+    - module: "\\test\\winterframework\\modules\\tihrd\\TihrdModule"
+      enabled: true

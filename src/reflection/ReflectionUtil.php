@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace dev\winterframework\reflection;
 
+use dev\winterframework\exception\AnnotationException;
 use dev\winterframework\reflection\ref\ReflectionAbstract;
+use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionFunction;
 use ReflectionMethod;
@@ -13,6 +15,7 @@ use ReflectionObject;
 use ReflectionParameter;
 use ReflectionProperty;
 use ReflectionUnionType;
+use Throwable;
 
 class ReflectionUtil {
 
@@ -178,5 +181,16 @@ class ReflectionUtil {
         }
 
         return ' * ' . implode("\n * ", $stubs) . "\n";
+    }
+
+    public static function createAttribute(ReflectionAttribute $attribute, object $owner): object {
+        try {
+            $attr = $attribute->newInstance();
+            $attr->init($owner);
+            return $attr;
+        } catch (Throwable $e) {
+            throw new AnnotationException('Could not build Annotation object '
+                . $attribute->getName(), 0, $e);
+        }
     }
 }

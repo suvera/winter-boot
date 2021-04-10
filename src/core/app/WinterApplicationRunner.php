@@ -19,17 +19,20 @@ use dev\winterframework\reflection\ClassResources;
 use dev\winterframework\reflection\ClassResourceScanner;
 use dev\winterframework\reflection\Psr4Namespace;
 use dev\winterframework\reflection\Psr4Namespaces;
+use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\stereotype\cache\EnableCaching;
+use dev\winterframework\stereotype\Module;
 use dev\winterframework\stereotype\txn\EnableTransactionManagement;
 use dev\winterframework\stereotype\WinterBootApplication;
-use dev\winterframework\type\StringList;
 use dev\winterframework\type\StringSet;
 use dev\winterframework\type\TypeAssert;
 use dev\winterframework\util\log\LoggerManager;
+use dev\winterframework\util\log\Wlf4p;
 use dev\winterframework\util\PropertyLoader;
 
 abstract class WinterApplicationRunner {
+    use Wlf4p;
 
     protected WinterApplicationContext $applicationContext;
     protected ClassResource $bootApp;
@@ -90,6 +93,9 @@ abstract class WinterApplicationRunner {
         $appClass = $this->bootApp->getClass()->getName();
         $this->applicationContext->addClass($appClass);
         $this->applicationContext->beanByClass($appClass);
+
+        $this->loadModules();
+
         $this->runBootApp();
     }
 
@@ -156,6 +162,8 @@ abstract class WinterApplicationRunner {
         }
 
         if (!isset($this->resources)) {
+            $this->initModules();
+
             $this->findAttributesToScan();
 
             $this->resources = $this->scanner->scan(
@@ -215,6 +223,48 @@ abstract class WinterApplicationRunner {
                 )
             );
             $this->attributesToScan->addAll($cacheTypes);
+        }
+    }
+
+    protected function loadModules() {
+        $modules = $this->propertyCtx->get('modules', []);
+        foreach ($modules as $moduleDef) {
+            if (!$moduleDef['module'] || !$moduleDef['enabled']) {
+                continue;
+            }
+            $clsRef = $this->applicationContext->addClass($moduleDef['module']);
+
+            /** @var Module $module */
+            $module = $clsRef->getAttribute(Module::class);
+
+            if ($module) {
+                $this->applicationContext->beanByClass($module->getClassName());
+                self::logInfo("Module [ {$module->title} ] loaded.");
+            }
+        }
+    }
+
+    protected function initModules() {
+        $modules = $this->propertyCtx->get('modules', []);
+        foreach ($modules as $moduleDef) {
+            if (!$moduleDef['module'] || !$moduleDef['enabled']) {
+                continue;
+            }
+
+            $clsRef = RefKlass::getInstance($moduleDef['module']);
+
+            /** @var Module $module */
+            $attrs = $clsRef->getAttributes(Module::class);
+
+            if ($attrs) {
+                $module = ReflectionUtil::createAttribute($attrs[0], $clsRef);
+
+                self::logInfo("Module [ {$module->title} ] loading.");
+
+                foreach ($module->namespaces as $nsRow) {
+                    $this->scanNamespaces[] = new Psr4Namespace($nsRow[0], $nsRow[1]);
+                }
+            }
         }
     }
 
