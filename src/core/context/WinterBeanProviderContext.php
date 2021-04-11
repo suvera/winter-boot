@@ -66,8 +66,19 @@ final class WinterBeanProviderContext implements BeanProviderContext {
     }
 
     public function addProviderClass(ClassResource $class): void {
+        $this->_addProviderClass($class);
+    }
+
+    public function addProviderClassAs(ClassResource $class, array $attributes): void {
+        $this->_addProviderClass($class, $attributes);
+    }
+
+    private function _addProviderClass(ClassResource $class, array $moreAttributes = null): void {
         $this->validateBeanClass($class->getClass());
         $attributes = $class->getAttributes();
+        if ($moreAttributes) {
+            $attributes->addAll($moreAttributes);
+        }
 
         foreach ($attributes as $attribute) {
             $this->processClassAttribute($class, $attribute);
@@ -118,7 +129,6 @@ final class WinterBeanProviderContext implements BeanProviderContext {
                 $beanProvider = new BeanProvider($class, null, $class->isProxyNeeded());
                 $beanDef = new Bean($attribute->name);
                 if ($attrClass == Module::class) {
-                    $beanDef->initMethod = $attribute->initMethod ?: null;
                     $beanDef->destroyMethod = $attribute->destroyMethod ?: null;
                 }
                 $this->registerBeanProvider($beanProvider, $beanDef);

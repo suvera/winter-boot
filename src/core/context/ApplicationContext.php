@@ -38,4 +38,6 @@ interface ApplicationContext {
 
     public function getProperties(): array;
 
+    public function hasModule(string $moduleName): bool;
+
 }

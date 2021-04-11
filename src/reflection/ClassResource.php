@@ -59,6 +59,9 @@ class ClassResource {
     }
 
     public function getAttributes(): AttributeList {
+        if (!isset($this->attributes)) {
+            $this->attributes = AttributeList::ofValues();
+        }
         return $this->attributes;
     }
 

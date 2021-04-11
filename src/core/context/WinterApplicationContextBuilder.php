@@ -22,6 +22,7 @@ use dev\winterframework\pdbc\pdo\PdoTemplateProvider;
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\ClassResources;
 use dev\winterframework\reflection\ClassResourceScanner;
+use dev\winterframework\stereotype\Module;
 use dev\winterframework\stereotype\WinterBootApplication;
 use dev\winterframework\util\concurrent\DefaultLockManager;
 use dev\winterframework\util\concurrent\LockManager;
@@ -32,6 +33,7 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
     protected PropertyContext $propertyContext;
     protected WinterBootApplication $bootConfig;
     protected ClassResourceScanner $scanner;
+    protected array $moduleRegistry = [];
     private bool $built = false;
     protected int $startTime;
 
@@ -237,6 +239,14 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
             $this->processClassResource($clsResource);
         }
         return $clsResource;
+    }
+
+    public function hasModule(string $moduleName): bool {
+        return isset($this->moduleRegistry[$moduleName]);
+    }
+
+    public function addModule(string $moduleName, Module $module): void {
+        $this->moduleRegistry[$moduleName] = $module;
     }
 
 }
