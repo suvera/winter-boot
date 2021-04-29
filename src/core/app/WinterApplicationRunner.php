@@ -246,7 +246,7 @@ abstract class WinterApplicationRunner {
                 $this->applicationContext->addModule($moduleDef['module'], $module);
                 $this->applicationContext->addModule($module->title, $module);
 
-                self::logInfo("Module [ {$module->title} ] loaded.");
+                self::logInfo("Module [ $module->title ] loaded.");
             }
         }
     }
@@ -266,7 +266,7 @@ abstract class WinterApplicationRunner {
             if ($attrs) {
                 $module = ReflectionUtil::createAttribute($attrs[0], $clsRef);
 
-                self::logInfo("Module [ {$module->title} ] loading.");
+                self::logInfo("Module [ $module->title ] loading.");
 
                 foreach ($module->namespaces as $nsRow) {
                     $this->scanNamespaces[] = new Psr4Namespace($nsRow[0], $nsRow[1]);

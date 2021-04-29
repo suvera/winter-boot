@@ -209,4 +209,4 @@ see above example.
 
 Starter class must be defined with **#[WinterBootApplication]** attribute.
 
-see (Application Starter)[application_starter.md] for more details
+see [Application Starter](application_starter.md) for more details

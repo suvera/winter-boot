@@ -69,6 +69,8 @@ cacheResolver |  | default to framework Managed | Bean derived from CacheResolve
 
 Cache containers are managed by *CacheManager* , so, CacheManager is mandatory to create cache containers.
 
+by default, framework provides **default** cache manager.
+
 #### Example:
 
 ```phpt
