@@ -1,6 +1,6 @@
 # Example Application
 
-This is an example application developed using WinterBoot framework to demonstrate it's power.
+[MyApp](MyApp), This is an example application developed using WinterBoot framework to demonstrate it's power.
 
 It can be deployed in two ways
 
@@ -59,7 +59,7 @@ https://www.swoole.co.uk/docs/modules/swoole-server/configuration
 
 ### 2. Deployment with Apache
 
-point  **examples/MyApp/web** directory as **DocumentRoot** in your httpd.conf
+point  **"examples/MyApp/web"** directory as **DocumentRoot** in your httpd.conf
 
 And test application using curl as mentioned above.
 
