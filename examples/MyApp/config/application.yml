@@ -1,7 +1,13 @@
 server:
-    port: 80
+    port: 8080
     address: 127.0.0.1
     context-path: /
+    swoole:
+        reactor_num: 2
+        worker_num: 4
+        backlog: 128
+        max_request: 50
+        dispatch_mode: 1
 winter:
     application:
         name: My Demo Application
@@ -33,10 +39,6 @@ datasource:
             defaultrowprefetch: 100
 
 modules:
-    - module: "Abc"
-      enabled: true
-    - module: "Xyz"
-      enabled: true
 
 management:
     endpoints:

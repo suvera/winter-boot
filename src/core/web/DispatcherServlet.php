@@ -20,6 +20,7 @@ use dev\winterframework\util\log\Wlf4p;
 use dev\winterframework\web\http\HttpRequest;
 use dev\winterframework\web\http\HttpStatus;
 use dev\winterframework\web\http\ResponseEntity;
+use dev\winterframework\web\http\SwooleRequest;
 use dev\winterframework\web\HttpRequestDispatcher;
 use dev\winterframework\web\MediaType;
 use ReflectionNamedType;
@@ -28,12 +29,12 @@ use Throwable;
 class DispatcherServlet implements HttpRequestDispatcher {
     use Wlf4p;
 
-    private ErrorController $errorController;
+    protected ErrorController $errorController;
 
     public function __construct(
-        private RequestMappingRegistry $mappingRegistry,
-        private ApplicationContextData $ctxData,
-        private ApplicationContext $appCtx
+        protected RequestMappingRegistry $mappingRegistry,
+        protected ApplicationContextData $ctxData,
+        protected ApplicationContext $appCtx
     ) {
     }
 
@@ -66,12 +67,18 @@ class DispatcherServlet implements HttpRequestDispatcher {
         $this->errorController = $errorController;
     }
 
-    public function dispatch(): void {
+    protected function initHttpRequest(): HttpRequest {
+        return new HttpRequest();
+    }
+
+    public function dispatch(HttpRequest $request = null): void {
         $this->initErrorController();
         $serverPath = $this->ctxData->getPropertyContext()->get('server.context-path', '/');
         $serverPath = isset($serverPath) ? trim($serverPath, '/') : '';
 
-        $request = new HttpRequest();
+        if (!$request) {
+            $request = $this->initHttpRequest();
+        }
 
         $uri = $request->getUri();
         $uri = trim($uri, '/');
@@ -86,10 +93,12 @@ class DispatcherServlet implements HttpRequestDispatcher {
         if ($matchedRoute === null) {
             self::logError('Could not find Requested URI [' . $request->getMethod() . ']' . $uri);
             $this->handleError(
+                $request,
                 HttpStatus::$NOT_FOUND,
                 new WinterException('Could not find Requested URI ['
-                    . $request->getMethod() . ']' . $uri)
+                    . $request->getMethod() . ']' . $uri),
             );
+            return;
         }
 
         try {
@@ -97,15 +106,23 @@ class DispatcherServlet implements HttpRequestDispatcher {
         } catch (Throwable $t) {
             self::logException($t);
             $this->handleError(
+                $request,
                 HttpStatus::$INTERNAL_SERVER_ERROR,
                 $t
             );
+            return;
         }
     }
 
-    private function handleError(HttpStatus $status, Throwable $t = null): void {
-        $this->errorController->handleError($status, $t);
-        System::exit();
+    protected function handleError(
+        HttpRequest $request,
+        HttpStatus $status,
+        Throwable $t = null
+    ): void {
+        $this->errorController->handleError($request, $status, $t);
+        if (!($request instanceof SwooleRequest)) {
+            System::exit();
+        }
     }
 
     /**
@@ -113,7 +130,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
      * @param HttpRequest $request
      * @throws
      */
-    private function routeRequest(
+    protected function routeRequest(
         MatchedRequestMapping $route,
         HttpRequest $request
     ): void {
@@ -150,12 +167,14 @@ class DispatcherServlet implements HttpRequestDispatcher {
 
             if (!$success) {
                 $this->handleError(
+                    $request,
                     HttpStatus::$BAD_REQUEST,
                     new WinterException('Bad Request: expected request types ['
                         . implode(', ', $consumes)
                         . ', but got "' . $contentType . '"'
                     )
                 );
+                return;
             }
         }
 
@@ -174,7 +193,19 @@ class DispatcherServlet implements HttpRequestDispatcher {
          * STEP - 3 : Validate Requested Parameters
          */
         foreach ($vars as $var) {
-            $args[$var->getVariableName()] = $this->getRequestParamValue($request, $var);
+            try {
+                $args[$var->getVariableName()] = $this->getRequestParamValue($request, $var);
+            } catch (WinterException $e) {
+                $this->handleError($request, HttpStatus::$BAD_REQUEST, $e);
+                return;
+            } catch (Throwable $e) {
+                self::logError('Invalid parameter in the request - with error '
+                    . $e::class . ': ' . $e->getMessage() . ', file: ' . $e->getFile()
+                    . ', line: ' . $e->getLine()
+                );
+                $this->handleError($request, HttpStatus::$BAD_REQUEST);
+                return;
+            }
         }
 
         /**
@@ -184,12 +215,16 @@ class DispatcherServlet implements HttpRequestDispatcher {
 
             try {
                 $args[$bodyMap->getVariableName()] = $this->parseBody($request, $bodyMap, $contentType);
+            } catch (WinterException $e) {
+                $this->handleError($request, HttpStatus::$BAD_REQUEST, $e);
+                return;
             } catch (Throwable $e) {
                 self::logError('Could not understand the request - with error '
                     . $e::class . ': ' . $e->getMessage() . ', file: ' . $e->getFile()
                     . ', line: ' . $e->getLine()
                 );
-                $this->handleError(HttpStatus::$BAD_REQUEST);
+                $this->handleError($request, HttpStatus::$BAD_REQUEST);
+                return;
             }
         }
 
@@ -236,7 +271,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
             $controller->postHandle($request, $entity, $method->getDelegate());
         }
 
-        $renderer->renderAndExit($entity);
+        $renderer->renderAndExit($entity, $request);
     }
 
     /**
@@ -269,11 +304,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 return ObjectCreator::createObject($varType, $_POST);
             } catch (Throwable $e) {
                 self::logException($e);
-
-                $this->handleError(
-                    HttpStatus::$BAD_REQUEST,
-                    new WinterException('Bad Request: Unexpected data passed')
-                );
+                throw new WinterException('Bad Request: Unexpected data passed');
             }
 
         } else if (!$body->disableParsing
@@ -286,22 +317,14 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 $row = JsonUtil::decodeArray($rawBody);
             } catch (Throwable $e) {
                 self::logException($e);
-
-                $this->handleError(
-                    HttpStatus::$BAD_REQUEST,
-                    new WinterException('Bad Request: Invalid JSON, ' . $e->getMessage())
-                );
+                throw new WinterException('Bad Request: Invalid JSON, ' . $e->getMessage());
             }
 
             try {
                 return ObjectCreator::createObject($varType, $row);
             } catch (Throwable $e) {
                 self::logException($e);
-
-                $this->handleError(
-                    HttpStatus::$BAD_REQUEST,
-                    new WinterException('Bad Request: Wrong JSON data passed')
-                );
+                throw new WinterException('Bad Request: Wrong JSON data passed');
             }
 
         } else if (!$body->disableParsing && (str_contains($contentType, MediaType::APPLICATION_XML)
@@ -313,11 +336,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 return ObjectCreator::createObjectXml($varType, $rawBody);
             } catch (Throwable $e) {
                 self::logException($e);
-
-                $this->handleError(
-                    HttpStatus::$BAD_REQUEST,
-                    new WinterException('Bad Request: Wrong XML data passed')
-                );
+                throw new WinterException('Bad Request: Wrong XML data passed');
             }
         }
 
@@ -325,13 +344,8 @@ class DispatcherServlet implements HttpRequestDispatcher {
             return ObjectCreator::createObject($varType, $rawBody);
         } catch (Throwable $e) {
             self::logException($e);
-
-            $this->handleError(
-                HttpStatus::$BAD_REQUEST,
-                new WinterException('Bad Request: Unexpected data passed')
-            );
+            throw new WinterException('Bad Request: Unexpected data passed');
         }
-        return null;
     }
 
     /**
@@ -342,7 +356,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
      * @param RequestParam $var
      * @return mixed
      */
-    private function getRequestParamValue(HttpRequest $request, RequestParam $var): mixed {
+    protected function getRequestParamValue(HttpRequest $request, RequestParam $var): mixed {
         $type = $var->getVariableType();
 
         $value = match ($var->getSource()) {
@@ -356,10 +370,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
         };
 
         if ($var->required && is_null($value)) {
-            $this->handleError(
-                HttpStatus::$BAD_REQUEST,
-                new WinterException('Bad Request: ' . $var->getRequiredText())
-            );
+            throw new WinterException('Bad Request: ' . $var->getRequiredText());
         }
 
         try {
@@ -370,20 +381,11 @@ class DispatcherServlet implements HttpRequestDispatcher {
             );
         } catch (NullPointerException $ex) {
             self::logException($ex);
-
-            $this->handleError(
-                HttpStatus::$BAD_REQUEST,
-                new WinterException('Bad Request: ' . $var->getRequiredText())
-            );
+            throw new WinterException('Bad Request: ' . $var->getRequiredText());
         } catch (Throwable $e) {
             self::logException($e);
-
-            $this->handleError(
-                HttpStatus::$BAD_REQUEST,
-                new WinterException('Bad Request: ' . $var->getInvalidText())
-            );
+            throw new WinterException('Bad Request: ' . $var->getInvalidText());
         }
-        return null;
     }
 
 }

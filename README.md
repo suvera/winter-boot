@@ -28,7 +28,7 @@ This framework gives advantage to people already know Spring Boot, and want to j
 
 - Dependency Injection is managed by the framework with PHP8 Attributes (Annotations)
 
-## Example Service
+## Sample Service
 
 ```phpt
 #[Service]
@@ -68,23 +68,12 @@ curl "http://localhost/api/v2/users" -d "name=Abc&email=mail"
 
 ```
 
-# Examples
+# Example Application
 
 ----
 
-Check out the example application here [MyApp](examples/MyApp)
+Check out the example application here [MyApp](examples/README.md)
 
-- Example [Controllers](examples/MyApp/src/controller)
-- Example [Services](examples/MyApp/src/service)
-- Example [StereoTypes](examples/MyApp/src/stereotype)
-- Example [Config YML's](examples/MyApp/config)
-
-**MyAPP API URLs:**
-
-```
-curl "http://localhost/hello/world"
-curl "http://localhost/calc/add" -d "a=10&b=30"
-```
 
 # Documentation
 

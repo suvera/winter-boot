@@ -18,25 +18,29 @@ use dev\winterframework\stereotype\web\RequestMapping;
 use dev\winterframework\web\HttpRequestDispatcher;
 
 class WinterWebContext implements WebContext {
-    private RequestMappingRegistry $requestMapping;
-    private DispatcherServlet $dispatcherServlet;
+    protected RequestMappingRegistry $requestMapping;
+    protected DispatcherServlet $dispatcherServlet;
 
     public function __construct(
-        private ApplicationContextData $ctxData,
-        private ApplicationContext $appCtx
+        protected ApplicationContextData $ctxData,
+        protected ApplicationContext $appCtx
     ) {
         $this->requestMapping = new WinterRequestMappingRegistry(
             $this->ctxData,
             $this->appCtx
         );
 
+        $this->initDispatcherServlet();
+
+        $this->buildActuator();
+    }
+
+    protected function initDispatcherServlet() {
         $this->dispatcherServlet = new DispatcherServlet(
             $this->requestMapping,
             $this->ctxData,
             $this->appCtx
         );
-
-        $this->buildActuator();
     }
 
     public function getDispatcher(): HttpRequestDispatcher {

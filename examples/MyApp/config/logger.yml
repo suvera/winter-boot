@@ -1,11 +1,11 @@
 loggers:
     myLogger:
         handlers: [ info_file_handler ]
-        processors: [ web_processor ]
+        processors: [ web_processor, pid_processor ]
 formatters:
     dashed:
         class: Monolog\Formatter\LineFormatter
-        format: "%datetime%-%channel%.%level_name% - %message%\n"
+        format: "%datetime% [%extra.process_id%] %channel%.%level_name% - %message%\n"
 handlers:
     console:
         class: Monolog\Handler\StreamHandler
@@ -21,5 +21,7 @@ handlers:
 processors:
     web_processor:
         class: Monolog\Processor\WebProcessor
+    pid_processor:
+        class: Monolog\Processor\ProcessIdProcessor
     memory_processor:
         class: Monolog\Processor\MemoryUsageProcessor

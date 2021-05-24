@@ -15,10 +15,10 @@ class WinterWebApplication extends WinterApplicationRunner implements WinterAppl
             $this->applicationContext
         );
 
-        $this->serverRequest();
+        $this->serveRequest();
     }
 
-    protected function serverRequest(): void {
+    protected function serveRequest(): void {
         $this->webContext->getDispatcher()->dispatch();
     }
 

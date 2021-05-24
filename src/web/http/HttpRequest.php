@@ -1,28 +1,29 @@
 <?php
+/** @noinspection PhpUnused */
 declare(strict_types=1);
 
 namespace dev\winterframework\web\http;
 
 class HttpRequest {
-    private array $queryParams;
-    private array $postParams;
-    private HttpHeaders $headers;
-    private array $cookies;
+    protected array $queryParams;
+    protected array $postParams;
+    protected HttpHeaders $headers;
+    protected array $cookies;
     /**
      * @var HttpUploadedFile[]
      */
-    private array $files;
-    private string $method;
-    private string $uri;
-    private string $body;
-    private $contentType;
+    protected array $files;
+    protected string $method;
+    protected string $uri;
+    protected string $body;
+    protected string $contentType;
 
     public function __construct() {
-        $this->queryParams = isset($_GET) ? $_GET : [];
-        $this->postParams = isset($_POST) ? $_POST : [];
+        $this->queryParams = $_GET ?? [];
+        $this->postParams = $_POST ?? [];
         $this->headers = new HttpHeaders();
         $this->loadHeaders();
-        $this->cookies = isset($_COOKIE) ? $_COOKIE : [];
+        $this->cookies = $_COOKIE ?? [];
 
         $this->method = isset($_SERVER['REQUEST_METHOD']) ? strtoupper($_SERVER['REQUEST_METHOD']) : '';
         $this->uri = isset($_SERVER['REQUEST_URI']) ? strtok($_SERVER['REQUEST_URI'], '?') : '';
@@ -30,9 +31,13 @@ class HttpRequest {
         $body = file_get_contents('php://input');
         $this->body = is_string($body) ? $body : '';
 
-        $this->contentType = isset($_SERVER['CONTENT_TYPE']) ? $_SERVER['CONTENT_TYPE'] : '';
+        $this->contentType = $_SERVER['CONTENT_TYPE'] ?? '';
 
-        $files = isset($_FILES) ? $_FILES : [];
+        $files = $_FILES ?? [];
+        $this->files = $this->loadUploadedFiles($files);
+    }
+
+    protected function loadUploadedFiles($files): array {
         $uploaded = [];
         foreach ($files as $name => $data) {
             $uploaded[$name] = [];
@@ -44,20 +49,18 @@ class HttpRequest {
 
             foreach ($fileList as $value) {
                 $uploaded[$name][] = new HttpUploadedFile(
-                    isset($value['name']) ? $value['name'] : '',
-                    isset($value['type']) ? $value['type'] : '',
-                    isset($value['size']) ? $value['size'] : 0,
-                    isset($value['tpm_name']) ? $value['tpm_name'] : '',
-                    isset($value['error']) ? $value['error'] : UPLOAD_ERR_NO_FILE
+                    $value['name'] ?? '',
+                    $value['type'] ?? '',
+                    $value['size'] ?? 0,
+                    $value['tpm_name'] ?? '',
+                    $value['error'] ?? UPLOAD_ERR_NO_FILE
                 );
             }
-
-
         }
-        $this->files = $uploaded;
+        return $uploaded;
     }
 
-    private function loadHeaders(): void {
+    protected function loadHeaders(): void {
         if (!function_exists('getallheaders')) {
             foreach ($_SERVER as $name => $value) {
                 if (substr($name, 0, 5) == 'HTTP_') {
@@ -85,7 +88,7 @@ class HttpRequest {
     }
 
     public function getCookie(string $name): ?string {
-        return isset($this->cookies[$name]) ? $this->cookies[$name] : null;
+        return $this->cookies[$name] ?? null;
     }
 
     public function getCookies(): array {
@@ -97,7 +100,7 @@ class HttpRequest {
     }
 
     public function getQueryParam(string $name): string|int|float|bool|null {
-        return isset($this->queryParams[$name]) ? $this->queryParams[$name] : null;
+        return $this->queryParams[$name] ?? null;
     }
 
     public function hasQueryParam(string $name): bool {
@@ -109,7 +112,7 @@ class HttpRequest {
     }
 
     public function getPostParam(string $name): string|int|float|bool|null {
-        return isset($this->postParams[$name]) ? $this->postParams[$name] : null;
+        return $this->postParams[$name] ?? null;
     }
 
     public function getPostParams(): array {
@@ -133,7 +136,7 @@ class HttpRequest {
     }
 
     public function getFile(string $name): ?array {
-        return isset($this->files[$name]) ? $this->files[$name] : null;
+        return $this->files[$name] ?? null;
     }
 
 }

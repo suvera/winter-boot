@@ -1,4 +1,5 @@
 <?php
+/** @noinspection PhpUnusedParameterInspection */
 declare(strict_types=1);
 
 namespace dev\winterframework\core\web\format;
@@ -6,38 +7,56 @@ namespace dev\winterframework\core\web\format;
 use ArrayObject;
 use dev\winterframework\core\System;
 use dev\winterframework\core\web\ResponseRenderer;
+use dev\winterframework\io\stream\HttpOutputStream;
+use dev\winterframework\io\stream\PrintHttpOutputStream;
+use dev\winterframework\io\stream\SwooleOutputStream;
+use dev\winterframework\util\log\Wlf4p;
+use dev\winterframework\web\http\HttpRequest;
 use dev\winterframework\web\http\ResponseEntity;
+use dev\winterframework\web\http\SwooleRequest;
 use dev\winterframework\web\MediaType;
 use dev\winterframework\web\view\View;
 use JsonSerializable;
 use SplFileInfo;
 
 class DefaultResponseRenderer extends AbstractResponseRenderer implements ResponseRenderer {
+    use Wlf4p;
 
-    public function renderAndExit(ResponseEntity $entity): void {
-        $this->render($entity);
-        System::exit();
+    public function renderAndExit(ResponseEntity $entity, HttpRequest $request = null): void {
+        $this->render($entity, $request);
+
+        if (!($request instanceof SwooleRequest)) {
+            System::exit();
+        }
     }
 
-    public function render(ResponseEntity $entity): void {
-        $this->checkResponseContentType($entity);
+    public function render(ResponseEntity $entity, HttpRequest $request = null): void {
+        if ($request instanceof SwooleRequest) {
+            $stream = new SwooleOutputStream($request->getResponse());
+        } else {
+            $stream = new PrintHttpOutputStream();
+        }
+        $this->checkResponseContentType($entity, $stream);
 
-        $this->renderHeaders($entity);
+        $this->renderHeaders($entity, $stream);
 
-        $this->renderBody($entity);
+        $this->renderBody($entity, $stream);
+
+        $stream->close();
     }
 
-    private function checkResponseContentType(ResponseEntity $entity): void {
+    protected function checkResponseContentType(ResponseEntity $entity, HttpOutputStream $stream): void {
         if (!empty($entity->getHeaders()->getContentType())) {
             return;
         }
 
-        $this->processResponse($entity, true);
+        $this->processResponse($entity, true, $stream);
     }
 
-    private function processResponse(
+    protected function processResponse(
         ResponseEntity $entity,
-        bool $checkOnly = false
+        bool $checkOnly,
+        HttpOutputStream $stream
     ): void {
 
         $body = $entity->getBody();
@@ -47,19 +66,19 @@ class DefaultResponseRenderer extends AbstractResponseRenderer implements Respon
             if ($checkOnly) {
                 $entity->withContentType(MediaType::TEXT_HTML);
             } else {
-                $body->render();
+                $body->render($stream);
             }
         } else if (is_scalar($body)) {
             if ($checkOnly) {
                 $entity->withContentType(MediaType::TEXT_PLAIN);
             } else {
-                echo $body;
+                $stream->write($body);
             }
         } else if ($body instanceof JsonSerializable) {
             if ($checkOnly) {
                 $entity->withContentType(MediaType::APPLICATION_JSON);
             } else {
-                echo json_encode($body->jsonSerialize(), $prettyPrint);
+                $stream->write(json_encode($body->jsonSerialize(), $prettyPrint));
             }
         } else if (is_array($body)
             || $body instanceof ArrayObject
@@ -67,7 +86,7 @@ class DefaultResponseRenderer extends AbstractResponseRenderer implements Respon
             if ($checkOnly) {
                 $entity->withContentType(MediaType::APPLICATION_JSON);
             } else {
-                echo json_encode($body, $prettyPrint);
+                $stream->write(json_encode($body, $prettyPrint));
             }
         } else if ($body instanceof SplFileInfo) {
             if ($checkOnly) {
@@ -78,20 +97,29 @@ class DefaultResponseRenderer extends AbstractResponseRenderer implements Respon
                     'attachment; filename=' . $body->getFileName()
                 );
             } else {
-                readfile($body->getRealPath());
+
+                $handle = fopen($body->getRealPath(), 'rb');
+                if (false === $handle) {
+                    self::logError('Could not read file ' . $body->getRealPath());
+                } else {
+                    while (!feof($handle)) {
+                        $stream->write(fread($handle, 8192));
+                    }
+                    fclose($handle);
+                }
             }
         } else {
             if ($checkOnly) {
                 $entity->withContentType(MediaType::TEXT_PLAIN);
             } else {
-                echo $body;
+                $stream->write($body);
             }
         }
     }
 
-    private function renderBody(ResponseEntity $entity): void {
-        $this->processResponse($entity, false);
-        flush();
+    protected function renderBody(ResponseEntity $entity, HttpOutputStream $stream): void {
+        $this->processResponse($entity, false, $stream);
+        $stream->flush();
     }
 
 }
