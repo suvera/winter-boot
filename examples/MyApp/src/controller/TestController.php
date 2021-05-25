@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace examples\MyApp\controller;
 
 use dev\winterframework\enums\RequestMethod;
+use dev\winterframework\stereotype\Autowired;
 use dev\winterframework\stereotype\RestController;
 use dev\winterframework\stereotype\web\GetMapping;
 use dev\winterframework\stereotype\web\PostMapping;
@@ -12,9 +13,13 @@ use dev\winterframework\stereotype\web\RequestMapping;
 use dev\winterframework\stereotype\web\RequestParam;
 use dev\winterframework\web\http\HttpHeaders;
 use examples\MyApp\data\Product;
+use examples\MyApp\service\AsyncService;
 
 #[RestController]
 class TestController {
+
+    #[Autowired]
+    protected AsyncService $asyncService;
 
     #[RequestMapping(path: "/test/body", method: [RequestMethod::POST])]
     public function test(
@@ -43,5 +48,13 @@ class TestController {
         #[RequestBody] string $body
     ): string {
         return 'Request Body: ' . $body;
+    }
+
+    #[GetMapping(path: "/test/async")]
+    public function testAsync(): string {
+        $id = time();
+        $str = str_repeat("-=", 700);
+        $this->asyncService->lazyWork($id, 'Suvera ' . $str);
+        return 'Async Initiated by PID: ' . getmypid() . "  $id \n";
     }
 }

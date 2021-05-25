@@ -23,6 +23,8 @@ use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\stereotype\cache\EnableCaching;
 use dev\winterframework\stereotype\Module;
+use dev\winterframework\stereotype\task\EnableAsync;
+use dev\winterframework\stereotype\task\EnableScheduling;
 use dev\winterframework\stereotype\txn\EnableTransactionManagement;
 use dev\winterframework\stereotype\WinterBootApplication;
 use dev\winterframework\type\StringSet;
@@ -78,7 +80,9 @@ abstract class WinterApplicationRunner {
             StringSet::ofValues(
                 WinterBootApplication::class,
                 EnableCaching::class,
-                EnableTransactionManagement::class
+                EnableTransactionManagement::class,
+                EnableAsync::class,
+                EnableScheduling::class
             )
         );
 
@@ -209,6 +213,26 @@ abstract class WinterApplicationRunner {
                 DirectoryScanner::scanForPhpClasses(
                     dirname(dirname(__DIR__)) . '/txn/stereotype',
                     'dev\\winterframework\\txn\\stereotype'
+                )
+            );
+            $this->attributesToScan->addAll($cacheTypes);
+        }
+
+        if ($this->bootApp->getAttribute(EnableAsync::class) != null) {
+            $cacheTypes = array_keys(
+                DirectoryScanner::scanForPhpClasses(
+                    dirname(dirname(__DIR__)) . '/task/async/stereotype',
+                    'dev\\winterframework\\task\\async\\stereotype'
+                )
+            );
+            $this->attributesToScan->addAll($cacheTypes);
+        }
+
+        if ($this->bootApp->getAttribute(EnableScheduling::class) != null) {
+            $cacheTypes = array_keys(
+                DirectoryScanner::scanForPhpClasses(
+                    dirname(dirname(__DIR__)) . '/task/scheduling/stereotype',
+                    'dev\\winterframework\\task\\scheduling\\stereotype'
                 )
             );
             $this->attributesToScan->addAll($cacheTypes);

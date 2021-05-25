@@ -111,7 +111,6 @@ final class TypeAssert {
         }
     }
 
-    /** @noinspection PhpUnusedParameterInspection */
     public static function stringArray(array $value, string $msg = '') {
         array_walk($value, function ($val, $idx, $msg) {
             self::string($val, $msg);

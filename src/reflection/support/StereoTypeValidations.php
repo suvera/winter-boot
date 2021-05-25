@@ -55,6 +55,21 @@ trait StereoTypeValidations {
         }
     }
 
+    protected function cannotBeProtectedMethod(RefMethod $ref, string $stereoName): void {
+        if ($ref->isProtected()) {
+            throw new TypeError("#[$stereoName] Annotation is not allowed on Private Method "
+                . ReflectionUtil::getFqName($ref));
+        }
+    }
+
+    protected function mustBePublicMethod(RefMethod $ref, string $stereoName): void {
+        if (!$ref->isPublic()) {
+            throw new TypeError("#[$stereoName] Annotation is not allowed on Private/Protected Method,"
+                . " must be public. "
+                . ReflectionUtil::getFqName($ref));
+        }
+    }
+
     protected function cannotBeStaticMethod(RefMethod $ref, string $stereoName): void {
         if ($ref->isStatic()) {
             throw new TypeError("#[$stereoName] Annotation is not allowed on Static Method "
@@ -65,6 +80,22 @@ trait StereoTypeValidations {
     protected function cannotBeStaticProperty(RefProperty $ref, string $stereoName): void {
         if ($ref->isStatic()) {
             throw new TypeError("#[$stereoName] Annotation is not allowed on Static Property "
+                . ReflectionUtil::getFqName($ref));
+        }
+    }
+
+    protected function cannotHaveReturn(RefMethod $ref, string $stereoName): void {
+        $type = ParameterType::fromType($ref->getReturnType());
+        if ($type->isUnionType() || !($type->isNoType() || $type->isVoidType())) {
+            throw new TypeError("#[$stereoName] Attribute method cannot have return type at "
+                . ReflectionUtil::getFqName($ref));
+        }
+    }
+
+    protected function mustHaveZeroRequiredArgument(RefMethod $ref, string $stereoName): void {
+        if ($ref->getNumberOfParameters() > 0 && $ref->getNumberOfRequiredParameters() > 0) {
+            throw new TypeError("#[$stereoName] Attribute method must not contain any "
+                . "required arguments at "
                 . ReflectionUtil::getFqName($ref));
         }
     }

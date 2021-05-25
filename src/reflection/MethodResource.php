@@ -21,6 +21,9 @@ class MethodResource {
     private AttributeList $attributes;
 
     private bool $proxyNeeded = false;
+    private bool $aopProxy = false;
+    private bool $asyncProxy = false;
+    private bool $scheduledProxy = false;
 
     public function getAttribute(string $name): ?object {
         return isset($this->attributes) ? $this->attributes->getByName($name) : null;
@@ -62,7 +65,7 @@ class MethodResource {
      * @noinspection PhpDocSignatureInspection
      */
     public function getAttributes(): AttributeList {
-        return isset($this->attributes) ? $this->attributes : AttributeList::emptyList();
+        return $this->attributes ?? AttributeList::emptyList();
     }
 
     public function setAttributes(AttributeList $attributes): void {
@@ -75,6 +78,30 @@ class MethodResource {
 
     public function setProxyNeeded(bool $proxyNeeded): void {
         $this->proxyNeeded = $proxyNeeded;
+    }
+
+    public function isAopProxy(): bool {
+        return $this->aopProxy;
+    }
+
+    public function setAopProxy(bool $aopProxy): void {
+        $this->aopProxy = $aopProxy;
+    }
+
+    public function isAsyncProxy(): bool {
+        return $this->asyncProxy;
+    }
+
+    public function setAsyncProxy(bool $asyncProxy): void {
+        $this->asyncProxy = $asyncProxy;
+    }
+
+    public function isScheduledProxy(): bool {
+        return $this->scheduledProxy;
+    }
+
+    public function setScheduledProxy(bool $scheduledProxy): void {
+        $this->scheduledProxy = $scheduledProxy;
     }
 
     public function getParameters(): MethodParameters {

@@ -19,7 +19,9 @@ class WinterWebApplication extends WinterApplicationRunner implements WinterAppl
     }
 
     protected function serveRequest(): void {
-        $this->webContext->getDispatcher()->dispatch();
+        if (php_sapi_name() != 'cli') {
+            $this->webContext->getDispatcher()->dispatch();
+        }
     }
 
 }

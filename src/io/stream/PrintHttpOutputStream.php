@@ -3,19 +3,27 @@ declare(strict_types=1);
 
 namespace dev\winterframework\io\stream;
 
-use dev\winterframework\util\Debug;
 use dev\winterframework\web\http\HttpCookie;
 
 class PrintHttpOutputStream implements HttpOutputStream {
 
+    protected bool $cliMode = false;
+
     public function __construct() {
+        $this->cliMode = (php_sapi_name() === 'cli');
     }
 
     public function writeHeader(string $name, string $value) {
+        if ($this->cliMode) {
+            return;
+        }
         header($name . ': ' . $value);
     }
 
     public function setStatus(int $status, string $phrase = null, string $version = null) {
+        if ($this->cliMode) {
+            return;
+        }
         if (!$version) {
             $version = 'HTTP/1.1';
         }
@@ -26,6 +34,10 @@ class PrintHttpOutputStream implements HttpOutputStream {
      * @param HttpCookie[] $cookies
      */
     public function setCookies(array $cookies) {
+        if ($this->cliMode) {
+            return;
+        }
+
         foreach ($cookies as $cookie) {
             setcookie(
                 $cookie->name,

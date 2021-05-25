@@ -17,6 +17,14 @@ winter:
         cacheTime: 10
     route:
         cacheTime: 10
+    task:
+        async:
+            poolSize: 1
+            queueCapacity: 50
+            argsSize: 2048
+        scheduling:
+            poolSize: 1
+            queueCapacity: 50
 myApp:
     value1: This is string
     value2: 99

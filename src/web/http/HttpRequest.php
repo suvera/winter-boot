@@ -65,12 +65,16 @@ class HttpRequest {
             foreach ($_SERVER as $name => $value) {
                 if (substr($name, 0, 5) == 'HTTP_') {
                     $ucWord = ucwords(strtolower(str_replace('_', ' ', substr($name, 5))));
-                    $this->headers->add(str_replace(' ', '-', $ucWord), $value);
+                    if (!is_null($value)) {
+                        $this->headers->add(str_replace(' ', '-', $ucWord), $value);
+                    }
                 }
             }
         } else {
             foreach (getallheaders() as $name => $value) {
-                $this->headers->add($name, $value);
+                if (!is_null($value)) {
+                    $this->headers->add($name, $value);
+                }
             }
         }
     }

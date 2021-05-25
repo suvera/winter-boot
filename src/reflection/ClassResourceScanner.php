@@ -14,6 +14,8 @@ use dev\winterframework\reflection\support\MethodParameters;
 use dev\winterframework\stereotype\aop\AopStereoType;
 use dev\winterframework\stereotype\StereoType;
 use dev\winterframework\stereotype\StereoTyped;
+use dev\winterframework\task\async\stereotype\Async;
+use dev\winterframework\task\scheduling\stereotype\Scheduled;
 use dev\winterframework\type\AttributeList;
 use dev\winterframework\type\StringSet;
 use dev\winterframework\util\log\Wlf4p;
@@ -318,10 +320,22 @@ class ClassResourceScanner {
                 $methList[] = $meth;
 
                 foreach ($methAttrs as $methAttr) {
-                    if ($methAttr instanceof AopStereoType) {
+                    if ($methAttr instanceof AopStereoType
+                        || $methAttr instanceof Async
+                        || $methAttr instanceof Scheduled
+                    ) {
                         $meth->setProxyNeeded(true);
                         $res->setProxyNeeded(true);
-                        $proxyMethList[] = $meth;
+                        if ($methAttr instanceof AopStereoType) {
+                            $meth->setAopProxy(true);
+                        }
+                        if ($methAttr instanceof Async) {
+                            $meth->setAsyncProxy(true);
+                        }
+                        if ($methAttr instanceof Scheduled) {
+                            $meth->setScheduledProxy(true);
+                        }
+                        $proxyMethList[$meth->getMethod()->getName()] = $meth;
                     }
                 }
             }

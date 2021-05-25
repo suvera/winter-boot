@@ -8,7 +8,6 @@ use dev\winterframework\exception\WinterException;
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\MethodResource;
 use dev\winterframework\reflection\ReflectionUtil;
-use dev\winterframework\stereotype\aop\AopStereoType;
 use ReflectionException;
 
 final class ProxyGenerator {
@@ -24,19 +23,6 @@ final class ProxyGenerator {
         return self::$instance;
     }
 
-    public static function isProxyNeeded(ClassResource $class): bool {
-        foreach ($class->getMethods() as $method) {
-            foreach ($method->getAttributes() as $attribute) {
-                $name = $attribute::class;
-                if (is_a($name, AopStereoType::class, true)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
     public static function getProxyClassName(string $cls): string {
         $cls = str_replace('\\', '_', $cls);
 
@@ -49,8 +35,10 @@ final class ProxyGenerator {
         $code .= 'use dev\\winterframework\\core\\aop\\AopInterceptorRegistry;' . "\n";
         $code .= 'use dev\\winterframework\\util\\log\\Wlf4p;' . "\n";
         $code .= 'use dev\\winterframework\\stereotype\\Autowired;' . "\n";
+        $code .= 'use dev\\winterframework\\core\\context\\ApplicationContext;' . "\n";
 
         $code .= 'use dev\\winterframework\\core\\aop\\AopExecutionContext;' . "\n";
+        $code .= 'use dev\\winterframework\\task\\async\\AsyncTaskPoolExecutor;' . "\n";
 
         //$code .= 'use Throwable;' . "\n";
         $code .= 'use dev\\winterframework\\core\\aop\\ex\\AopStopExecution;' . "\n";
@@ -69,6 +57,9 @@ final class ProxyGenerator {
          */
         $code .= "    #[Autowired]\n";
         $code .= "    private static AopInterceptorRegistry \$aopRegistry;\n\n";
+
+        $code .= "    #[Autowired]\n";
+        $code .= "    private static ApplicationContext \$appCtx;\n\n";
 
         foreach ($class->getProxyMethods() as $method) {
             /** @var MethodResource $method */
@@ -106,7 +97,8 @@ final class ProxyGenerator {
             $code .= 'static ';
         }
 
-        $code .= 'function ' . $m->getName() . '(';
+        $methodNameCode = 'function ' . $m->getShortName();
+        $code .= $methodNameCode . '(';
         $params = [];
         foreach ($m->getParameters() as $p) {
             $param = '';
@@ -135,28 +127,89 @@ final class ProxyGenerator {
         }
         $code .= implode(', ', $params) . ')';
 
-        $return = 'return;';
-        $resultId = '';
         $retType = $method->getReturnNamedType();
         if (!$retType->isNoType()) {
             $code .= ': ' . $retType->getName();
+        }
+        $hasReturnType = (!$retType->isNoType() && !$retType->isVoidType());
 
-            if (!$retType->isVoidType()) {
-                $return = 'return $result;';
-                $resultId = ' $result =';
-            }
+        /**
+         *  STEP - 1.  Build Method Body
+         */
+        $code .= " {\n";
+        $methodDefBegin = $code;
+        $methodPrefix = 'Original';
+
+        if ($method->isAsyncProxy()) {
+            $origMethodName = $m->getShortName() . $methodPrefix;
+            $code .= $this->buildAsyncProxyMethodCode($method, $origMethodName, $hasReturnType);
+            $code .= "\n    }\n";
+
+            $code .= str_replace($methodNameCode, 'function ' . $origMethodName, $methodDefBegin);
+        }
+
+        if ($method->isAopProxy()) {
+            $code .= $this->buildAopProxyMethodCode($method);
+        } else {
+            $code .= $this->buildProxyMethodCode($method, $hasReturnType);
+        }
+
+        $code .= "\n    }";
+
+        return $code;
+    }
+
+    protected function buildAsyncProxyMethodCode(
+        MethodResource $method,
+        string $origMethodName,
+        bool $hasReturnType
+    ): string {
+        $className = $method->getMethod()->getDeclaringClass()->getName();
+        $className = str_replace('\\', '\\\\', $className);
+
+        $return = $hasReturnType ? 'return null' : 'return';
+
+        return <<<EOQ
+        \$args = func_get_args();
+        
+        \$executor = self::\$appCtx->beanByClass(AsyncTaskPoolExecutor::class);
+        \$executor->enqueue("$className", "$origMethodName", \$args);
+           
+        $return;
+EOQ;
+    }
+
+    protected function buildProxyMethodCode(
+        MethodResource $method,
+        bool $hasReturnType
+    ): string {
+        $methodName = $method->getMethod()->getShortName();
+
+        $return = $hasReturnType ? 'return' : '';
+
+        return <<<EOQ
+        \$args = func_get_args();
+        $return parent::$methodName(...\$args);
+        
+EOQ;
+    }
+
+    protected function buildAopProxyMethodCode(
+        MethodResource $method
+    ): string {
+        $return = 'return;';
+        $resultId = '';
+        $retType = $method->getReturnNamedType();
+        if (!$retType->isNoType() && !$retType->isVoidType()) {
+            $return = 'return $result;';
+            $resultId = ' $result =';
         }
 
         $className = $method->getMethod()->getDeclaringClass()->getName();
         $className = str_replace('\\', '\\\\', $className);
         $methodName = $method->getMethod()->getShortName();
 
-        /**
-         *  STEP - 1.  Build Method Body
-         */
-        $code .= " {\n";
-
-        $code .= <<<EOQ
+        return <<<EOQ
         \$args = func_get_args();
         \$result = null;
         
@@ -198,8 +251,5 @@ final class ProxyGenerator {
         $return
         
 EOQ;
-        $code .= "\n    }";
-
-        return $code;
     }
 }
