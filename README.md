@@ -92,4 +92,5 @@ Documentation
 - [Actuator](docs/actuator.md)
 - [Locking](docs/locking.md)
 - [Json and XML](docs/json_xml.md)
+- [Async and Scheduling support](docs/async_scheduling.md)
 

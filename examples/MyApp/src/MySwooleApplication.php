@@ -5,6 +5,7 @@ namespace examples\MyApp;
 
 use dev\winterframework\core\app\WinterWebSwooleApplication;
 use dev\winterframework\stereotype\task\EnableAsync;
+use dev\winterframework\stereotype\task\EnableScheduling;
 use dev\winterframework\stereotype\WinterBootApplication;
 
 #[WinterBootApplication(
@@ -14,6 +15,7 @@ use dev\winterframework\stereotype\WinterBootApplication;
     ]
 )]
 #[EnableAsync]
+#[EnableScheduling]
 class MySwooleApplication {
 
     public static function main(): void {

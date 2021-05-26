@@ -24,5 +24,6 @@ testApp/
 composer.lock
 examples/MyApp/logs/*.log
 examples/logs/MyApp.log
+logs/*.log
 
 

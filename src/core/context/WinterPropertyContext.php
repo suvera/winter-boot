@@ -48,15 +48,40 @@ final class WinterPropertyContext implements PropertyContext {
     }
 
     public function getBool(string $name, bool $default = null): bool {
-        return boolval(self::get($name, $default));
+        $value = self::get($name, $default);
+        if (is_bool($value)) {
+            return $value;
+        }
+        $val = strtolower($value);
+        switch ($val) {
+            case 'true':
+            case '1':
+                return true;
+
+            case 'false':
+            case '0':
+            case null:
+            case '':
+                return false;
+        }
+        throw new PropertyException("property " . json_encode($name) . ' is not of type "boolean" but got "'
+            . var_export($value, true) . '"');
     }
 
     public function getInt(string $name, int $default = null): int {
-        return intval(self::get($name, $default));
+        $val = self::get($name, $default);
+        if (!is_numeric($val)) {
+            throw new PropertyException("property " . json_encode($name) . ' is not of type "integer"');
+        }
+        return intval($val);
     }
 
     public function getFloat(string $name, float $default = null): float {
-        return floatval(self::get($name, $default));
+        $val = self::get($name, $default);
+        if (!is_numeric($val)) {
+            throw new PropertyException("property " . json_encode($name) . ' is not of type "float"');
+        }
+        return floatval($val);
     }
 
     public function getAll(): array {

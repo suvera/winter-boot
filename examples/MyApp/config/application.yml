@@ -53,20 +53,20 @@ management:
         enabled: true
     endpoint:
         beans:
-            enabled: true,
+            enabled: true
             path: "acme/beans"
         configprops:
-            enabled: true,
+            enabled: true
             path: "acme/configprops"
         env:
-            enabled: true,
+            enabled: true
             path: "acme/env"
         health:
-            enabled: true,
+            enabled: true
             path: "acme/health"
         info:
-            enabled: true,
+            enabled: true
             path: "acme/info"
         mappings:
-            enabled: true,
+            enabled: true
             path: "acme/mappings"

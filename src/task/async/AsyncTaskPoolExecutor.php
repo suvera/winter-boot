@@ -9,6 +9,7 @@ use dev\winterframework\stereotype\Autowired;
 use dev\winterframework\stereotype\Component;
 use dev\winterframework\stereotype\Value;
 use dev\winterframework\task\TaskPoolExecutor;
+use dev\winterframework\task\TaskPoolExecutorTrait;
 use dev\winterframework\util\log\Wlf4p;
 use OverflowException;
 use Swoole\Process;
@@ -17,6 +18,7 @@ use Throwable;
 #[Component]
 class AsyncTaskPoolExecutor implements TaskPoolExecutor {
     use Wlf4p;
+    use TaskPoolExecutorTrait;
 
     const ARG_SIZE = 2048;
 
@@ -48,24 +50,15 @@ class AsyncTaskPoolExecutor implements TaskPoolExecutor {
         //$workerId = (mt_rand(1, $this->poolSize) % $this->poolSize) + 1;
         //$table = $this->server->getAsyncTable($workerId);
 
-        $min = PHP_INT_MAX;
-        $table = null;
-        $workerId = null;
-        foreach ($this->server->getAsyncTables() as $id => $workTable) {
-            $cnt = count($workTable->getTable());
-            if ($min > $cnt) {
-                $min = $cnt;
-                $table = $workTable;
-                $workerId = $id;
-            }
-        }
+        $tables = $this->server->getAsyncTables();
+        $workerId = $this->findAvailableWorker($tables);
 
-        if ($table == null) {
+        if ($workerId == null) {
             self::logInfo("No Async worker found!");
             return;
         }
 
-        $id = $table->insert([
+        $id = $tables[$workerId]->insert([
             'className' => $className,
             'methodName' => $methodName,
             'timestamp' => time(),
@@ -81,7 +74,7 @@ class AsyncTaskPoolExecutor implements TaskPoolExecutor {
 
         foreach ($table->getTable() as $id => $row) {
             go(function () use ($table, $id, $row, $appCtx, $workerId) {
-                self::logInfo("Processing Async call '$id' on worker-$workerId");
+                self::logInfo("Processing Async call '$id' on async-worker-$workerId");
                 $id = intval($id);
 
                 $table->delete($id);
