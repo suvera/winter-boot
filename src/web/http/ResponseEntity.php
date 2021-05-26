@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace dev\winterframework\web\http;
 
+use dev\winterframework\io\stream\HttpOutputStream;
+use dev\winterframework\io\stream\PrintHttpOutputStream;
 use dev\winterframework\web\MediaType;
 
 class ResponseEntity {
 
-    private HttpHeaders $headers;
-    private mixed $body;
-    private HttpStatus $status;
+    protected HttpHeaders $headers;
+    protected mixed $body = null;
+    protected HttpStatus $status;
+    protected HttpOutputStream $outputStream;
     /**
      * @var HttpCookie[]
      */
@@ -19,6 +22,24 @@ class ResponseEntity {
     public function __construct() {
         $this->headers = new HttpHeaders();
         $this->status = HttpStatus::$OK;
+        $this->outputStream = new PrintHttpOutputStream();
+    }
+
+    public function merge(ResponseEntity $other): void {
+        if ($this === $other) {
+            return;
+        }
+        if (!empty($other->cookies)) {
+            $this->cookies = array_merge($this->cookies, $other->cookies);
+        }
+
+        if (isset($other->body) && !empty($other->body)
+            && (!isset($this->body) || empty($this->body))
+        ) {
+            $this->body = $other->body;
+        }
+
+        $this->headers->merge($other->headers);
     }
 
     public function getHeaders(): HttpHeaders {
@@ -77,6 +98,14 @@ class ResponseEntity {
         $this->headers->setContentType(MediaType::APPLICATION_XML);
         $this->setBody($body);
         return $this;
+    }
+
+    public function getOutputStream(): HttpOutputStream {
+        return $this->outputStream;
+    }
+
+    public function setOutputStream(HttpOutputStream $outputStream): void {
+        $this->outputStream = $outputStream;
     }
 
     /**

@@ -70,6 +70,15 @@ final class HttpHeaders {
 
     private array $headers = [];
 
+    public function merge(HttpHeaders $other): void {
+        if ($this === $other) {
+            return;
+        }
+        if ($other->headers) {
+            $this->headers = array_merge($this->headers, $other->headers);
+        }
+    }
+
     public function add(string $headerName, string $headerValue): void {
         TypeAssert::notEmpty('headerName', $headerName);
 
@@ -145,4 +154,5 @@ final class HttpHeaders {
     public function getLocation(): ?string {
         return $this->getFirst(self::LOCATION);
     }
+
 }

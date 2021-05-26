@@ -7,6 +7,7 @@ namespace dev\winterframework\core\web;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\core\System;
+use dev\winterframework\core\web\config\InterceptorRegistry;
 use dev\winterframework\core\web\error\DefaultErrorController;
 use dev\winterframework\core\web\error\ErrorController;
 use dev\winterframework\core\web\route\RequestMappingRegistry;
@@ -15,6 +16,7 @@ use dev\winterframework\exception\WinterException;
 use dev\winterframework\reflection\ObjectCreator;
 use dev\winterframework\stereotype\web\RequestBody;
 use dev\winterframework\stereotype\web\RequestParam;
+use dev\winterframework\util\BeanFinderTrait;
 use dev\winterframework\util\JsonUtil;
 use dev\winterframework\util\log\Wlf4p;
 use dev\winterframework\web\http\HttpRequest;
@@ -28,6 +30,7 @@ use Throwable;
 
 class DispatcherServlet implements HttpRequestDispatcher {
     use Wlf4p;
+    use BeanFinderTrait;
 
     protected ErrorController $errorController;
 
@@ -38,46 +41,31 @@ class DispatcherServlet implements HttpRequestDispatcher {
     ) {
     }
 
-    private function initErrorController(): void {
-        $errorController = null;
-        try {
-            $errorController = $this->appCtx->beanByName('errorController');
-            if (!($errorController instanceof ErrorController)) {
-                self::logDebug('Bean named "errorController" does not implement ErrorController');
-                $errorController = null;
-            }
-        } /** @noinspection PhpUnusedLocalVariableInspection */
-        catch (Throwable $e) {
-            // ignore this error
+    private function initialize(): void {
+        if (!isset($this->errorController)) {
+            $this->errorController = $this->findBean(
+                $this->appCtx,
+                'errorController',
+                ErrorController::class,
+                DefaultErrorController::class
+            );
         }
-        try {
-            $errorController = $this->appCtx->beanByClass(ErrorController::class);
-            if (!($errorController instanceof ErrorController)) {
-                self::logDebug('Bean object does not implement ErrorController');
-                $errorController = null;
-            }
-        } catch (Throwable $e) {
-            self::logDebug('No controller has implemented ErrorController', [$e]);
-        }
-
-        if ($errorController == null) {
-            $errorController = $this->appCtx->beanByClass(DefaultErrorController::class);
-        }
-        /** @var ErrorController $errorController */
-        $this->errorController = $errorController;
     }
 
     protected function initHttpRequest(): HttpRequest {
         return new HttpRequest();
     }
 
-    public function dispatch(HttpRequest $request = null): void {
-        $this->initErrorController();
+    public function dispatch(HttpRequest $request = null, ResponseEntity $response = null): void {
+        $this->initialize();
         $serverPath = $this->ctxData->getPropertyContext()->get('server.context-path', '/');
         $serverPath = isset($serverPath) ? trim($serverPath, '/') : '';
 
         if (!$request) {
             $request = $this->initHttpRequest();
+        }
+        if (!$response) {
+            $response = new ResponseEntity();
         }
 
         $uri = $request->getUri();
@@ -94,6 +82,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
             self::logError('Could not find Requested URI [' . $request->getMethod() . ']' . $uri);
             $this->handleError(
                 $request,
+                $response,
                 HttpStatus::$NOT_FOUND,
                 new WinterException('Could not find Requested URI ['
                     . $request->getMethod() . ']' . $uri),
@@ -102,11 +91,12 @@ class DispatcherServlet implements HttpRequestDispatcher {
         }
 
         try {
-            $this->routeRequest($matchedRoute, $request);
+            $this->routeRequest($matchedRoute, $request, $response);
         } catch (Throwable $t) {
             self::logException($t);
             $this->handleError(
                 $request,
+                $response,
                 HttpStatus::$INTERNAL_SERVER_ERROR,
                 $t
             );
@@ -116,10 +106,21 @@ class DispatcherServlet implements HttpRequestDispatcher {
 
     protected function handleError(
         HttpRequest $request,
+        ResponseEntity $response,
         HttpStatus $status,
         Throwable $t = null
     ): void {
-        $this->errorController->handleError($request, $status, $t);
+        $this->errorController->handleError($request, $response, $status, $t);
+
+        try {
+            $this->afterCompletion(
+                $this->ctxData->getInterceptorRegistry(),
+                $request, $response, $t
+            );
+        } catch (Throwable $e) {
+            self::logException($e);
+        }
+
         if (!($request instanceof SwooleRequest)) {
             System::exit();
         }
@@ -128,14 +129,22 @@ class DispatcherServlet implements HttpRequestDispatcher {
     /**
      * @param MatchedRequestMapping $route
      * @param HttpRequest $request
+     * @param ResponseEntity $response
      * @throws
      */
     protected function routeRequest(
         MatchedRequestMapping $route,
-        HttpRequest $request
+        HttpRequest $request,
+        ResponseEntity $response
     ): void {
         /** @var ResponseRenderer $renderer */
         $renderer = $this->appCtx->beanByClass(ResponseRenderer::class);
+        $interceptor = $this->ctxData->getInterceptorRegistry();
+
+        if (!$this->preHandle($interceptor, $request, $response)) {
+            $renderer->render($response, $request);
+            return;
+        }
 
         $mapping = $route->getMapping();
         $method = $mapping->getRefOwner();
@@ -168,6 +177,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
             if (!$success) {
                 $this->handleError(
                     $request,
+                    $response,
                     HttpStatus::$BAD_REQUEST,
                     new WinterException('Bad Request: expected request types ['
                         . implode(', ', $consumes)
@@ -196,14 +206,14 @@ class DispatcherServlet implements HttpRequestDispatcher {
             try {
                 $args[$var->getVariableName()] = $this->getRequestParamValue($request, $var);
             } catch (WinterException $e) {
-                $this->handleError($request, HttpStatus::$BAD_REQUEST, $e);
+                $this->handleError($request, $response, HttpStatus::$BAD_REQUEST, $e);
                 return;
             } catch (Throwable $e) {
                 self::logError('Invalid parameter in the request - with error '
                     . $e::class . ': ' . $e->getMessage() . ', file: ' . $e->getFile()
                     . ', line: ' . $e->getLine()
                 );
-                $this->handleError($request, HttpStatus::$BAD_REQUEST);
+                $this->handleError($request, $response, HttpStatus::$BAD_REQUEST);
                 return;
             }
         }
@@ -216,14 +226,14 @@ class DispatcherServlet implements HttpRequestDispatcher {
             try {
                 $args[$bodyMap->getVariableName()] = $this->parseBody($request, $bodyMap, $contentType);
             } catch (WinterException $e) {
-                $this->handleError($request, HttpStatus::$BAD_REQUEST, $e);
+                $this->handleError($request, $response, HttpStatus::$BAD_REQUEST, $e);
                 return;
             } catch (Throwable $e) {
                 self::logError('Could not understand the request - with error '
                     . $e::class . ': ' . $e->getMessage() . ', file: ' . $e->getFile()
                     . ', line: ' . $e->getLine()
                 );
-                $this->handleError($request, HttpStatus::$BAD_REQUEST);
+                $this->handleError($request, $response, HttpStatus::$BAD_REQUEST);
                 return;
             }
         }
@@ -243,6 +253,8 @@ class DispatcherServlet implements HttpRequestDispatcher {
 
             if ($type->getName() === HttpRequest::class) {
                 $args[$injectableParam->getName()] = $request;
+            } else if ($type->getName() === ResponseEntity::class) {
+                $args[$injectableParam->getName()] = $response;
             }
         }
 
@@ -259,19 +271,28 @@ class DispatcherServlet implements HttpRequestDispatcher {
         $out = $method->invokeArgs($controller, $args);
 
         if ($out instanceof ResponseEntity) {
-            $entity = $out;
+            $response->merge($out);
         } else {
-            $entity = ResponseEntity::ok()->setBody($out);
+            $response->setBody($out);
         }
+
 
         /**
          * STEP - 6.3 : post-intercept Controller
          */
+        $this->postHandle($interceptor, $request, $response);
         if ($controller instanceof ControllerInterceptor) {
-            $controller->postHandle($request, $entity, $method->getDelegate());
+            $controller->postHandle($request, $response, $method->getDelegate());
         }
 
-        $renderer->renderAndExit($entity, $request);
+
+        $renderer->render($response, $request);
+
+        try {
+            $this->afterCompletion($interceptor, $request, $response);
+        } catch (Throwable $e) {
+            self::logException($e);
+        }
     }
 
     /**
@@ -312,7 +333,6 @@ class DispatcherServlet implements HttpRequestDispatcher {
 
             self::logInfo('JSON Body: ' . $rawBody);
 
-            $row = [];
             try {
                 $row = JsonUtil::decodeArray($rawBody);
             } catch (Throwable $e) {
@@ -387,5 +407,70 @@ class DispatcherServlet implements HttpRequestDispatcher {
             throw new WinterException('Bad Request: ' . $var->getInvalidText());
         }
     }
+
+
+    /**
+     * Interceptor execution
+     *
+     * @param InterceptorRegistry $registry
+     * @param HttpRequest $request
+     * @param ResponseEntity $entity
+     * @return bool
+     */
+    protected function preHandle(
+        InterceptorRegistry $registry,
+        HttpRequest $request,
+        ResponseEntity $entity
+    ): bool {
+        $uri = $request->getUri();
+        foreach ($registry->getInterceptors() as $regexPath => $interceptors) {
+            if (!preg_match('/' . $regexPath . '/', $uri)) {
+                continue;
+            }
+            foreach ($interceptors as $interceptor) {
+                if (!$interceptor->preHandle($request, $entity)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    protected function postHandle(
+        InterceptorRegistry $registry,
+        HttpRequest $request,
+        ResponseEntity $entity
+    ): void {
+        $uri = $request->getUri();
+        foreach ($registry->getInterceptors() as $regexPath => $interceptors) {
+
+            if (!preg_match('/' . $regexPath . '/', $uri)) {
+                continue;
+            }
+            foreach ($interceptors as $interceptor) {
+                $interceptor->postHandle($request, $entity);
+            }
+        }
+    }
+
+    protected function afterCompletion(
+        InterceptorRegistry $registry,
+        HttpRequest $request,
+        ResponseEntity $entity,
+        Throwable $ex = null
+    ): void {
+        $uri = $request->getUri();
+        foreach ($registry->getInterceptors() as $regexPath => $interceptors) {
+
+            if (!preg_match('/' . $regexPath . '/', $uri)) {
+                continue;
+            }
+            foreach ($interceptors as $interceptor) {
+                $interceptor->afterCompletion($request, $entity, $ex);
+            }
+        }
+    }
+
 
 }

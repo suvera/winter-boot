@@ -8,8 +8,6 @@ use ArrayObject;
 use dev\winterframework\core\System;
 use dev\winterframework\core\web\ResponseRenderer;
 use dev\winterframework\io\stream\HttpOutputStream;
-use dev\winterframework\io\stream\PrintHttpOutputStream;
-use dev\winterframework\io\stream\SwooleOutputStream;
 use dev\winterframework\util\log\Wlf4p;
 use dev\winterframework\web\http\HttpRequest;
 use dev\winterframework\web\http\ResponseEntity;
@@ -22,7 +20,7 @@ use SplFileInfo;
 class DefaultResponseRenderer extends AbstractResponseRenderer implements ResponseRenderer {
     use Wlf4p;
 
-    public function renderAndExit(ResponseEntity $entity, HttpRequest $request = null): void {
+    public function renderAndExit(ResponseEntity $entity, HttpRequest $request): void {
         $this->render($entity, $request);
 
         if (!($request instanceof SwooleRequest)) {
@@ -30,12 +28,9 @@ class DefaultResponseRenderer extends AbstractResponseRenderer implements Respon
         }
     }
 
-    public function render(ResponseEntity $entity, HttpRequest $request = null): void {
-        if ($request instanceof SwooleRequest) {
-            $stream = new SwooleOutputStream($request->getResponse());
-        } else {
-            $stream = new PrintHttpOutputStream();
-        }
+    public function render(ResponseEntity $entity, HttpRequest $request): void {
+        $stream = $entity->getOutputStream();
+
         $this->checkResponseContentType($entity, $stream);
 
         $this->renderHeaders($entity, $stream);
@@ -111,7 +106,7 @@ class DefaultResponseRenderer extends AbstractResponseRenderer implements Respon
         } else {
             if ($checkOnly) {
                 $entity->withContentType(MediaType::TEXT_PLAIN);
-            } else {
+            } else if (isset($body)) {
                 $stream->write($body);
             }
         }

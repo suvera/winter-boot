@@ -6,6 +6,8 @@ namespace dev\winterframework\core\context;
 use dev\winterframework\actuator\ActuatorController;
 use dev\winterframework\actuator\ActuatorEndPoints;
 use dev\winterframework\actuator\DefaultActuatorController;
+use dev\winterframework\core\web\config\DefaultWebMvcConfigurer;
+use dev\winterframework\core\web\config\WebMvcConfigurer;
 use dev\winterframework\core\web\DispatcherServlet;
 use dev\winterframework\core\web\route\RequestMappingRegistry;
 use dev\winterframework\core\web\route\WinterRequestMappingRegistry;
@@ -15,9 +17,12 @@ use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\stereotype\web\RequestMapping;
+use dev\winterframework\util\BeanFinderTrait;
 use dev\winterframework\web\HttpRequestDispatcher;
 
 class WinterWebContext implements WebContext {
+    use BeanFinderTrait;
+
     protected RequestMappingRegistry $requestMapping;
     protected DispatcherServlet $dispatcherServlet;
 
@@ -33,6 +38,8 @@ class WinterWebContext implements WebContext {
         $this->initDispatcherServlet();
 
         $this->buildActuator();
+
+        $this->configureWebMvc();
     }
 
     protected function initDispatcherServlet() {
@@ -93,6 +100,17 @@ class WinterWebContext implements WebContext {
 
             $this->requestMapping->put($mapping);
         }
+    }
+
+    protected function configureWebMvc(): void {
+        /** @var WebMvcConfigurer $webConfig */
+        $webConfig = $this->findBean(
+            $this->appCtx,
+            'webMvcConfigurer',
+            WebMvcConfigurer::class,
+            DefaultWebMvcConfigurer::class
+        );
+        $webConfig->addInterceptors($this->ctxData->getInterceptorRegistry());
     }
 
 }

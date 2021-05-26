@@ -10,6 +10,8 @@ use dev\winterframework\cache\impl\SimpleCacheResolver;
 use dev\winterframework\cache\impl\SimpleKeyGenerator;
 use dev\winterframework\cache\KeyGenerator;
 use dev\winterframework\core\aop\AopInterceptorRegistry;
+use dev\winterframework\core\web\config\DefaultWebMvcConfigurer;
+use dev\winterframework\core\web\config\WebMvcConfigurer;
 use dev\winterframework\core\web\error\DefaultErrorController;
 use dev\winterframework\core\web\error\ErrorController;
 use dev\winterframework\core\web\format\DefaultResponseRenderer;
@@ -143,6 +145,10 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
 
         $this->beanProvider->registerInternalBean(
             new DefaultErrorController(), ErrorController::class, false
+        );
+
+        $this->beanProvider->registerInternalBean(
+            new DefaultWebMvcConfigurer(), WebMvcConfigurer::class, false
         );
 
         $cacheManager = new DefaultCacheManager();

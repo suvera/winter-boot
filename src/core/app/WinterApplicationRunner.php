@@ -10,6 +10,7 @@ use dev\winterframework\core\context\PropertyContext;
 use dev\winterframework\core\context\ShutDownRegistry;
 use dev\winterframework\core\context\WinterApplicationContext;
 use dev\winterframework\core\context\WinterPropertyContext;
+use dev\winterframework\core\web\config\InterceptorRegistry;
 use dev\winterframework\enums\Winter;
 use dev\winterframework\exception\NotWinterApplicationException;
 use dev\winterframework\exception\WinterException;
@@ -117,6 +118,7 @@ abstract class WinterApplicationRunner {
         $data->setPropertyContext($this->propertyCtx);
         $data->setAttributesToScan($this->attributesToScan);
         $data->setShutDownRegistry(new ShutDownRegistry());
+        $data->setInterceptorRegistry(new InterceptorRegistry());
 
         return $data;
     }

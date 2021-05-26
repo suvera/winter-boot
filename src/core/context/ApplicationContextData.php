@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace dev\winterframework\core\context;
 
 use dev\winterframework\core\aop\AopInterceptorRegistry;
+use dev\winterframework\core\web\config\InterceptorRegistry;
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\ClassResources;
 use dev\winterframework\reflection\ClassResourceScanner;
@@ -19,7 +20,7 @@ final class ApplicationContextData {
     private ClassResourceScanner $scanner;
     private StringSet $attributesToScan;
     private ShutDownRegistry $shutDownRegistry;
-
+    private InterceptorRegistry $interceptorRegistry;
     private AopInterceptorRegistry $aopRegistry;
 
     public function getBeanProvider(): BeanProviderContext {
@@ -94,5 +95,12 @@ final class ApplicationContextData {
         $this->shutDownRegistry = $shutDownRegistry;
     }
 
+    public function getInterceptorRegistry(): InterceptorRegistry {
+        return $this->interceptorRegistry;
+    }
 
+    public function setInterceptorRegistry(InterceptorRegistry $interceptorRegistry): void {
+        $this->interceptorRegistry = $interceptorRegistry;
+    }
+    
 }

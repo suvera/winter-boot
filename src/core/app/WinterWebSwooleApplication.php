@@ -11,6 +11,7 @@ use dev\winterframework\task\scheduling\ScheduledTaskPoolExecutor;
 use dev\winterframework\task\scheduling\stereotype\Scheduled;
 use dev\winterframework\task\TaskPoolExecutor;
 use dev\winterframework\web\http\SwooleRequest;
+use dev\winterframework\web\http\SwooleResponseEntity;
 use Swoole\Atomic;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
@@ -32,11 +33,10 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
     }
 
     public function serveRequest(Request $request, Response $response): void {
-        //self::logInfo(print_r($request, true));
-
         $wrapperReq = new SwooleRequest($request, $response);
+        $wrapperResp = new SwooleResponseEntity($response);
 
-        $this->webContext->getDispatcher()->dispatch($wrapperReq);
+        $this->webContext->getDispatcher()->dispatch($wrapperReq, $wrapperResp);
     }
 
     protected function startServer() {

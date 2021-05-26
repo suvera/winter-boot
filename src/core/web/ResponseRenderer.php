@@ -8,8 +8,8 @@ use dev\winterframework\web\http\ResponseEntity;
 
 interface ResponseRenderer {
 
-    public function render(ResponseEntity $entity, HttpRequest $request = null): void;
+    public function render(ResponseEntity $entity, HttpRequest $request): void;
 
-    public function renderAndExit(ResponseEntity $entity, HttpRequest $request = null): void;
+    public function renderAndExit(ResponseEntity $entity, HttpRequest $request): void;
 
 }

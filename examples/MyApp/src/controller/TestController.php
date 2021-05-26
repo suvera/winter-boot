@@ -57,4 +57,9 @@ class TestController {
         $this->asyncService->lazyWork($id, 'Suvera ' . $str);
         return 'Async Initiated by PID: ' . getmypid() . "  $id \n";
     }
+
+    #[GetMapping(path: "/admin/show")]
+    public function adminShow(): string {
+        return "ADMIN";
+    }
 }

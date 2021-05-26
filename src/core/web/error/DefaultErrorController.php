@@ -20,20 +20,23 @@ class DefaultErrorController implements ErrorController {
 
     public function handleError(
         HttpRequest $request,
+        ResponseEntity $response,
         HttpStatus $status,
         Throwable $t = null
     ): void {
 
-        $e = ResponseEntity::status($status)->withContentType(MediaType::APPLICATION_JSON);
+        $response->setCookies([])
+            ->withStatus($status)
+            ->withContentType(MediaType::APPLICATION_JSON);
 
-        $e->setBody([
+        $response->setBody([
             'timestamp' => gmdate('Y-m-d\TH:i:s\Z'),
             'status' => $status->getValue(),
             'message' => $status->getReasonPhrase(),
             'error' => $t ? $t->getMessage() : null
         ]);
 
-        $this->renderer->renderAndExit($e, $request);
+        $this->renderer->renderAndExit($response, $request);
     }
 
 }
