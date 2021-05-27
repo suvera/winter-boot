@@ -92,5 +92,5 @@ winter:
 
 ## Example
 
-Check out the example application [MyApp](../examples/README.md)
+Check out the example application [MyApp](../examples/)
 

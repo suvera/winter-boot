@@ -9,7 +9,7 @@ use ReflectionMethod;
 
 interface ControllerInterceptor {
 
-    public function preHandle(HttpRequest $request, ReflectionMethod $method): bool;
+    public function preHandle(HttpRequest $request, ResponseEntity $response, ReflectionMethod $handler): bool;
 
-    public function postHandle(HttpRequest $request, ResponseEntity $response, ReflectionMethod $method): void;
+    public function postHandle(HttpRequest $request, ResponseEntity $response, ReflectionMethod $handler): void;
 }

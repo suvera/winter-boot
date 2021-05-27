@@ -262,7 +262,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
          * STEP - 6.1 : pre-intercept Controller
          */
         if ($controller instanceof ControllerInterceptor) {
-            $controller->preHandle($request, $method->getDelegate());
+            $controller->preHandle($request, $response, $method->getDelegate());
         }
 
         /**

@@ -184,5 +184,114 @@ public function getErrorController(): ErrorController {
 }
 ```
 
+# Request Interceptors
 
-# 
+----
+
+When a request is sent to REST controller, it will have to pass through 0 or more interceptors before being processed by Controller method.
+
+Http Interceptor is only applied to request(s) that are being sent to a REST controllers.
+
+
+There are two ways to intercept http requests.
+
+1) Controller Level (applicable to that controller only)
+2) Application Level (applicable to all controllers)
+
+
+## 1. Controller Interceptor
+This is applicable to controller only, and applicable to all handler methods.
+
+Controller must implement **ControllerInterceptor** interface.
+
+```phpt
+
+class OrderContorller implements ControllerInterceptor {
+
+    public function preHandle(
+        HttpRequest $request, 
+        ResponseEntity $response, R
+        eflectionMethod $handler
+    ): bool {
+        // do something here
+        return true;
+    }
+
+    public function postHandle(
+        HttpRequest $request, 
+        ResponseEntity $response, 
+        ReflectionMethod $handler
+    ): void {
+        // do something
+    }
+
+}
+
+```
+
+**1.preHandle():** This method will be called just before handler method invoked.
+
+**2. postHandle():** This method will be called after handler method executed. if handler method throws any exception then this method won't be called.
+
+
+## 2. Application Interceptor
+
+These are applicable to all controllers based on matching pattern provided.
+
+### How to write Interceptor
+
+All interceptors must implement **HandlerInterceptor** interface
+
+```phpt
+
+class MyInterceptor implements HandlerInterceptor {
+    use Wlf4p;
+
+    public function preHandle(HttpRequest $request, ResponseEntity $response): bool {
+        self::logInfo(__METHOD__ . ' called ');
+        return true;
+    }
+
+    public function postHandle(HttpRequest $request, ResponseEntity $response): void {
+        self::logInfo(__METHOD__ . ' called ');
+    }
+
+    public function afterCompletion(HttpRequest $request, ResponseEntity $response, Throwable $ex = null): void {
+        self::logInfo(__METHOD__ . ' called ');
+    }
+
+}
+
+```
+
+
+### Register Interceptor
+
+All interceptors must have to be registered in a **#[Configuration]** bean
+
+```phpt
+
+#[Configuration(name: "webMvcConfigurer")]
+class MyWebConfigurer implements WebMvcConfigurer {
+
+    public function addInterceptors(InterceptorRegistry $registry): void {
+        // Applicable to all Interceptors
+        $registry->addInterceptor(new MyInterceptor(), '.*');
+        
+        // Applicable to matching URI's
+        $registry->addInterceptor(new AdminInterceptor(), '^\/admin\/.*', '^\/super\/.*');
+    }
+
+}
+```
+
+**addInterceptor(HandlerInterceptor, string ...$pathRegexes)** takes variable number of path matching regexes so that matched HTTP requests will be intercepted by this interceptor object.
+
+
+### HandlerInterceptor
+
+**1. preHandle():** This method is used to intercept the request before it's handed over to the REST Controller. This method should return 'true' to let framework know to process the request through another  interceptor or to send it to actual controller method if there are no further interceptors. If this method returns 'false' Framework assumes that request has been handled by this interceptor itself and no further processing is needed. We should use response object to send response to the client request in this case.
+
+**2. postHandle():** This method is called just before rendering the data to client. We can use this interceptor method to determine the time taken by controller method to process the client request.
+
+**3. afterCompletion():** This is a HandlerInterceptor callback method that is called once the handler is executed and view is rendered.

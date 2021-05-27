@@ -72,7 +72,7 @@ curl "http://localhost/api/v2/users" -d "name=Abc&email=mail"
 
 ----
 
-Check out the example application here [MyApp](examples/README.md)
+Check out the example application here [MyApp](examples/)
 
 
 # Documentation
