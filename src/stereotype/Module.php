@@ -10,11 +10,12 @@ use dev\winterframework\type\TypeAssert;
 #[Attribute(Attribute::TARGET_CLASS)]
 class Module implements StereoType {
     private string $className;
+    private array $config = [];
     public string $name = '';
 
     public function __construct(
         public string $title = '',
-        public string $initMethod = '',
+        public string $initMethod = 'init',
         public string $destroyMethod = '',
         public array $namespaces = [],
     ) {
@@ -22,6 +23,14 @@ class Module implements StereoType {
 
     public function getClassName(): string {
         return $this->className;
+    }
+
+    public function getConfig(): array {
+        return $this->config;
+    }
+
+    public function setConfig(array $config): void {
+        $this->config = $config;
     }
 
     public function init(object $ref): void {
@@ -35,7 +44,7 @@ class Module implements StereoType {
         $this->className = $ref->getName();
 
         if (empty($this->namespaces)) {
-            $this->namespaces[] = [ $ref->getNamespaceName(), dirname($ref->getFileName()) ];
+            $this->namespaces[] = [$ref->getNamespaceName(), dirname($ref->getFileName())];
         }
     }
 

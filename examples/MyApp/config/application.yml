@@ -3,8 +3,8 @@ server:
     address: 127.0.0.1
     context-path: /
     swoole:
-        reactor_num: 2
-        worker_num: 4
+        reactor_num: 4
+        worker_num: 8
         backlog: 128
         max_request: 50
         dispatch_mode: 1

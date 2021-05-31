@@ -264,15 +264,17 @@ abstract class WinterApplicationRunner {
             $module = $clsRef->getAttribute(Module::class);
 
             if ($module) {
+                $module->setConfig($moduleDef);
+
                 $obj = $this->applicationContext->beanByClass($module->getClassName());
+
+                $this->applicationContext->addModule($module->getClassName(), $module);
+
                 if ($module->initMethod) {
                     $obj->{$module->initMethod}($this->applicationContext, $this->appCtxData);
                 }
-
-                $this->applicationContext->addModule($moduleDef['module'], $module);
-                $this->applicationContext->addModule($module->title, $module);
-
-                self::logInfo("Module [ $module->title ] loaded.");
+                
+                self::logInfo("Module [ $module->title ] loaded. ");
             }
         }
     }

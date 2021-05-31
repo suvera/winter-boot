@@ -62,7 +62,7 @@ Annotating a method of a *service/component* bean with **#[Scheduled]** will mak
 
 #[Scheduled(fixedDelay: 20, initialDelay: 10)]
 public function someScheduledMethodName(): void {
-    echo 'I did generated a unique Id on every 20 seconds ' . uniqid();
+    echo 'I generate a unique Id on every 20 seconds ' . uniqid();
 }
 
 ```
@@ -85,9 +85,11 @@ winter:
             queueCapacity: 50
 ```
 
-**poolSize** Total number of backend workers needed
-**argsSize** Maximum allowed size of total arguments that are passed to a Async method (in bytes)
-**queueCapacity** how many concurrent async/schedule requests can be queued.
+- **poolSize** Total number of backend workers needed
+
+- **argsSize** Maximum allowed size of total arguments that are passed to a Async method (in bytes)
+
+- **queueCapacity** how many concurrent async/schedule requests can be queued.
 
 
 ## Example

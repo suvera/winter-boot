@@ -275,7 +275,7 @@ All interceptors must have to be registered in a **#[Configuration]** bean
 class MyWebConfigurer implements WebMvcConfigurer {
 
     public function addInterceptors(InterceptorRegistry $registry): void {
-        // Applicable to all Interceptors
+        // Applicable to all URI paths
         $registry->addInterceptor(new MyInterceptor(), '.*');
         
         // Applicable to matching URI's

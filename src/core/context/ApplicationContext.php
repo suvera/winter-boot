@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace dev\winterframework\core\context;
 
 use dev\winterframework\reflection\ClassResource;
+use dev\winterframework\stereotype\Module;
 
 interface ApplicationContext {
     const FACTORY_BEAN_PREFIX = "&";
@@ -39,5 +40,9 @@ interface ApplicationContext {
     public function getProperties(): array;
 
     public function hasModule(string $moduleName): bool;
+
+    public function getModule(string $moduleName): Module;
+
+    public function getModules(): array;
 
 }

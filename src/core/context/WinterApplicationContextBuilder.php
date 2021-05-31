@@ -16,6 +16,7 @@ use dev\winterframework\core\web\error\DefaultErrorController;
 use dev\winterframework\core\web\error\ErrorController;
 use dev\winterframework\core\web\format\DefaultResponseRenderer;
 use dev\winterframework\core\web\ResponseRenderer;
+use dev\winterframework\exception\ModuleException;
 use dev\winterframework\exception\NoUniqueBeanDefinitionException;
 use dev\winterframework\pdbc\DataSource;
 use dev\winterframework\pdbc\datasource\DataSourceBuilder;
@@ -253,6 +254,17 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
 
     public function addModule(string $moduleName, Module $module): void {
         $this->moduleRegistry[$moduleName] = $module;
+    }
+
+    public function getModule(string $moduleName): Module {
+        if (!isset($this->moduleRegistry[$moduleName])) {
+            throw new ModuleException('Could not find module ' . json_encode($moduleName));
+        }
+        return $this->moduleRegistry[$moduleName];
+    }
+
+    public function getModules(): array {
+        return array_keys($this->moduleRegistry);
     }
 
 }

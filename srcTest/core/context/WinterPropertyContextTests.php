@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace test\winterframework\core\context;
 
 use dev\winterframework\core\context\WinterPropertyContext;
+use dev\winterframework\util\PropertyLoader;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -18,5 +19,7 @@ class WinterPropertyContextTests extends TestCase {
 
         $this->assertSame($prop->get('tesla.key.krazy'), "Thgh%#)()*\$l;',./po");
         //var_dump($prop->getAll());
+
+        print_r(PropertyLoader::loadProperties(__DIR__ . '/files/test.yml'));
     }
 }
