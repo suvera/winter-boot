@@ -185,4 +185,11 @@ class PdoConnection extends AbstractConnection {
         return false;
     }
 
+    public function getRowPreFetch(): int {
+        if (isset($this->options[PDO::ATTR_PREFETCH]) && is_numeric($this->options[PDO::ATTR_PREFETCH])) {
+            return intval($this->options[PDO::ATTR_PREFETCH]);
+        }
+        return 0;
+    }
+
 }

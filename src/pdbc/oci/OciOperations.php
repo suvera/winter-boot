@@ -12,12 +12,14 @@ use dev\winterframework\pdbc\DataSource;
 use dev\winterframework\pdbc\ex\IncorrectResultSizeDataAccessException;
 use dev\winterframework\pdbc\PreparedStatement;
 use dev\winterframework\reflection\ObjectCreator;
+use dev\winterframework\type\TypeAssert;
 
 abstract class OciOperations {
 
     public function __construct(
         protected DataSource $dataSource
     ) {
+        TypeAssert::objectOf($this->dataSource, OciDataSource::class);
     }
 
     protected function doExecute(
@@ -187,6 +189,7 @@ abstract class OciOperations {
             $generatedKeys[$key] = $value;
         }
 
+        $stmt->close();
         return $ret;
     }
 
@@ -203,6 +206,7 @@ abstract class OciOperations {
             $ret[] = $stmt->executeUpdate();
         }
 
+        $stmt->close();
         return $ret;
     }
 

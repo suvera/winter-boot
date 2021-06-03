@@ -13,6 +13,7 @@ use dev\winterframework\pdbc\support\AbstractConnection;
 use dev\winterframework\pdbc\support\DatabaseMetaData;
 use dev\winterframework\txn\Savepoint;
 use PDO;
+use RuntimeException;
 use Throwable;
 
 class OciConnection extends AbstractConnection {
@@ -37,29 +38,40 @@ class OciConnection extends AbstractConnection {
     }
 
     private function doConnect() {
-        $lang = isset($this->options['NLS_LANG']) ? $this->options['NLS_LANG'] : 'AMERICAN_AMERICA.UTF8';
+        $lang = $this->options['NLS_LANG'] ?? 'AMERICAN_AMERICA.UTF8';
+        $df = $this->options['NLS_DATE_FORMAT'] ?? 'YYYY-MM-DD HH24:MI:SS';
+        putenv('NLS_LANG=' . $lang);
+        putenv('NLS_DATE_FORMAT=' . $df);
+        $_ENV['NLS_LANG'] = $lang;
+        $_ENV['NLS_DATE_FORMAT'] = $df;
+
         try {
             if ($this->options[PDO::ATTR_PERSISTENT]) {
                 $this->oci = oci_pconnect(
                     $this->username,
                     $this->password,
-                    $this->dsn,
-                    $lang
+                    $this->dsn
                 );
             } else {
                 $this->oci = oci_connect(
                     $this->username,
                     $this->password,
-                    $this->dsn,
-                    $lang
+                    $this->dsn
                 );
             }
 
-            if (isset($this->options[PDO::ATTR_PREFETCH])) {
-                oci_set_prefetch($this->oci, $this->options[PDO::ATTR_PREFETCH]);
+            if (!$this->oci) {
+                $e = oci_error();
+                throw new RuntimeException(
+                    $e['code']
+                    . ': ' . htmlentities($e['message'], ENT_QUOTES)
+                    . ', sqltext:' . ($e['sqltext'] ?? '')
+                    . ', offset:' . (isset($e['offset']) ? $e['offset'] + 1 : '')
+                );
             }
+
         } catch (Throwable $e) {
-            throw new CannotGetConnectionException('Could not connect to datasource', 0, $e);
+            throw new CannotGetConnectionException('Could not connect to datasource ' . $e->getMessage(), 0, $e);
         }
     }
 
@@ -68,6 +80,13 @@ class OciConnection extends AbstractConnection {
             throw new SQLException('Oci connection already been closed, '
                 . 'Could not perform operation on closed connection.');
         }
+    }
+
+    public function getRowPreFetch(): int {
+        if (isset($this->options[PDO::ATTR_PREFETCH]) && is_numeric($this->options[PDO::ATTR_PREFETCH])) {
+            return intval($this->options[PDO::ATTR_PREFETCH]);
+        }
+        return 0;
     }
 
     /**
@@ -93,7 +112,7 @@ class OciConnection extends AbstractConnection {
         return is_null($this->oci);
     }
 
-    public function getDriverType(): mixed {
+    public function getDriverType(): string {
         return 'oci8';
     }
 
@@ -239,7 +258,7 @@ class OciConnection extends AbstractConnection {
     }
 
     public function getClientInfoValue(string $name): string {
-        return isset($this->clientInfo[$name]) ? $this->clientInfo[$name] : '';
+        return $this->clientInfo[$name] ?? '';
     }
 
 }

@@ -33,12 +33,18 @@ class OciResultSet extends AbstractResultSet {
         }
     }
 
+    public function __destruct() {
+        $this->close();
+    }
+
     public function getStatement(): OciQueryStatement|OciPreparedStatement|OciCallableStatement {
         return $this->ociStmt;
     }
 
     public function close(): void {
-        $this->ociStmt->close();
+        if (!$this->ociStmt->isClosed()) {
+            $this->ociStmt->close();
+        }
     }
 
     public function isClosed(): bool {
@@ -218,8 +224,8 @@ class OciResultSet extends AbstractResultSet {
     private function findColumns(): void {
         $len = oci_num_fields($this->stmt);
         for ($i = 1; $i <= $len; $i++) {
-            $meta = oci_field_name($this->stmt, $i);
-            $this->columns[$meta['name']] = $i - 1;
+            $fieldName = oci_field_name($this->stmt, $i);
+            $this->columns[$fieldName] = $i - 1;
         }
     }
 

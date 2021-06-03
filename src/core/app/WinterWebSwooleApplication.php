@@ -60,10 +60,18 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
 
         $http->on('request', [$this, 'serveRequest']);
         $http->on('start', function ($server) {
-            self::logInfo("Http server started on $server->host:" . $server->port);
+            self::logInfo("Http server started on $server->host:" . $server->port . ', pid:' . getmypid());
         });
 
-        self::logInfo("Starting Http server on $address:$port");
+        $http->on('workerstart', function ($server) {
+            self::logInfo("Http Worker started " . ', pid:' . getmypid());
+        });
+
+        $http->on('managerstart', function ($server) {
+            self::logInfo("Http Manager started " . ', pid:' . getmypid());
+        });
+
+        self::logInfo("Starting Http server on $address:$port" . ', pid:' . getmypid());
         $http->start();
     }
 
@@ -113,7 +121,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
 
             $wServer->getServer()->addProcess(
                 new Process(function ($process) use ($executor, $workerId) {
-                    self::logInfo("Async async-worker-$workerId has started successfully! ");
+                    self::logInfo("Async async-worker-$workerId has started successfully! " . getmypid());
                     while (1) {
                         $executor->executeAll($process, $workerId);
                         usleep(200000);
@@ -164,9 +172,10 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
 
             $wServer->getServer()->addProcess(
                 new Process(function ($process) use ($executor, $workerId) {
-                    self::logInfo("Scheduling sch-worker-$workerId has started successfully! ");
+                    self::logInfo("Scheduling sch-worker-$workerId has started successfully! " . getmypid());
                     while (1) {
                         $executor->executeAll($process, $workerId);
+                        usleep(200000);
                     }
                 })
             );

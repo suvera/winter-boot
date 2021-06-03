@@ -79,4 +79,5 @@ interface Connection {
 
     public function getSchema(): string;
 
+    public function getRowPreFetch(): int;
 }

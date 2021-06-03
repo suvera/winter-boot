@@ -53,5 +53,4 @@ abstract class AbstractConnection implements Connection {
         $this->transactionIsolation = $level;
     }
 
-
 }
