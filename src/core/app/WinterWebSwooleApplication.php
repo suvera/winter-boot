@@ -4,20 +4,20 @@ declare(strict_types=1);
 namespace dev\winterframework\core\app;
 
 use dev\winterframework\core\context\WinterServer;
-use dev\winterframework\core\context\WinterTable;
 use dev\winterframework\core\context\WinterWebSwooleContext;
+use dev\winterframework\io\process\AsyncWorkerProcess;
+use dev\winterframework\io\process\ScheduleWorkerProcess;
 use dev\winterframework\task\async\AsyncTaskPoolExecutor;
 use dev\winterframework\task\scheduling\ScheduledTaskPoolExecutor;
 use dev\winterframework\task\scheduling\stereotype\Scheduled;
 use dev\winterframework\task\TaskPoolExecutor;
 use dev\winterframework\web\http\SwooleRequest;
 use dev\winterframework\web\http\SwooleResponseEntity;
-use Swoole\Atomic;
+use RuntimeException;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
 use Swoole\HTTP\Server;
 use Swoole\Process;
-use Swoole\Table;
 
 class WinterWebSwooleApplication extends WinterApplicationRunner implements WinterApplication {
 
@@ -39,6 +39,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         $this->webContext->getDispatcher()->dispatch($wrapperReq, $wrapperResp);
     }
 
+    /** @noinspection PhpUnusedParameterInspection */
     protected function startServer() {
         $prop = $this->appCtxData->getPropertyContext();
         $address = $prop->get('server.address', '127.0.0.1');
@@ -63,12 +64,30 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
             self::logInfo("Http server started on $server->host:" . $server->port . ', pid:' . getmypid());
         });
 
-        $http->on('workerstart', function ($server) {
+        $http->on('WorkerStart', function ($server) {
             self::logInfo("Http Worker started " . ', pid:' . getmypid());
         });
 
-        $http->on('managerstart', function ($server) {
+        $http->on('ManagerStart', function ($server) {
             self::logInfo("Http Manager started " . ', pid:' . getmypid());
+        });
+
+        $http->on('PipeMessage', function (Server $server, $srcWorkerId, $data) {
+            if (substr($data, 0, 5) === 'json:') {
+                $json = json_decode(substr($data, 5), true);
+                switch ($json['cmd']) {
+                    case 'shutdown':
+                        echo $json['message'] . "\n";
+                        Process::kill($server->master_pid, SIGKILL);
+                        break;
+
+                    default:
+                        self::logWarning("Worker '$srcWorkerId' sent a message to server: $data");
+                        break;
+                }
+            } else {
+                self::logWarning("Worker '$srcWorkerId' sent a message to server: $data");
+            }
         });
 
         self::logInfo("Starting Http server on $address:$port" . ', pid:' . getmypid());
@@ -114,34 +133,9 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         }
 
         for ($workerId = 1; $workerId <= $executor->getPoolSize(); $workerId++) {
-            $wServer->addAsyncTable(
-                $workerId,
-                $this->createAsyncTaskTable($executor->getQueueCapacity(), $executor->getArgsSize())
-            );
-
-            $wServer->getServer()->addProcess(
-                new Process(function ($process) use ($executor, $workerId) {
-                    self::logInfo("Async async-worker-$workerId has started successfully! " . getmypid());
-                    while (1) {
-                        $executor->executeAll($process, $workerId);
-                        usleep(200000);
-                    }
-                })
-            );
+            $asyncPs = new AsyncWorkerProcess($wServer, $appCtx, $executor, $workerId);
+            $wServer->getServer()->addProcess($asyncPs);
         }
-    }
-
-    protected function createAsyncTaskTable(int $capacity, int $argSize): WinterTable {
-        $table = new Table($capacity);
-        $table->column('timestamp', Table::TYPE_INT);
-        $table->column('className', Table::TYPE_STRING, 128);
-        $table->column('methodName', Table::TYPE_STRING, 64);
-        $table->column('arguments', Table::TYPE_STRING, $argSize);
-        $table->create();
-
-        self::logInfo("Shared Async Table Capacity: $capacity, Memory: " . $table->getMemorySize() . ' bytes');
-
-        return new WinterTable($table, new Atomic(1));
     }
 
     protected function setDefaultTaskProperties(TaskPoolExecutor $executor): void {
@@ -164,42 +158,11 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         $this->setDefaultTaskProperties($executor);
 
         for ($workerId = 1; $workerId <= $executor->getPoolSize(); $workerId++) {
-
-            $wServer->addScheduledTable(
-                $workerId,
-                $this->createScheduledTaskTable($executor->getQueueCapacity())
-            );
-
-            $wServer->getServer()->addProcess(
-                new Process(function ($process) use ($executor, $workerId) {
-                    self::logInfo("Scheduling sch-worker-$workerId has started successfully! " . getmypid());
-                    while (1) {
-                        $executor->executeAll($process, $workerId);
-                        usleep(200000);
-                    }
-                })
-            );
+            $schPs = new ScheduleWorkerProcess($wServer, $appCtx, $executor, $workerId);
+            $wServer->getServer()->addProcess($schPs);
         }
 
         $this->buildScheduledRegistry($executor);
-    }
-
-    protected function createScheduledTaskTable(int $capacity): WinterTable {
-        $table = new Table($capacity);
-        $table->column('className', Table::TYPE_STRING, 128);
-        $table->column('methodName', Table::TYPE_STRING, 64);
-        $table->column('nextRun', Table::TYPE_INT);
-        $table->column('fixedDelay', Table::TYPE_INT);
-        $table->column('fixedRate', Table::TYPE_INT);
-        $table->column('initialDelay', Table::TYPE_INT);
-        $table->column('inProgress', Table::TYPE_INT);
-        $table->column('lastRun', Table::TYPE_INT);
-        $table->create();
-
-        self::logInfo("Shared Scheduling Table Capacity: $capacity, Memory: "
-            . $table->getMemorySize() . ' bytes');
-
-        return new WinterTable($table, new Atomic(1));
     }
 
     protected function buildScheduledRegistry(ScheduledTaskPoolExecutor $executor): void {

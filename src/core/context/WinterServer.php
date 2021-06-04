@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 namespace dev\winterframework\core\context;
 
+use dev\winterframework\util\Debug;
 use Swoole\Server;
+use Throwable;
 
 class WinterServer {
 
@@ -65,4 +67,20 @@ class WinterServer {
         return $this->scheduledTables[$workerId] ?? null;
     }
 
+    public function shutdown(string $message = null, Throwable $ex = null): void {
+        $msg = '';
+        if ($message) {
+            $msg .= "$message\n";
+        }
+        if ($ex) {
+            $msg .= $ex->getMessage() . "\n";
+            $msg .= Debug::exceptionBacktrace($ex);
+        }
+
+        $worker_id = 1 - $this->server->worker_id;
+        $this->server->sendMessage(
+            'json:' . json_encode(['cmd' => 'shutdown', 'message' => $msg]),
+            $worker_id
+        );
+    }
 }
