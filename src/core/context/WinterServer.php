@@ -16,11 +16,6 @@ class WinterServer {
     /**
      * @var WinterTable[]
      */
-    protected array $asyncTables = [];
-
-    /**
-     * @var WinterTable[]
-     */
     protected array $scheduledTables = [];
 
     public function getServer(): Server {
@@ -39,19 +34,6 @@ class WinterServer {
     public function setServerArgs(array $serverArgs): WinterServer {
         $this->serverArgs = $serverArgs;
         return $this;
-    }
-
-    public function getAsyncTables(): array {
-        return $this->asyncTables;
-    }
-
-    public function addAsyncTable(int $workerId, WinterTable $table): WinterServer {
-        $this->asyncTables[$workerId] = $table;
-        return $this;
-    }
-
-    public function getAsyncTable(int $workerId): ?WinterTable {
-        return $this->asyncTables[$workerId] ?? null;
     }
 
     public function getScheduledTables(): array {

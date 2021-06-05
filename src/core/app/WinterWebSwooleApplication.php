@@ -7,13 +7,13 @@ use dev\winterframework\core\context\WinterServer;
 use dev\winterframework\core\context\WinterWebSwooleContext;
 use dev\winterframework\io\process\AsyncWorkerProcess;
 use dev\winterframework\io\process\ScheduleWorkerProcess;
+use dev\winterframework\task\async\AsyncQueueStoreManager;
 use dev\winterframework\task\async\AsyncTaskPoolExecutor;
 use dev\winterframework\task\scheduling\ScheduledTaskPoolExecutor;
 use dev\winterframework\task\scheduling\stereotype\Scheduled;
 use dev\winterframework\task\TaskPoolExecutor;
 use dev\winterframework\web\http\SwooleRequest;
 use dev\winterframework\web\http\SwooleResponseEntity;
-use RuntimeException;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
 use Swoole\HTTP\Server;
@@ -58,6 +58,9 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
 
         $this->buildSharedServer($wServer);
         $this->beginModules();
+        
+        $this->buildAsyncPlatform($wServer);
+        $this->buildScheduledPlatform($wServer);
 
         $http->on('request', [$this, 'serveRequest']);
         $http->on('start', function ($server) {
@@ -114,17 +117,17 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         $this->appCtxData->getBeanProvider()->registerInternalBean(
             $wServer, WinterServer::class, true
         );
-
-        $this->buildAsyncPlatform($wServer);
-        $this->buildScheduledPlatform($wServer);
     }
 
     protected function buildAsyncPlatform(WinterServer $wServer) {
         $appCtx = $this->applicationContext;
+        $appCtx->addClass(AsyncQueueStoreManager::class);
         $appCtx->addClass(AsyncTaskPoolExecutor::class);
 
         /** @var AsyncTaskPoolExecutor $executor */
         $executor = $appCtx->beanByClass(AsyncTaskPoolExecutor::class);
+        /** @var AsyncQueueStoreManager $queueManager */
+        $queueManager = $appCtx->beanByClass(AsyncQueueStoreManager::class);
 
         $this->setDefaultTaskProperties($executor);
 
@@ -133,6 +136,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         }
 
         for ($workerId = 1; $workerId <= $executor->getPoolSize(); $workerId++) {
+            $queueManager->addQueueStoreDefault($workerId);
             $asyncPs = new AsyncWorkerProcess($wServer, $appCtx, $executor, $workerId);
             $wServer->getServer()->addProcess($asyncPs);
         }

@@ -1,5 +1,4 @@
 <?php
-
 declare(strict_types=1);
 
 namespace dev\winterframework\core\context;
@@ -12,7 +11,6 @@ use dev\winterframework\exception\ClassNotFoundException;
 use dev\winterframework\exception\NoUniqueBeanDefinitionException;
 use dev\winterframework\exception\WinterException;
 use dev\winterframework\reflection\ClassResource;
-use dev\winterframework\reflection\ClassResourceScanner;
 use dev\winterframework\reflection\MethodResource;
 use dev\winterframework\reflection\proxy\ProxyGenerator;
 use dev\winterframework\reflection\ref\RefKlass;
@@ -56,13 +54,10 @@ final class WinterBeanProviderContext implements BeanProviderContext {
      */
     private array $beanResolutionOrder = [];
 
-    private ClassResourceScanner $scanner;
-
     public function __construct(
         protected ApplicationContextData $ctxData,
         protected ApplicationContext $appCtx
     ) {
-        $this->scanner = ClassResourceScanner::getDefaultScanner();
     }
 
     public function addProviderClass(ClassResource $class): void {
@@ -277,6 +272,7 @@ final class WinterBeanProviderContext implements BeanProviderContext {
             throw new BeansException($class);
         }
 
+        /** @noinspection PhpUnusedLocalVariableInspection */
         foreach ($this->beanClassFactory[$class] as $beanClass => $resource) {
             if ($this->beanNameFactory[$name]->equals($resource)) {
                 return $this->getInstance($resource);
@@ -582,16 +578,23 @@ final class WinterBeanProviderContext implements BeanProviderContext {
      *
      * @param object $bean
      * @param string $beanClass
-     * @param bool $overwrite
+     * @param bool $overwriteClass
+     * @param string $beanName
+     * @param bool $overwriteName
      */
     public function registerInternalBean(
         object $bean,
         string $beanClass = '',
-        bool $overwrite = true
+        bool $overwriteClass = true,
+        string $beanName = '',
+        bool $overwriteName = false
     ): void {
         $beanClass = empty($beanClass) ? $bean::class : $beanClass;
 
-        if (!$overwrite && $this->hasBeanByClass($beanClass)) {
+        $clsOverWritable = ($overwriteClass || !$this->hasBeanByClass($beanClass));
+        $nameOverWritable = ($beanName && ($overwriteName || !$this->hasBeanByName($beanName)));
+
+        if (!$clsOverWritable && !$nameOverWritable) {
             return;
         }
 
@@ -616,11 +619,15 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         $class->setClass($ref);
 
         $beanProvider = new BeanProvider($class);
-        // Validation here ?
-        unset($this->beanClassFactory[$beanClass]);
-
         $beanProvider->setCached($bean);
-        $this->beanClassFactory[$beanClass][$beanClass] = $beanProvider;
+
+        if ($clsOverWritable) {
+            unset($this->beanClassFactory[$beanClass]);
+            $this->beanClassFactory[$beanClass][$beanClass] = $beanProvider;
+        }
+        if ($nameOverWritable) {
+            $this->beanNameFactory[$beanName] = $beanProvider;
+        }
     }
 
     /**

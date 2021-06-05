@@ -4,21 +4,18 @@ declare(strict_types=1);
 namespace dev\winterframework\task\async;
 
 use dev\winterframework\core\context\ApplicationContext;
-use dev\winterframework\core\context\WinterServer;
 use dev\winterframework\stereotype\Autowired;
 use dev\winterframework\stereotype\Component;
 use dev\winterframework\stereotype\Value;
 use dev\winterframework\task\TaskPoolExecutor;
-use dev\winterframework\task\TaskPoolExecutorTrait;
+use dev\winterframework\util\async\AsyncQueueRecord;
 use dev\winterframework\util\log\Wlf4p;
 use OverflowException;
-use Swoole\Process;
 use Throwable;
 
 #[Component]
 class AsyncTaskPoolExecutor implements TaskPoolExecutor {
     use Wlf4p;
-    use TaskPoolExecutorTrait;
 
     const ARG_SIZE = 2048;
 
@@ -32,7 +29,7 @@ class AsyncTaskPoolExecutor implements TaskPoolExecutor {
     private int $argsSize = self::ARG_SIZE;
 
     #[Autowired]
-    private WinterServer $server;
+    private AsyncQueueStoreManager $queueManager;
 
     #[Autowired]
     private ApplicationContext $appCtx;
@@ -47,41 +44,36 @@ class AsyncTaskPoolExecutor implements TaskPoolExecutor {
             }
         }
 
-        //$workerId = (mt_rand(1, $this->poolSize) % $this->poolSize) + 1;
-        //$table = $this->server->getAsyncTable($workerId);
-
-        $tables = $this->server->getAsyncTables();
-        $workerId = $this->findAvailableWorker($tables);
+        $workerId = $this->queueManager->findAvailableWorker();
 
         if ($workerId == null) {
             self::logInfo("No Async worker found!");
             return;
         }
+        $store = $this->queueManager->getQueueStore($workerId);
 
-        $id = $tables[$workerId]->insert([
+        $id = $store->enqueue(AsyncQueueRecord::fromArray(0, [
             'className' => $className,
             'methodName' => $methodName,
             'timestamp' => time(),
-            'arguments' => $argValue
-        ]);
+            'arguments' => $argValue,
+            'workerId' => $workerId,
+        ]));
 
         self::logInfo("Async call id '$id' enqueued to worker-$workerId");
     }
 
-    public function executeAll(Process $worker, int $workerId) {
-        $table = $this->server->getAsyncTable($workerId);
+    public function executeAll(int $workerId) {
+        $store = $this->queueManager->getQueueStore($workerId);
         $appCtx = $this->appCtx;
 
-        foreach ($table->getTable() as $id => $row) {
-            go(function () use ($table, $id, $row, $appCtx, $workerId) {
-                self::logInfo("Processing Async call '$id' on async-worker-$workerId");
-                $id = intval($id);
-
-                $table->delete($id);
-
-                $className = $row['className'];
-                $methodName = $row['methodName'];
-                $args = json_decode($row['arguments'], true);
+        while ($record = $store->dequeue()) {
+            go(function () use ($store, $record, $appCtx, $workerId) {
+                self::logInfo("Processing Async call '" . $record->getId() . "' on async-worker-$workerId");
+                $id = intval($record->getId());
+                $className = $record->getClassName();
+                $methodName = $record->getMethodName();
+                $args = json_decode($record->getArguments(), true);
 
                 try {
                     $bean = $appCtx->beanByClass($className);
@@ -89,7 +81,6 @@ class AsyncTaskPoolExecutor implements TaskPoolExecutor {
                 } catch (Throwable $e) {
                     self::logException($e);
                 }
-
             });
         }
     }
