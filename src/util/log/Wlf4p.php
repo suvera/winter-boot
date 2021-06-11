@@ -27,6 +27,12 @@ trait Wlf4p {
         self::logLog(MonoLogger::ERROR, $message, $context);
     }
 
+    public static function logEx(Throwable $e, string $message = '', array $context = []) {
+        $message = $message . get_class($e) . ' ' . $e->getCode() . ': ' . $e->getMessage()
+            . ', at line: ' . $e->getFile() . ', at line: ' . $e->getLine();
+        self::logLog(MonoLogger::ERROR, $message, $context);
+    }
+
     public static function logError(string $message, array $context = []) {
         self::logLog(MonoLogger::ERROR, $message, $context);
     }

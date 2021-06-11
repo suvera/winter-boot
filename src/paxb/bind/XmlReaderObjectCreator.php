@@ -11,8 +11,10 @@ use dev\winterframework\paxb\attr\XmlAnyElement;
 use dev\winterframework\paxb\attr\XmlAttribute;
 use dev\winterframework\paxb\attr\XmlElement;
 use dev\winterframework\paxb\attr\XmlValue;
+use dev\winterframework\paxb\ex\NodeBindDoesNotExist;
 use dev\winterframework\paxb\ex\PaxbException;
 use dev\winterframework\paxb\LibxmlUtil;
+use dev\winterframework\paxb\XmlValueAdapter;
 use dev\winterframework\reflection\ObjectPropertySetter;
 use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ref\RefProperty;
@@ -26,6 +28,11 @@ class XmlReaderObjectCreator {
     use Wlf4p;
     use ObjectPropertySetter;
     use XmlResourceScanner;
+
+    /**
+     * @var XmlValueAdapter[]
+     */
+    protected array $valueAdapters = [];
 
     public function __construct(
         protected XMLReader $reader,
@@ -66,47 +73,69 @@ class XmlReaderObjectCreator {
                 throw new PaxbException(LibxmlUtil::getXmlError());
             }
 
-            switch ($this->reader->nodeType) {
-                case XMLReader::ELEMENT:
-                    $depth++;
+            $nodeType = $this->reader->nodeType;
 
-                    //echo "\n" . 'Element: ' . $this->reader->name, ', depth:' . $depth . "\n";
-                    if (!isset($objectStore[$depth])) {
-                        list($curObj, $curCls)
-                            = $this->initObjectFromElement($objectStore[$depth - 1], $classStore[$depth - 1]);
-
-                        //echo get_class($curObj) . "\n";
-                        if (!is_null($curObj)) {
-                            $objectStore[$depth] = $curObj;
-                            $classStore[$depth] = $curCls;
+            while (1) {
+                switch ($nodeType) {
+                    case XMLReader::ELEMENT:
+                        $isEmpty = $this->reader->isEmptyElement;
+                        if ($isEmpty && !$this->reader->hasAttributes) {
+                            break;
                         }
-                    }
-                    if (!is_null($curObj)) {
-                        $this->mapXmlAttributes($curObj, $curCls);
-                    }
 
-                    break;
+                        $depth++;
+                        //echo "\n" . 'Element: ' . $this->reader->name, ', depth:' . $depth . "\n";
+                        try {
+                            if (!isset($objectStore[$depth])) {
+                                list($curObj, $curCls)
+                                    = $this->initObjectFromElement($objectStore[$depth - 1], $classStore[$depth - 1]);
 
-                case XMLReader::TEXT:
-                case XMLReader::CDATA:
-                    //echo 'TEXT ' . $this->reader->value, ', depth:' . $depth . "\n";
-                    if (!is_null($curObj)) {
-                        $this->mapXmlValue($curObj, $curCls);
-                    }
-                    break;
+                                //echo get_class($curObj) . "\n";
+                                if (!is_null($curObj)) {
+                                    $objectStore[$depth] = $curObj;
+                                    $classStore[$depth] = $curCls;
+                                }
+                            }
+                            if (!is_null($curObj)) {
+                                $this->mapXmlAttributes($curObj, $curCls);
+                            }
+                        } catch (NodeBindDoesNotExist $e) {
+                            self::logDebug($e->getMessage());
+                            $depth--;
+                            $this->reader->next();
+                        }
 
-                case XMLReader::END_ELEMENT:
-                    $depth--;
-                    if (isset($objectStore[$depth])) {
-                        $curObj = $objectStore[$depth];
-                        $curCls = $classStore[$depth];
-                        unset($objectStore[$depth + 1], $classStore[$depth + 1]);
-                    } else {
-                        $curObj = null;
-                        $curCls = null;
-                        //echo 'END_ELEMENT curObj setting to null, ' . $this->reader->name, ', depth:' . $depth . "\n";
-                    }
-                    break;
+                        if ($isEmpty) {
+                            $nodeType = XMLReader::END_ELEMENT;
+                            continue 2;
+                        }
+
+                        break;
+
+                    case XMLReader::TEXT:
+                    case XMLReader::CDATA:
+                        //echo 'TEXT ' . $this->reader->value, ', depth:' . $depth . "\n";
+                        if (!is_null($curObj)) {
+                            $this->mapXmlValue($curObj, $curCls);
+                        }
+                        break;
+
+                    case XMLReader::END_ELEMENT:
+                        $depth--;
+                        if (isset($objectStore[$depth])) {
+                            $curObj = $objectStore[$depth];
+                            $curCls = $classStore[$depth];
+                            unset($objectStore[$depth + 1], $classStore[$depth + 1]);
+                            //echo 'Unsetting ... ' . $this->reader->name, ', depth:' . ($depth) . "\n";
+                        } else {
+                            $curObj = null;
+                            $curCls = null;
+                            //echo 'END_ELEMENT curObj setting to null, ' . $this->reader->name, ', depth:' . $depth . "\n";
+                        }
+                        break;
+                }
+
+                break;
             }
         }
 
@@ -115,6 +144,25 @@ class XmlReaderObjectCreator {
 
     protected function initObjectFromElement(object $parent, XmlBeanAnnotations $parentDef): array {
         $tagName = $this->reader->name;
+
+        /** @var XmlBeanAnnotation[] $elements */
+        $elements = $parentDef->getAttributesBy(XmlElement::class);
+        /** @var XmlBeanAnnotation[] $anyElement */
+        $anyElement = $parentDef->getAttributesBy(XmlAnyElement::class);
+
+        $bindAnnotation = null;
+        foreach ($elements as $element) {
+            /** @var XmlElement $annot */
+            $annot = $element->getAnnotation();
+            if ($annot->getName() == $tagName) {
+                $bindAnnotation = $annot;
+                break;
+            }
+        }
+
+        if (!$bindAnnotation && empty($anyElement)) {
+            throw new NodeBindDoesNotExist('There is no bind for tag ' . $tagName);
+        }
 
         if ($parent instanceof XmlNode) {
             $node = new XmlNode($tagName);
@@ -127,49 +175,50 @@ class XmlReaderObjectCreator {
             return [null, null];
         }
 
-        /** @var XmlBeanAnnotation[] $elements */
-        $elements = $parentDef->getAttributesBy(XmlElement::class);
-        /** @var XmlBeanAnnotation[] $anyElement */
-        $anyElement = $parentDef->getAttributesBy(XmlAnyElement::class);
 
         $variables = $parentDef->getClassResource()->getVariables();
-        foreach ($elements as $element) {
+        if ($bindAnnotation) {
             /** @var XmlElement $annot */
-            $annot = $element->getAnnotation();
-            if ($annot->getName() == $tagName) {
-                if ($annot->getRefOwner() instanceof RefProperty) {
-                    $resource = $variables[$annot->getRefOwner()->getName()];
-                    $type = $resource->getParameterType();
+            $annot = $bindAnnotation;
+            if ($annot->getRefOwner() instanceof RefProperty) {
+                $resource = $variables[$annot->getRefOwner()->getName()];
+                $type = $resource->getParameterType();
 
-                    if ($annot->isList()) {
-                        return $this->initElementListObject($resource, $parent, $annot);
+                if ($annot->isList()) {
+                    return $this->initElementListObject($resource, $parent, $annot);
 
-                    } else if ($type->getName() == 'array') {
-                        $node = $this->createXmlNodeArray($resource, $parent, $tagName);
+                } else if ($type->getName() == 'array') {
+                    $node = $this->createXmlNodeArray($resource, $parent, $tagName);
 
-                        return [$node, $parentDef];
-                    } else if ($type->getName() == XmlNode::class) {
-                        $node = $this->createXmlNode($resource, $parent, $tagName);
+                    return [$node, $parentDef];
+                } else if ($type->getName() == XmlNode::class) {
+                    $node = $this->createXmlNode($resource, $parent, $tagName);
 
-                        return [$node, $parentDef];
-                    } else if ($type->isNoType()
-                        || $type->isUnionType()
-                        || $type->isBuiltin()
-                        || $type->getName() == DateTimeInterface::class
-                        || $type->getName() == DateTime::class
-                    ) {
-                        return [new ScalarPropertyValue($resource, $parent), $parentDef];
-                    }
-                    return $this->initElementObject($resource, $parent);
+                    return [$node, $parentDef];
+                } else if ($type->isNoType()
+                    || $type->isUnionType()
+                    || $type->isBuiltin()
+                    || $type->getName() == DateTimeInterface::class
+                    || $type->getName() == DateTime::class
+                    || $annot->getValueAdapter()
+                ) {
+                    return [
+                        new ScalarPropertyValue(
+                            $resource,
+                            $parent,
+                            $annot
+                        ),
+                        $parentDef
+                    ];
                 }
+                return $this->initElementObject($resource, $parent);
             }
         }
 
         if (!empty($anyElement)) {
-            /** @var XmlAnyElement $any */
             $any = $anyElement[0];
-            if ($any->getRefOwner() instanceof RefProperty) {
-                $resource = $variables[$any->getRefOwner()->getName()];
+            if ($any->getAnnotation()->getRefOwner() instanceof RefProperty) {
+                $resource = $variables[$any->getAnnotation()->getRefOwner()->getName()];
                 $node = $this->createXmlNodeArray($resource, $parent, $tagName);
                 return [$node, $parentDef];
             }
@@ -259,14 +308,26 @@ class XmlReaderObjectCreator {
             $obj->setValue($this->reader->value);
             return;
         } else if ($obj instanceof ScalarPropertyValue) {
-            $this->setObjectProperty($obj->getResource(), $obj->getObject(), $this->reader->value);
+            $this->setObjectProperty(
+                $obj->getResource(),
+                $obj->getObject(),
+                $this->reader->value,
+                $obj->getAnnotation()
+            );
             return;
         }
 
         $attrList = $objDef->getAttributesBy(XmlValue::class);
         foreach ($attrList as $attr) {
             $resource = $attr->getResource();
-            $this->setObjectProperty($resource, $obj, $this->reader->value);
+            /** @var XmlValue $xmlVal */
+            $xmlVal = $attr->getAnnotation();
+            $this->setObjectProperty(
+                $resource,
+                $obj,
+                $this->reader->value,
+                $xmlVal
+            );
         }
     }
 
@@ -307,10 +368,15 @@ class XmlReaderObjectCreator {
 
             if (isset($properties[$annotation->getName()])) {
                 if ($resource instanceof VariableResource) {
-                    $this->setObjectProperty($resource, $obj, $properties[$annotation->getName()]);
+                    $this->setObjectProperty(
+                        $resource,
+                        $obj,
+                        $properties[$annotation->getName()],
+                        $annotation
+                    );
                 }
             } else if ($annotation->isRequired()) {
-                throw new PaxbException('#[XmlAttribute] on resource is required "'
+                throw new PaxbException('#[XmlAttribute] ' . $annotation->getName() . ' on resource is required "'
                     . ReflectionUtil::getFqName($resource)
                     . '", but could not find it in the source XML '
                 );
@@ -330,6 +396,14 @@ class XmlReaderObjectCreator {
 
         // Move cursor back to Element from attribute
         $this->reader->moveToElement();
+    }
+
+    protected function getValueAdapter(string $adapterClass): XmlValueAdapter {
+        if (isset($this->valueAdapters[$adapterClass])) {
+            return $this->valueAdapters[$adapterClass];
+        }
+
+        return $this->valueAdapters[$adapterClass] = new $adapterClass();
     }
 
     /**
@@ -356,12 +430,56 @@ class XmlReaderObjectCreator {
 
     /**
      * Set Object property from XML Tag attribute value
-     *
+     */
+    /**
      * @param VariableResource $variable
      * @param object $obj
      * @param string $value
+     * @param mixed|XmlAttribute|XmlElement|XmlValue $annotation
      */
-    protected function setObjectProperty(VariableResource $variable, object $obj, string $value): void {
+    protected function setObjectProperty(
+        VariableResource $variable,
+        object $obj,
+        string $value,
+        mixed $annotation = null
+    ): void {
+        if ($annotation) {
+            if ($annotation->getFilters()) {
+                foreach ($annotation->getFilters() as $filter => $filterVal) {
+                    switch ($filter) {
+                        case XmlValue::FILTER_TRIM:
+                            if ($filterVal) {
+                                $value = trim($value);
+                            }
+                            break;
+
+                        case XmlValue::FILTER_LENGTH:
+                            if ($filterVal && is_numeric($filterVal)) {
+                                $value = substr($value, 0, $filterVal);
+                            }
+                            break;
+
+                        case XmlValue::FILTER_LOWERCASE:
+                            if ($filterVal) {
+                                $value = strtolower($value);
+                            }
+                            break;
+
+                        case XmlValue::FILTER_UPPERCASE:
+                            if ($filterVal) {
+                                $value = strtoupper($value);
+                            }
+                            break;
+                    }
+                }
+            }
+
+            if ($annotation->getValueAdapter()) {
+                $adapter = $this->getValueAdapter($annotation->getValueAdapter());
+                $value = $adapter->unmarshal($value);
+            }
+        }
+
         $var = $variable->getVariable();
         self::doSetObjectProperty($var, $obj, $value, ObjectMapper::SOURCE_XML);
     }

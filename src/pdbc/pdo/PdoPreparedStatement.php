@@ -3,8 +3,10 @@ declare(strict_types=1);
 
 namespace dev\winterframework\pdbc\pdo;
 
+use DateTime;
 use dev\winterframework\pdbc\core\BindType;
 use dev\winterframework\pdbc\core\BindVar;
+use dev\winterframework\pdbc\core\OutBindVar;
 use dev\winterframework\pdbc\ResultSet;
 use dev\winterframework\pdbc\support\AbstractPreparedStatement;
 use PDO;
@@ -118,22 +120,42 @@ class PdoPreparedStatement extends AbstractPreparedStatement {
                     break;
 
                 case BindType::BLOB:
-                    $tmpRow = count($this->tmpValues);
-                    $this->tmpValues[] = $bindVar->value->getStreamResource();
-                    $this->stmt->bindParam($bindKey, $this->tmpValues[$tmpRow], PDO::PARAM_LOB);
+                    if (is_null($bindVar->value)) {
+                        $this->stmt->bindParam($bindKey, $bindVar->value, PDO::PARAM_NULL);
+                    } else {
+                        $tmpRow = count($this->tmpValues);
+                        $this->tmpValues[] = $bindVar->value->getStreamResource();
+                        $this->stmt->bindParam($bindKey, $this->tmpValues[$tmpRow], PDO::PARAM_LOB);
+                    }
+
                     break;
 
                 case BindType::CLOB:
-
-                    $driver = $this->connection->getDriverType();
-                    $tmpRow = count($this->tmpValues);
-                    if ($driver == 'oci') {
-                        $this->tmpValues[] = $bindVar->value->getString();
-                        $this->stmt->bindParam($bindKey, $this->tmpValues[$tmpRow],
-                            PDO::PARAM_STR, strlen($this->tmpValues[$tmpRow]));
+                    if (is_null($bindVar->value)) {
+                        $this->stmt->bindParam($bindKey, $bindVar->value, PDO::PARAM_NULL);
                     } else {
-                        $this->tmpValues[] = $bindVar->value->getStreamResource();
-                        $this->stmt->bindParam($bindKey, $this->tmpValues[$tmpRow], PDO::PARAM_LOB);
+                        $driver = $this->connection->getDriverType();
+                        $tmpRow = count($this->tmpValues);
+                        if ($driver == 'oci') {
+                            $this->tmpValues[] = $bindVar->value->getString();
+                            $this->stmt->bindParam($bindKey, $this->tmpValues[$tmpRow],
+                                PDO::PARAM_STR, strlen($this->tmpValues[$tmpRow]));
+                        } else {
+                            $this->tmpValues[] = $bindVar->value->getStreamResource();
+                            $this->stmt->bindParam($bindKey, $this->tmpValues[$tmpRow], PDO::PARAM_LOB);
+                        }
+                    }
+                    break;
+
+                case BindType::DATE:
+                    /** @var DateTime $dateVal */
+                    $dateVal = $bindVar->value;
+                    if (!is_null($dateVal)) {
+                        $tmpRow = count($this->tmpValues);
+                        $this->tmpValues[] = $dateVal->format('Y-m-d H:i:s');
+                        $this->stmt->bindParam($bindKey, $this->tmpValues[$tmpRow]);
+                    } else {
+                        $this->stmt->bindParam($bindKey, $bindVar->value);
                     }
                     break;
 
@@ -151,20 +173,80 @@ class PdoPreparedStatement extends AbstractPreparedStatement {
 
     protected function bindOutParameters(): void {
         $this->outValues = [];
-        foreach ($this->outParameters as $type => $binds) {
 
-            foreach ($binds as $bindKey => $len) {
-                $this->outValues[$bindKey] = null;
-                $this->stmt->bindParam(
-                    $bindKey,
-                    $this->outValues[$bindKey],
-                    $type | PDO::PARAM_INPUT_OUTPUT,
-                    $len
-                );
+        foreach ($this->outParameters as $bindKey => $bindVar) {
+            /** @var OutBindVar $bindVar */
+            $this->outValues[$bindKey] = null;
+
+            $maxLen = $bindVar->getMaxLength();
+            switch ($bindVar->getType()) {
+                case BindType::BOOL:
+                    $maxLen = ($maxLen < 1) ? 10 : $maxLen;
+                    $this->stmt->bindParam(
+                        $bindKey,
+                        $this->outValues[$bindKey],
+                        PDO::PARAM_BOOL | PDO::PARAM_INPUT_OUTPUT,
+                        $maxLen
+                    );
+                    break;
+
+                case BindType::NULL:
+                    $this->stmt->bindParam(
+                        $bindKey,
+                        $this->outValues[$bindKey],
+                        PDO::PARAM_NULL | PDO::PARAM_INPUT_OUTPUT,
+                        $maxLen
+                    );
+                    break;
+
+                case BindType::INTEGER:
+                case BindType::FLOAT:
+                    $maxLen = ($maxLen < 1) ? 64 : $maxLen;
+                    $this->stmt->bindParam(
+                        $bindKey,
+                        $this->outValues[$bindKey],
+                        PDO::PARAM_INT | PDO::PARAM_INPUT_OUTPUT,
+                        $maxLen
+                    );
+                    break;
+
+                case BindType::BLOB:
+                    $this->stmt->bindParam(
+                        $bindKey,
+                        $this->outValues[$bindKey],
+                        PDO::PARAM_LOB | PDO::PARAM_INPUT_OUTPUT,
+                        $maxLen
+                    );
+                    break;
+
+                case BindType::CLOB:
+                    $driver = $this->connection->getDriverType();
+                    if ($driver == 'oci') {
+                        $type = PDO::PARAM_STR;
+                    } else {
+                        $type = PDO::PARAM_LOB;
+                    }
+                    $this->stmt->bindParam(
+                        $bindKey,
+                        $this->outValues[$bindKey],
+                        $type | PDO::PARAM_INPUT_OUTPUT,
+                        $maxLen
+                    );
+                    break;
+
+                default:
+                    $this->stmt->bindParam(
+                        $bindKey,
+                        $this->outValues[$bindKey],
+                        PDO::PARAM_STR | PDO::PARAM_INPUT_OUTPUT,
+                        $maxLen
+                    );
+                    break;
             }
         }
     }
 
+    /** @noinspection PhpSameParameterValueInspection */
     private function loadAutoGeneratedKeys(PDO $pdo, array $columnIdxOrNames = []): void {
         if (empty($columnIdxOrNames)) {
             $this->generatedKeys[] = $pdo->lastInsertId();

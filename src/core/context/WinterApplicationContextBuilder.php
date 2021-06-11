@@ -22,10 +22,12 @@ use dev\winterframework\pdbc\DataSource;
 use dev\winterframework\pdbc\datasource\DataSourceBuilder;
 use dev\winterframework\pdbc\PdbcTemplate;
 use dev\winterframework\pdbc\pdo\PdoTemplateProvider;
+use dev\winterframework\ppa\EntityRegistry;
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\ClassResources;
 use dev\winterframework\reflection\ClassResourceScanner;
 use dev\winterframework\stereotype\Module;
+use dev\winterframework\stereotype\ppa\Table;
 use dev\winterframework\stereotype\WinterBootApplication;
 use dev\winterframework\util\concurrent\DefaultLockManager;
 use dev\winterframework\util\concurrent\LockManager;
@@ -230,6 +232,12 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
 
     private function processClassResource(ClassResource $resource): void {
         $this->beanProvider->addProviderClass($resource);
+
+        $table = $resource->getAttribute(Table::class);
+        if ($table) {
+            EntityRegistry::putEntity($resource);
+        }
+        
     }
 
     public function addClass(string $class): ClassResource {
@@ -245,6 +253,7 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         if (!$this->hasBeanByClass($class)) {
             $this->processClassResource($clsResource);
         }
+
         return $clsResource;
     }
 

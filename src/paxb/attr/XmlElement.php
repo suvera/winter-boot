@@ -29,7 +29,9 @@ class XmlElement implements XmlStereoType, ScanClassProvider {
         protected string $namespace = '',
         protected mixed $defaultValue = null,
         protected bool $list = false,
-        protected string $listClass = ''
+        protected string $listClass = '',
+        protected string $valueAdapter = '',
+        protected array $filters = []
     ) {
         if (!empty($this->listClass)) {
             $this->list = true;
@@ -41,6 +43,18 @@ class XmlElement implements XmlStereoType, ScanClassProvider {
         } else if ($this->list) {
             throw new TypeError('#[XmlElement] attribute must have "listClass" defined where "list=true" set');
         }
+
+        if ($this->valueAdapter) {
+            $this->validateValueAdapter($this->valueAdapter, 'XmlElement');
+        }
+    }
+
+    public function getFilters(): array {
+        return $this->filters;
+    }
+
+    public function getValueAdapter(): string {
+        return $this->valueAdapter;
     }
 
     public function getName(): string {

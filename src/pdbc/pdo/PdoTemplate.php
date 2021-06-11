@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace dev\winterframework\pdbc\pdo;
 
 use dev\winterframework\pdbc\core\BindVars;
+use dev\winterframework\pdbc\core\OutBindVars;
 use dev\winterframework\pdbc\core\PreparedStatementCallback;
 use dev\winterframework\pdbc\core\ResultSetExtractor;
 use dev\winterframework\pdbc\core\RowCallbackHandler;
@@ -69,9 +70,10 @@ class PdoTemplate extends PdoOperations implements PdbcTemplate {
     public function update(
         string $sql,
         BindVars|array $bindVars,
+        array|OutBindVars $outBindVars = [],
         array &$generatedKeys = []
     ): int {
-        return $this->doUpdate($sql, $bindVars, $generatedKeys);
+        return $this->doUpdate($sql, $bindVars, $outBindVars, $generatedKeys);
     }
 
     public function batchUpdate(

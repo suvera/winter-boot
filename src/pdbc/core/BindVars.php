@@ -14,7 +14,7 @@ class BindVars extends ArrayList {
 
     public function offsetSet($offset, $value): void {
         if (is_array($value) && isset($value[0]) && isset($value[1])) {
-            $value = new BindVar($value[0], $value[1], isset($value[2]) ? $value[2] : BindType::STRING);
+            $value = new BindVar($value[0], $value[1], $value[2] ?? BindType::STRING);
         }
         TypeAssert::typeOf($value, BindVar::class);
         /** @var BindVar $value */

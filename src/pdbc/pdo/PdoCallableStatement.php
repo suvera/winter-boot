@@ -4,11 +4,12 @@ declare(strict_types=1);
 namespace dev\winterframework\pdbc\pdo;
 
 use dev\winterframework\pdbc\CallableStatement;
+use dev\winterframework\pdbc\core\OutBindVar;
 
 class PdoCallableStatement extends PdoPreparedStatement implements CallableStatement {
 
     public function registerOutParameter(int|string $parameter, int $sqlType, int $len = 64): void {
-        $this->outParameters[$sqlType][$parameter] = $len;
+        $this->outParameters[] = new OutBindVar($parameter, $len, $sqlType);
     }
 
     public function getOutParameter(int|string $parameter): mixed {

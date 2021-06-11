@@ -3,8 +3,10 @@ declare(strict_types=1);
 
 namespace dev\winterframework\pdbc\oci;
 
+use DateTime;
 use dev\winterframework\pdbc\core\BindType;
 use dev\winterframework\pdbc\core\BindVar;
+use dev\winterframework\pdbc\core\OutBindVar;
 use dev\winterframework\pdbc\ResultSet;
 use dev\winterframework\pdbc\support\AbstractPreparedStatement;
 
@@ -113,19 +115,34 @@ class OciPreparedStatement extends AbstractPreparedStatement {
 
 
                 case BindType::BLOB:
+                case BindType::CLOB:
+                    $ociType = ($bindVar->getType() == BindType::CLOB) ? OCI_B_CLOB : OCI_B_BLOB;
+
+                    $myLob = oci_new_descriptor($this->getConnection()->getOci(), OCI_DTYPE_LOB);
                     $tmpRow = count($this->tmpValues);
-                    $this->tmpValues[] = $bindVar->value->getString();
+                    $this->tmpValues[] = $myLob;
+
+                    if (!is_null($bindVar->value)) {
+                        $myLob->write($bindVar->value->getString());
+                    }
                     oci_bind_by_name(
-                        $this->stmt, $bindKey, $this->tmpValues[$tmpRow], -1, OCI_B_BLOB
+                        $this->stmt, $bindKey, $this->tmpValues[$tmpRow], -1, $ociType
                     );
                     break;
 
-                case BindType::CLOB:
-                    $tmpRow = count($this->tmpValues);
-                    $this->tmpValues[] = $bindVar->value->getString();
-                    oci_bind_by_name(
-                        $this->stmt, $bindKey, $this->tmpValues[$tmpRow], -1, OCI_B_CLOB
-                    );
+                case BindType::DATE:
+                    /** @var DateTime $dateVal */
+                    $dateVal = $bindVar->value;
+
+                    if (!is_null($dateVal)) {
+                        $tmpRow = count($this->tmpValues);
+                        $this->tmpValues[] = $dateVal->format('Y-m-d H:i:s');
+                        oci_bind_by_name(
+                            $this->stmt, $bindKey, $this->tmpValues[$tmpRow], 24
+                        );
+                    } else {
+                        oci_bind_by_name($this->stmt, $bindKey, $bindVar->value);
+                    }
                     break;
 
                 case OCI_B_CURSOR:
@@ -150,14 +167,58 @@ class OciPreparedStatement extends AbstractPreparedStatement {
 
     protected function bindOutParameters(): void {
         $this->outValues = [];
-        foreach ($this->outParameters as $type => $binds) {
+        foreach ($this->outParameters as $bindKey => $bindVar) {
+            /** @var OutBindVar $bindVar */
+            $this->outValues[$bindKey] = null;
 
-            foreach ($binds as $bindKey => $len) {
-                $this->outValues[$bindKey] = null;
+            $maxLen = $bindVar->getMaxLength();
+            switch ($bindVar->getType()) {
+                case BindType::BOOL:
+                    $maxLen = ($maxLen < 1) ? 10 : $maxLen;
+                    oci_bind_by_name(
+                        $this->stmt, $bindKey, $this->outValues[$bindKey], $maxLen, OCI_B_BOL
+                    );
+                    break;
 
-                oci_bind_by_name(
-                    $this->stmt, $bindKey, $this->outValues[$bindKey], $len
-                );
+
+                case BindType::BLOB:
+                    oci_bind_by_name(
+                        $this->stmt, $bindKey, $this->outValues[$bindKey], $maxLen, OCI_B_BLOB
+                    );
+                    break;
+
+                case BindType::CLOB:
+                    oci_bind_by_name(
+                        $this->stmt, $bindKey, $this->outValues[$bindKey], $maxLen, OCI_B_CLOB
+                    );
+                    break;
+
+                case OCI_B_CURSOR:
+                case OCI_B_NTY:
+                case SQLT_BIN:
+                case SQLT_RSET:
+                case OCI_B_ROWID:
+                    oci_bind_by_name(
+                        $this->stmt, $bindKey, $this->outValues[$bindKey], $maxLen, $bindVar->getType()
+                    );
+                    break;
+
+                case BindType::INTEGER:
+                case BindType::FLOAT:
+
+                    $maxLen = ($maxLen < 1) ? 64 : $maxLen;
+
+                    oci_bind_by_name(
+                        $this->stmt, $bindKey, $this->outValues[$bindKey], $maxLen, OCI_B_NUM
+                    );
+                    break;
+
+                default:
+                case BindType::NULL:
+                    oci_bind_by_name(
+                        $this->stmt, $bindKey, $this->outValues[$bindKey], $maxLen
+                    );
+                    break;
             }
         }
     }

@@ -224,6 +224,9 @@ class XmlSchemaCreator {
     }
 
     protected function getClassShortName(string $clsName): string {
+        if (is_a($clsName, XmlScalar::class, true)) {
+            return $clsName::getXsdType();
+        }
         $cls = RefKlass::getInstance($clsName);
         return $cls->getShortName();
     }

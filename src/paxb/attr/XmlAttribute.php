@@ -21,8 +21,17 @@ class XmlAttribute implements XmlStereoType {
     public function __construct(
         protected string $name = '',
         protected bool $required = false,
-        protected string $namespace = ''
+        protected string $namespace = '',
+        protected string $valueAdapter = '',
+        protected array $filters = []
     ) {
+        if ($this->valueAdapter) {
+            $this->validateValueAdapter($this->valueAdapter, 'XmlAttribute');
+        }
+    }
+
+    public function getFilters(): array {
+        return $this->filters;
     }
 
     public function getRefOwner(): RefProperty {
@@ -39,6 +48,10 @@ class XmlAttribute implements XmlStereoType {
 
     public function getNamespace(): string {
         return $this->namespace;
+    }
+
+    public function getValueAdapter(): string {
+        return $this->valueAdapter;
     }
 
     public function init(object $ref): void {

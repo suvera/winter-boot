@@ -19,7 +19,7 @@ class AsyncQueueStoreManager {
     #[Value('${winter.task.async.queueCapacity}')]
     private int $queueCapacity = 50;
 
-    #[Value('${winter.task.async.queueStorageHandler}')]
+    #[Value('${winter.task.async.queueStorage.handler}')]
     private string $queueStorageHandler = "\\dev\\winterframework\\util\\async\\AsyncInMemoryQueue";
 
     #[Autowired]

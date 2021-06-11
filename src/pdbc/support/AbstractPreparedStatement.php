@@ -7,6 +7,8 @@ use DateTimeInterface;
 use dev\winterframework\pdbc\core\BindType;
 use dev\winterframework\pdbc\core\BindVar;
 use dev\winterframework\pdbc\core\BindVars;
+use dev\winterframework\pdbc\core\OutBindVar;
+use dev\winterframework\pdbc\core\OutBindVars;
 use dev\winterframework\pdbc\PreparedStatement;
 use dev\winterframework\pdbc\ResultSet;
 use dev\winterframework\pdbc\types\Blob;
@@ -20,13 +22,14 @@ abstract class AbstractPreparedStatement implements PreparedStatement {
     protected int $fetchSize;
     protected int $maxRows;
     protected BindVars $parameters;
-    protected array $outParameters = [];
+    protected OutBindVars $outParameters;
     protected array $outValues = [];
 
     public function __construct(
         protected int $resultSetType = ResultSet::TYPE_FORWARD_ONLY
     ) {
         $this->parameters = new BindVars();
+        $this->outParameters = new OutBindVars();
     }
 
     public function clearParameters(): void {
@@ -158,6 +161,18 @@ abstract class AbstractPreparedStatement implements PreparedStatement {
 
     public function bindVars(BindVars $bindVars): void {
         $this->parameters->merge($bindVars);
+    }
+
+    public function outBindVar(OutBindVar $bindVar): void {
+        $this->outParameters[] = $bindVar;
+    }
+
+    public function outBindVars(OutBindVars $bindVars): void {
+        $this->outParameters->merge($bindVars);
+    }
+
+    public function getOutValues(): array {
+        return $this->outValues;
     }
 
 }

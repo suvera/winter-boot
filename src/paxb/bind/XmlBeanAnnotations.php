@@ -27,7 +27,7 @@ class XmlBeanAnnotations {
     }
 
     public function getAttributesBy(string $className): array {
-        return isset($this->attributes[$className]) ? $this->attributes[$className] : [];
+        return $this->attributes[$className] ?? [];
     }
 
     private function mergeToAttributes(array $local): void {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace test\winterframework\paxb;
 
 use dev\winterframework\io\file\BasicFile;
+use dev\winterframework\paxb\bind\XmlNode;
 use dev\winterframework\paxb\XmlObjectMapper;
 use PHPUnit\Framework\TestCase;
 use test\winterframework\paxb\beans\PaxbTest01;
@@ -61,7 +62,7 @@ class XmlObjectMapperTests extends TestCase {
         $obj = $mapper->readValueFromFile(
             new BasicFile(__DIR__ . '/xml/PaxbTest03.xml'),
             PaxbTest03::class,
-            true
+            false
         );
         //print_r($obj);
         $this->assertNotEmpty($obj);
@@ -75,6 +76,11 @@ class XmlObjectMapperTests extends TestCase {
         $this->assertSame($items[0]->getPrice(), 39.95);
         $this->assertSame($items[1]->getPrice(), 42.50);
         $this->assertSame(count($items[1]->getSizes()), 4);
+
+        $extras = $p[0]->getExtras();
+        $this->assertSame(count($extras), 2);
+        $this->assertInstanceOf(XmlNode::class, $extras[0]);
+        $this->assertInstanceOf(XmlNode::class, $extras[1]);
     }
 
 }

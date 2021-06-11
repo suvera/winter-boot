@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace test\winterframework\paxb\beans;
 
+use dev\winterframework\paxb\attr\XmlAnyElement;
 use dev\winterframework\paxb\attr\XmlAttribute;
 use dev\winterframework\paxb\attr\XmlElement;
 use dev\winterframework\paxb\attr\XmlRootElement;
@@ -18,6 +19,9 @@ class PaxbProduct {
     #[XmlElement(name: "catalog_item", list: true, listClass: PaxbCatalogItem::class)]
     private array $catalogItems;
 
+    #[XmlAnyElement]
+    private ?array $extras = null;
+
     public function getDescription(): string {
         return $this->description;
     }
@@ -31,6 +35,10 @@ class PaxbProduct {
      */
     public function getCatalogItems(): array {
         return $this->catalogItems;
+    }
+
+    public function getExtras(): mixed {
+        return $this->extras;
     }
 
 

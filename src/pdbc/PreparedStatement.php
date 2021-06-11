@@ -6,6 +6,8 @@ namespace dev\winterframework\pdbc;
 use DateTimeInterface;
 use dev\winterframework\pdbc\core\BindVar;
 use dev\winterframework\pdbc\core\BindVars;
+use dev\winterframework\pdbc\core\OutBindVar;
+use dev\winterframework\pdbc\core\OutBindVars;
 use dev\winterframework\pdbc\types\Blob;
 use dev\winterframework\pdbc\types\Clob;
 
@@ -54,6 +56,12 @@ interface PreparedStatement {
     public function bindVar(BindVar $bindVar): void;
 
     public function bindVars(BindVars $bindVars): void;
+
+    public function outBindVar(OutBindVar $bindVar): void;
+
+    public function outBindVars(OutBindVars $bindVars): void;
+
+    public function getOutValues(): array;
 
     /**
      * Default methods

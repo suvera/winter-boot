@@ -22,7 +22,8 @@ winter:
             poolSize: 1
             queueCapacity: 50
             argsSize: 2048
-            queueStorageHandler:
+            queueStorage:
+                handler:
         scheduling:
             poolSize: 1
             queueCapacity: 50

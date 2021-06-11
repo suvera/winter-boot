@@ -36,5 +36,7 @@
                 <color_swatch image="black_cardigan.jpg">Black</color_swatch>
             </size>
         </catalog_item>
+        <boom_extra>agsfas</boom_extra>
+        <zooom>100</zooom>
     </product>
 </catalog>

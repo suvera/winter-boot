@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace dev\winterframework\pdbc\oci;
 
 use dev\winterframework\pdbc\core\BindVars;
+use dev\winterframework\pdbc\core\OutBindVars;
 use dev\winterframework\pdbc\core\PreparedStatementCallback;
 use dev\winterframework\pdbc\core\ResultSetExtractor;
 use dev\winterframework\pdbc\core\RowCallbackHandler;
@@ -69,9 +70,10 @@ class OciTemplate extends OciOperations implements PdbcTemplate {
     public function update(
         string $sql,
         BindVars|array $bindVars,
+        OutBindVars|array $outBindVars = [],
         array &$generatedKeys = []
     ): int {
-        return $this->doUpdate($sql, $bindVars, $generatedKeys);
+        return $this->doUpdate($sql, $bindVars, $outBindVars, $generatedKeys);
     }
 
     public function batchUpdate(
@@ -80,5 +82,7 @@ class OciTemplate extends OciOperations implements PdbcTemplate {
     ): array {
         return $this->doBatchUpdate($sql, $arrayBindVars);
     }
+
+
 
 }
