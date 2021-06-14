@@ -20,7 +20,7 @@ public function updateOrderStatus(int $id): void {
 
 ```
 
-No two processes in same node cannot execute **updateOrderStatus** per OrderId.
+No two processes in same node can execute **updateOrderStatus** per OrderId.
 
 ## Distributed Locking
 
@@ -39,7 +39,7 @@ Following technologies allows distributed locking
 #[Lockable(name: "order-#{id}", lockManager: "redisLockManager")]
 public function updateOrderStatus(int $id): void {
 }
-// No two processes in acorss cluster of nodes cannot execute **updateOrderStatus** per OrderId.
+// No two processes in acorss cluster of nodes can execute **updateOrderStatus** per OrderId.
 
 
 
