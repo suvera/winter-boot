@@ -66,14 +66,12 @@ curl "http://localhost/api/v2/users" -d "name=Abc&email=mail"
 
 # Example Application
 
-----
 
 Check out the example application here [MyApp](examples/)
 
 
 # Documentation
 
-----
 
 Documentation
 
