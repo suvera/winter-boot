@@ -5,14 +5,12 @@ namespace dev\winterframework\pdbc\oci;
 
 use dev\winterframework\pdbc\datasource\DataSourceConfig;
 use dev\winterframework\pdbc\support\AbstractDataSource;
-use dev\winterframework\util\log\Wlf4p;
 use PDO;
 
 class OciDataSource extends AbstractDataSource {
-    use Wlf4p;
 
     private static array $defaultOptions = [
-        PDO::ATTR_PERSISTENT => true,
+        PDO::ATTR_PERSISTENT => false,
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_CASE => PDO::CASE_NATURAL,
         PDO::ATTR_ORACLE_NULLS => PDO::NULL_EMPTY_STRING,
@@ -73,6 +71,8 @@ class OciDataSource extends AbstractDataSource {
         $this->ociOptions[PDO::ATTR_TIMEOUT] = $this->config->getTimeoutSecs();
         $this->ociOptions[PDO::ATTR_AUTOCOMMIT] = $this->config->isAutoCommit();
         $this->ociOptions[PDO::ATTR_PREFETCH] = $this->config->getRowsPrefetch();
+        $this->ociOptions[PDO::ATTR_PREFETCH] = $this->config->getRowsPrefetch();
+        $this->ociOptions['idleTimeout'] = $this->config->getIdleTimeout();
     }
 
     private function validateConnection(): void {
@@ -84,7 +84,10 @@ class OciDataSource extends AbstractDataSource {
         $stmt = $this->connection->createStatement();
         $resultSet = $stmt->executeQuery($validateSql);
         $resultSet->next();
+
         self::logInfo("ValidationQuery:" . $resultSet->getString(0));
+        $stmt->close();
+        $resultSet = null;
     }
 
 }

@@ -18,6 +18,20 @@ class WinterServer {
      */
     protected array $scheduledTables = [];
 
+    public function __construct(
+        private ApplicationContext $appCtx,
+        private ApplicationContextData $appCtxData
+    ) {
+    }
+
+    public function getAppCtx(): ApplicationContext {
+        return $this->appCtx;
+    }
+
+    public function getAppCtxData(): ApplicationContextData {
+        return $this->appCtxData;
+    }
+
     public function getServer(): Server {
         return $this->server;
     }

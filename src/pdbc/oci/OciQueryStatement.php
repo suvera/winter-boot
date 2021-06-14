@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace dev\winterframework\pdbc\oci;
 
+use dev\winterframework\pdbc\ex\SQLFeatureNotSupportedException;
 use dev\winterframework\pdbc\support\AbstractStatement;
 
 class OciQueryStatement extends AbstractStatement {
@@ -10,12 +11,10 @@ class OciQueryStatement extends AbstractStatement {
     private ?OciResultSet $resultSet = null;
     private array $generatedKeys = [];
     private int $commitMode;
-    private mixed $oci;
 
     public function __construct(
         protected OciConnection $connection
     ) {
-        $this->oci = $this->connection->getOci();
         $this->commitMode = $this->connection->getCommitMode();
 
         parent::__construct();
@@ -36,9 +35,9 @@ class OciQueryStatement extends AbstractStatement {
     public function close(): void {
         if (isset($this->stmt)) {
             oci_free_statement($this->stmt);
-            $this->reset();
-            $this->stmt = null;
         }
+        $this->stmt = null;
+        $this->reset();
     }
 
     private function reset(): void {
@@ -53,7 +52,7 @@ class OciQueryStatement extends AbstractStatement {
     public function executeQuery(string $sql): OciResultSet {
         $this->close();
 
-        $this->stmt = oci_parse($this->oci, $sql);
+        $this->stmt = oci_parse($this->connection->getOci(), $sql);
         if ($this->getConnection()->getRowPreFetch() > 0) {
             oci_set_prefetch($this->stmt, $this->getConnection()->getRowPreFetch());
         }
@@ -72,7 +71,7 @@ class OciQueryStatement extends AbstractStatement {
         $this->close();
         $this->reset();
 
-        $this->stmt = oci_parse($this->oci, $sql);
+        $this->stmt = oci_parse($this->connection->getOci(), $sql);
         if ($this->getConnection()->getRowPreFetch() > 0) {
             oci_set_prefetch($this->stmt, $this->getConnection()->getRowPreFetch());
         }
@@ -93,7 +92,7 @@ class OciQueryStatement extends AbstractStatement {
         $this->close();
         $this->reset();
 
-        $this->stmt = oci_parse($this->oci, $sql);
+        $this->stmt = oci_parse($this->connection->getOci(), $sql);
         oci_execute($this->stmt, $this->commitMode);
 
         $count = oci_num_rows($this->stmt);
@@ -110,14 +109,7 @@ class OciQueryStatement extends AbstractStatement {
     }
 
     public function executeBatch(): array {
-        $ret = [];
-
-        foreach ($this->sqlBatch as $sql) {
-            $pdo = $this->connection->getOci();
-            $ret[] = $pdo->exec($sql);
-        }
-
-        return $ret;
+        throw new SQLFeatureNotSupportedException('executeBatch is not supported');
     }
 
     public function getResultSet(): ?OciResultSet {

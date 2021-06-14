@@ -13,7 +13,7 @@ use PDO;
 use PDOStatement;
 
 class PdoPreparedStatement extends AbstractPreparedStatement {
-    protected PDOStatement $stmt;
+    protected ?PDOStatement $stmt;
     protected ?PdoResultSet $resultSet = null;
     protected array $generatedKeys = [];
     private array $tmpValues = [];
@@ -38,8 +38,9 @@ class PdoPreparedStatement extends AbstractPreparedStatement {
     public function close(): void {
         if (isset($this->stmt)) {
             $this->stmt->closeCursor();
-            $this->reset();
         }
+        $this->stmt = null;
+        $this->reset();
     }
 
     private function reset(): void {

@@ -10,4 +10,6 @@ interface DataSource {
     public function getLoginTimeout(): int;
 
     public function setLoginTimeout(int $timeoutSecs): void;
+
+    public function checkIdleConnection(): void;
 }

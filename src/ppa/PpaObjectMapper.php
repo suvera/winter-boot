@@ -203,7 +203,11 @@ class PpaObjectMapper {
 
         $where = [];
         foreach ($entity->getIdColumns() as $propName => $column) {
-            $bindKey = 'b_' . $propName;
+            $prop = $ref->getProperty($propName);
+            $prop->setAccessible(true);
+            $value = $prop->getValue($obj);
+
+            $bindKey = 'b_id_' . $propName;
             $where[] = $column->getName() . ' = :' . $bindKey;
             $bindVars[] = new BindVar($bindKey, $value, $column->getType());
         }

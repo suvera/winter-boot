@@ -45,7 +45,7 @@ datasource:
             persistent: true
             errorMode: ERRMODE_EXCEPTION
             columnsCase: CASE_NATURAL
-            connectionTimeoutSecs: 30
+            idleTimeout: 300
             autoCommit: true
             defaultrowprefetch: 100
 

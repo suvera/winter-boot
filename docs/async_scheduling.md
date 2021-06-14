@@ -51,6 +51,40 @@ public function someAsyncMethodName(): void {
 
 ```
 
+### Configuration
+
+```yaml
+
+winter:
+    task:
+        async:
+            poolSize: 1
+            queueCapacity: 50
+            argsSize: 2048
+```
+- **poolSize** Total number of backend workers needed
+
+- **argsSize** Maximum allowed size of total arguments that are passed to a Async method (in bytes)
+
+- **queueCapacity** how many concurrent async requests can be queued.
+
+
+by default, async uses shared memory as internal queue to execute Async calls. 
+Redis also can be used as async queue as a persistence layer, and application restart execute any old pending async calls.
+
+More info on [Redis module](https://github.com/suvera/winter-modules/tree/master/winter-data-redis)
+```yaml
+winter:
+    task:
+        async:
+            ...
+            ...
+            queueStorage:
+                handler: dev\winterframework\data\redis\async\AsyncRedisQueueStore
+
+```
+
+
 ## 2. Scheduled Support
 
 `#[EnableScheduling] is required on your main application`
@@ -68,7 +102,7 @@ public function someScheduledMethodName(): void {
 ```
 
 
-## Configuration
+### Configuration
 
 in your **application.yml**
 
@@ -76,10 +110,6 @@ in your **application.yml**
 
 winter:
     task:
-        async:
-            poolSize: 1
-            queueCapacity: 50
-            argsSize: 2048
         scheduling:
             poolSize: 1
             queueCapacity: 50
@@ -87,9 +117,7 @@ winter:
 
 - **poolSize** Total number of backend workers needed
 
-- **argsSize** Maximum allowed size of total arguments that are passed to a Async method (in bytes)
-
-- **queueCapacity** how many concurrent async/schedule requests can be queued.
+- **queueCapacity** how many concurrent schedule requests can be queued.
 
 
 ## Example

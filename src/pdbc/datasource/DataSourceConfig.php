@@ -19,7 +19,7 @@ class DataSourceConfig {
     private string $driverClass;
 
     #[JsonProperty("connection.persistent")]
-    private bool $persistent = true;
+    private bool $persistent = false;
 
     #[JsonProperty("connection.errorMode")]
     private string $errorMode = 'ERRMODE_EXCEPTION';
@@ -35,6 +35,9 @@ class DataSourceConfig {
 
     #[JsonProperty("connection.rowsPrefetch")]
     private int $rowsPrefetch = 100;
+
+    #[JsonProperty("connection.idleTimeout")]
+    private int $idleTimeout = 0;
 
     public function getName(): string {
         return $this->name;
@@ -139,5 +142,13 @@ class DataSourceConfig {
     public function setRowsPrefetch(int $rowsPrefetch): void {
         $this->rowsPrefetch = $rowsPrefetch;
     }
-    
+
+    public function getIdleTimeout(): int {
+        return $this->idleTimeout;
+    }
+
+    public function setIdleTimeout(int $idleTimeout): void {
+        $this->idleTimeout = $idleTimeout;
+    }
+
 }

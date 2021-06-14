@@ -29,8 +29,9 @@ class PdoQueryStatement extends AbstractStatement {
     public function close(): void {
         if (isset($this->stmt)) {
             $this->stmt->closeCursor();
-            $this->reset();
         }
+        $this->stmt = null;
+        $this->reset();
     }
 
     private function reset(): void {

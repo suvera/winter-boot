@@ -16,15 +16,13 @@ class OciPreparedStatement extends AbstractPreparedStatement {
     protected array $generatedKeys = [];
     private array $tmpValues = [];
     private int $commitMode;
-    private mixed $oci;
 
     public function __construct(
         protected OciConnection $connection,
         protected string $sql,
         protected array $options = []
     ) {
-        $this->oci = $this->connection->getOci();
-        $this->stmt = oci_parse($this->oci, $sql);
+        $this->stmt = oci_parse($this->connection->getOci(), $sql);
         $this->commitMode = $this->connection->getCommitMode();
         parent::__construct();
     }
@@ -44,9 +42,9 @@ class OciPreparedStatement extends AbstractPreparedStatement {
     public function close(): void {
         if (isset($this->stmt)) {
             oci_free_statement($this->stmt);
-            $this->stmt = null;
-            $this->reset();
         }
+        $this->stmt = null;
+        $this->reset();
     }
 
     private function reset(): void {
@@ -93,6 +91,7 @@ class OciPreparedStatement extends AbstractPreparedStatement {
         $this->bindInParameters();
         $this->bindOutParameters();
 
+        $this->getConnection()->touch();
         $ret = oci_execute($this->stmt, $this->commitMode);
         $this->tmpValues = [];
         return $ret;

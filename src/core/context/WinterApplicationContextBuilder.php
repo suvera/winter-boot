@@ -18,6 +18,7 @@ use dev\winterframework\core\web\format\DefaultResponseRenderer;
 use dev\winterframework\core\web\ResponseRenderer;
 use dev\winterframework\exception\ModuleException;
 use dev\winterframework\exception\NoUniqueBeanDefinitionException;
+use dev\winterframework\io\timer\IdleCheckRegistry;
 use dev\winterframework\pdbc\DataSource;
 use dev\winterframework\pdbc\datasource\DataSourceBuilder;
 use dev\winterframework\pdbc\PdbcTemplate;
@@ -175,6 +176,10 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
             new DefaultLockManager(), LockManager::class, false
         );
 
+        $this->beanProvider->registerInternalBean(
+            new IdleCheckRegistry(), IdleCheckRegistry::class, false
+        );
+
     }
 
     private function registerDataSources(): void {
@@ -187,7 +192,7 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
             return;
         }
 
-        $dsBuilder = new DataSourceBuilder($ds);
+        $dsBuilder = new DataSourceBuilder($this, $this->contextData, $ds);
         foreach ($dsBuilder->getDataSourceConfig() as $beanName => $config) {
             if ($this->hasBeanByName($beanName)) {
                 throw new NoUniqueBeanDefinitionException('DataSource creation failed, '
@@ -237,7 +242,7 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         if ($table) {
             EntityRegistry::putEntity($resource);
         }
-        
+
     }
 
     public function addClass(string $class): ClassResource {

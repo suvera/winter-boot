@@ -26,7 +26,7 @@ interface PdbcTemplate {
     public function query(
         string $sql,
         array|BindVars $bindVars,
-        ResultSetExtractor|RowCallbackHandler|RowMapper $processor
+        callable|ResultSetExtractor|RowCallbackHandler|RowMapper $processor
     ): mixed;
 
     /**
@@ -41,13 +41,11 @@ interface PdbcTemplate {
      *
      * @param string $sql
      * @param array|BindVars $bindVars
-     * @param string|null $class -  If provided then List of Objects returned (instead of List of Arrays)
      * @return array
      */
     public function queryForList(
         string $sql,
-        array|BindVars $bindVars = [],
-        string $class = null
+        array|BindVars $bindVars = []
     ): array;
 
     public function queryForScalar(

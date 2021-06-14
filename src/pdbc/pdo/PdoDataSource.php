@@ -5,14 +5,12 @@ namespace dev\winterframework\pdbc\pdo;
 
 use dev\winterframework\pdbc\datasource\DataSourceConfig;
 use dev\winterframework\pdbc\support\AbstractDataSource;
-use dev\winterframework\util\log\Wlf4p;
 use PDO;
 
 class PdoDataSource extends AbstractDataSource {
-    use Wlf4p;
 
     private static array $defaultOptions = [
-        PDO::ATTR_PERSISTENT => true,
+        PDO::ATTR_PERSISTENT => false,
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_CASE => PDO::CASE_NATURAL,
         PDO::ATTR_ORACLE_NULLS => PDO::NULL_EMPTY_STRING,
@@ -72,6 +70,8 @@ class PdoDataSource extends AbstractDataSource {
             'ERRMODE_WARNING' => PDO::ERRMODE_WARNING,
             default => PDO::ERRMODE_EXCEPTION,
         };
+
+        $this->pdoOptions['idleTimeout'] = $this->config->getIdleTimeout();
     }
 
     private function validateConnection(): void {

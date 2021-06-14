@@ -18,17 +18,14 @@ class OciResultSet extends AbstractResultSet {
     private int $type;
     private array|bool $row = false;
     private array $columns = [];
-    private mixed $stmt;
 
     public function __construct(
         private OciQueryStatement|OciPreparedStatement|OciCallableStatement $ociStmt,
         private string $cursorName = ''
     ) {
-        $this->stmt = $this->ociStmt->getStatement();
-
         $this->type = PDO::CURSOR_FWDONLY;
 
-        if ($this->stmt != null) {
+        if ($this->ociStmt->getStatement() != null) {
             $this->findColumns();
         }
     }
@@ -66,11 +63,12 @@ class OciResultSet extends AbstractResultSet {
      * @return bool
      */
     public function next(): bool {
-        if (is_null($this->stmt)) {
+        if ($this->ociStmt->getStatement() == null) {
             return false;
         }
 
-        $this->row = oci_fetch_array($this->stmt, OCI_BOTH + OCI_RETURN_NULLS + OCI_RETURN_LOBS);
+        $this->getStatement()->getConnection()->touch();
+        $this->row = oci_fetch_array($this->ociStmt->getStatement(), OCI_BOTH + OCI_RETURN_NULLS + OCI_RETURN_LOBS);
         return !empty($this->row);
     }
 
@@ -134,7 +132,7 @@ class OciResultSet extends AbstractResultSet {
     }
 
     public function getRow(): ?array {
-        return $this->row ? $this->row : null;
+        return $this->row ?? null;
     }
 
     public function getObject(int|string $column, string $class): ?object {
@@ -222,9 +220,9 @@ class OciResultSet extends AbstractResultSet {
     }
 
     private function findColumns(): void {
-        $len = oci_num_fields($this->stmt);
+        $len = oci_num_fields($this->ociStmt->getStatement());
         for ($i = 1; $i <= $len; $i++) {
-            $fieldName = oci_field_name($this->stmt, $i);
+            $fieldName = oci_field_name($this->ociStmt->getStatement(), $i);
             $this->columns[$fieldName] = $i - 1;
         }
     }

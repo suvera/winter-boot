@@ -34,6 +34,7 @@ abstract class AbstractPreparedStatement implements PreparedStatement {
 
     public function clearParameters(): void {
         $this->parameters->clear();
+        $this->outParameters->clear();
     }
 
     public function closeOnCompletion(bool $closeOnCompletion): void {

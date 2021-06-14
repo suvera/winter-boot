@@ -37,7 +37,15 @@ class OciConnection extends AbstractConnection {
         return $this->oci;
     }
 
+    public function reConnect(): void {
+        $this->doConnect();
+    }
+
     private function doConnect() {
+        $this->idleTimeout = $this->options['idleTimeout'] ?? 0;
+        $this->lastAccessTime = time();
+        $this->lastIdleCheck = time();
+
         $lang = $this->options['NLS_LANG'] ?? 'AMERICAN_AMERICA.UTF8';
         $df = $this->options['NLS_DATE_FORMAT'] ?? 'YYYY-MM-DD HH24:MI:SS';
         putenv('NLS_LANG=' . $lang);
@@ -47,13 +55,18 @@ class OciConnection extends AbstractConnection {
 
         try {
             if ($this->options[PDO::ATTR_PERSISTENT]) {
-                $this->oci = oci_pconnect(
+                self::logInfo('Persistent OCI connection ');
+                // both oci_connect() and oci_pconnect() cache the connection
+                $this->oci = oci_connect(
                     $this->username,
                     $this->password,
                     $this->dsn
                 );
             } else {
-                $this->oci = oci_connect(
+                self::logInfo('NON-Persistent OCI connection ');
+                // Unlike oci_connect() and oci_pconnect(), oci_new_connect() does not cache
+                // connections and will always return a brand-new freshly opened connection handle.
+                $this->oci = oci_new_connect(
                     $this->username,
                     $this->password,
                     $this->dsn
@@ -76,9 +89,10 @@ class OciConnection extends AbstractConnection {
     }
 
     private function assertConnectionOpen(): void {
+        $this->lastAccessTime = time();
         if (!isset($this->oci)) {
-            throw new SQLException('Oci connection already been closed, '
-                . 'Could not perform operation on closed connection.');
+            self::logInfo("assertConnectionOpen ... reConnecting ...");
+            $this->reConnect();
         }
     }
 
@@ -93,11 +107,12 @@ class OciConnection extends AbstractConnection {
      * --------------------------
      * Implemented Methods
      */
-    public function close(): void {
+    public function close($safe = false): void {
         if ($this->oci) {
             oci_close($this->oci);
         }
         $this->oci = null;
+        self::logInfo('OCI Connection Closed -  safe ' . $safe);
     }
 
     public function getOci(): mixed {
@@ -194,11 +209,6 @@ class OciConnection extends AbstractConnection {
             }
         } else {
             $this->releaseSavepoint($savepoint);
-
-//            if (empty($this->savePoints)) {
-//                oci_rollback($this->oci);
-//                $this->txnCounter = 0;
-//            }
         }
     }
 

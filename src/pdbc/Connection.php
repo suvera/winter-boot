@@ -17,7 +17,7 @@ interface Connection {
 
     public function isReadOnly(): bool;
 
-    public function close(): void;
+    public function close($safe = false): void;
 
     public function isClosed(): bool;
 
@@ -80,4 +80,10 @@ interface Connection {
     public function getSchema(): string;
 
     public function getRowPreFetch(): int;
+
+    public function reConnect(): void;
+
+    public function checkIdleConnection(): void;
+
+    public function touch(): void;
 }

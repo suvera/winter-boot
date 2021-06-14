@@ -70,6 +70,7 @@ class PdoResultSet extends AbstractResultSet {
     }
 
     private function assertScrollableCursor(string $method = ''): void {
+        $this->getStatement()->getConnection()->touch();
         if ($this->type == self::TYPE_FORWARD_ONLY) {
             throw new SQLFeatureNotSupportedException('PDO driver does not support this method ' . $method);
         }
@@ -85,6 +86,8 @@ class PdoResultSet extends AbstractResultSet {
         if (is_null($this->stmt)) {
             return false;
         }
+
+        $this->getStatement()->getConnection()->touch();
 
         /** @noinspection PhpRedundantOptionalArgumentInspection */
         $this->row = $this->stmt->fetch(PDO::FETCH_BOTH, PDO::FETCH_ORI_NEXT);

@@ -50,7 +50,18 @@ class PdoConnection extends AbstractConnection {
         return $this->pdo;
     }
 
+    public function reConnect(): void {
+        $this->doConnect();
+    }
+
     private function doConnect() {
+        if (isset($this->options['idleTimeout'])) {
+            $this->idleTimeout = $this->options['idleTimeout'];
+            unset($this->options['idleTimeout']);
+        }
+        $this->lastAccessTime = time();
+        $this->lastIdleCheck = time();
+
         try {
             $this->pdo = new PDO($this->dsn, $this->username, $this->password, $this->options);
         } catch (Throwable $e) {
@@ -59,9 +70,9 @@ class PdoConnection extends AbstractConnection {
     }
 
     private function assertConnectionOpen(): void {
+        $this->lastAccessTime = time();
         if (!isset($this->pdo)) {
-            throw new SQLException('PDO connection already been closed, '
-                . 'Could not perform operation on closed connection.');
+            $this->reConnect();
         }
     }
 
@@ -69,7 +80,7 @@ class PdoConnection extends AbstractConnection {
      * --------------------------
      * Implemented Methods
      */
-    public function close(): void {
+    public function close($safe = false): void {
         $this->pdo = null;
     }
 

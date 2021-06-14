@@ -5,6 +5,7 @@ namespace dev\winterframework\io\process;
 
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\core\context\WinterServer;
+use dev\winterframework\io\timer\IdleCheckRegistry;
 use Swoole\Process;
 
 abstract class ServerWorkerProcess extends Process implements AttachableProcess {
@@ -18,8 +19,8 @@ abstract class ServerWorkerProcess extends Process implements AttachableProcess 
         $this->appCtx = $ctx;
         parent::__construct(
             $this,
-            // $redirect_stdin_and_stdout = true/false,
-            // $pipe_type = 0/1/2
+        // $redirect_stdin_and_stdout = true/false,
+        // $pipe_type = 0/1/2
         );
     }
 
@@ -37,6 +38,10 @@ abstract class ServerWorkerProcess extends Process implements AttachableProcess 
 
     public function __invoke(Process $me): void {
         $this->process = $me;
+
+        /** @var IdleCheckRegistry $idleCheck */
+        $idleCheck = $this->appCtx->beanByClass(IdleCheckRegistry::class);
+        $idleCheck->initialize();
 
         $this->run();
     }

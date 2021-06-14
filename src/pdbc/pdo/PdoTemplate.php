@@ -26,7 +26,7 @@ class PdoTemplate extends PdoOperations implements PdbcTemplate {
     public function query(
         string $sql,
         BindVars|array $bindVars,
-        RowCallbackHandler|RowMapper|ResultSetExtractor $processor
+        callable|RowCallbackHandler|RowMapper|ResultSetExtractor $processor
     ): mixed {
         return $this->doQuery($sql, $bindVars, $processor);
     }
@@ -36,10 +36,9 @@ class PdoTemplate extends PdoOperations implements PdbcTemplate {
      */
     public function queryForList(
         string $sql,
-        BindVars|array $bindVars = [],
-        string $class = null
+        BindVars|array $bindVars = []
     ): array {
-        return $this->doQueryForList($sql, $bindVars, $class);
+        return $this->doQueryForList($sql, $bindVars);
     }
 
     /**

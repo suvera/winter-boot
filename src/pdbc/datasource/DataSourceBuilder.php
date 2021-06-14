@@ -3,8 +3,11 @@ declare(strict_types=1);
 
 namespace dev\winterframework\pdbc\datasource;
 
+use dev\winterframework\core\context\ApplicationContext;
+use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\exception\ClassNotFoundException;
 use dev\winterframework\exception\WinterException;
+use dev\winterframework\io\timer\IdleCheckRegistry;
 use dev\winterframework\pdbc\DataSource;
 use dev\winterframework\reflection\ObjectCreator;
 use dev\winterframework\type\TypeAssert;
@@ -30,6 +33,8 @@ class DataSourceBuilder {
     private WeakMap $dsObjectMap;
 
     public function __construct(
+        private ApplicationContext $ctx,
+        private ApplicationContextData $ctxData,
         array $dataSources
     ) {
         $this->dsObjectMap = new WeakMap();
@@ -142,6 +147,11 @@ class DataSourceBuilder {
 
         TypeAssert::typeOf($obj, DataSource::class);
         $this->dsObjectMap[$ds] = $obj;
+
+        /** @var IdleCheckRegistry $idleCheck */
+        $idleCheck = $this->ctx->beanByClass(IdleCheckRegistry::class);
+        $idleCheck->register([$obj, 'checkIdleConnection']);
+
         return $obj;
     }
 

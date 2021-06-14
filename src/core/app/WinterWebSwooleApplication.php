@@ -7,6 +7,7 @@ use dev\winterframework\core\context\WinterServer;
 use dev\winterframework\core\context\WinterWebSwooleContext;
 use dev\winterframework\io\process\AsyncWorkerProcess;
 use dev\winterframework\io\process\ScheduleWorkerProcess;
+use dev\winterframework\io\timer\IdleCheckRegistry;
 use dev\winterframework\task\async\AsyncQueueStoreManager;
 use dev\winterframework\task\async\AsyncTaskPoolExecutor;
 use dev\winterframework\task\scheduling\ScheduledTaskPoolExecutor;
@@ -47,7 +48,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
 
         $http = new Server($address, $port);
 
-        $wServer = new WinterServer();
+        $wServer = new WinterServer($this->applicationContext, $this->appCtxData);
         $wServer->setServer($http);
 
         $args = $this->getServerArgs();
@@ -58,7 +59,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
 
         $this->buildSharedServer($wServer);
         $this->beginModules();
-        
+
         $this->buildAsyncPlatform($wServer);
         $this->buildScheduledPlatform($wServer);
 
@@ -67,11 +68,17 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
             self::logInfo("Http server started on $server->host:" . $server->port . ', pid:' . getmypid());
         });
 
-        $http->on('WorkerStart', function ($server) {
+        $http->on('WorkerStart', function ($server) use ($wServer) {
+            /** @var IdleCheckRegistry $idleCheck */
+            $idleCheck = $wServer->getAppCtx()->beanByClass(IdleCheckRegistry::class);
+            $idleCheck->initialize();
             self::logInfo("Http Worker started " . ', pid:' . getmypid());
         });
 
-        $http->on('ManagerStart', function ($server) {
+        $http->on('ManagerStart', function ($server) use ($wServer) {
+            /** @var IdleCheckRegistry $idleCheck */
+            $idleCheck = $wServer->getAppCtx()->beanByClass(IdleCheckRegistry::class);
+            $idleCheck->initialize();
             self::logInfo("Http Manager started " . ', pid:' . getmypid());
         });
 
