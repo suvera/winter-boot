@@ -88,3 +88,62 @@ Documentation
 - [Json and XML](docs/json_xml.md)
 - [Async and Scheduling support](docs/async_scheduling.md)
 
+
+# Installation
+
+
+1) Install PHP 8.0 (or greater)
+
+2) Install following extensions - they are optional but required for few features to work
+
+- [Asynchronous functions](https://github.com/suvera/winter-boot/blob/master/docs/async_scheduling.md) #[Async] and #[Scheduled] to work, swoole extension needed.
+    
+```shell
+pecl install swoole
+```
+    
+- Rdkafka extension is needed for  [Kafka module](https://github.com/suvera/winter-modules/tree/master/winter-kafka) to work
+
+```shell
+pecl install rdkafka
+```
+
+- Rdkafka extension is needed for  [Redis module](https://github.com/suvera/winter-modules/tree/master/winter-redis) to work
+
+```shell
+pecl install redis
+```
+
+
+
+
+## composer.json
+Add following repositories into **composer.json**
+
+```json
+
+"repositories": [
+    {
+        "type": "vcs",
+        "url": "https://github.com/suvera/winter-boot"
+    },
+    {
+        "type": "vcs",
+        "url": "https://github.com/suvera/winter-modules"
+    }
+]
+
+
+```
+
+Now install framework with below commands
+
+```shell
+
+composer require suvera/winter-boot
+
+composer require suvera/winter-modules
+
+```
+
+You're Done!

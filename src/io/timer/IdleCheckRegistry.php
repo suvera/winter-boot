@@ -47,7 +47,7 @@ class IdleCheckRegistry {
     }
 
     public function checkIdleIo(): void {
-        //self::logInfo('checking idle connections ...');
+        //self::logInfo('checking idle connections ... callbacks: ' . count($this->callbacks));
         foreach ($this->callbacks as $callback) {
             try {
                 $callback();

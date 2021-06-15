@@ -69,7 +69,7 @@ class TransactionalAspect implements WinterAspect {
         AopExecutionContext $exCtx,
         mixed $result
     ): void {
-        self::logInfo('Trying to commit Transaction on method '
+        self::logInfo('Committing transaction on method '
             . ReflectionUtil::getFqName($ctx->getMethod()));
         /** @var TransactionStatus $txnStatus */
         $txnStatus = $exCtx->getVariable(self::OPERATION);

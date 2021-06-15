@@ -9,7 +9,9 @@ use dev\winterframework\exception\ClassNotFoundException;
 use dev\winterframework\exception\WinterException;
 use dev\winterframework\io\timer\IdleCheckRegistry;
 use dev\winterframework\pdbc\DataSource;
+use dev\winterframework\pdbc\pdo\PdoTransactionManager;
 use dev\winterframework\reflection\ObjectCreator;
+use dev\winterframework\txn\PlatformTransactionManager;
 use dev\winterframework\type\TypeAssert;
 use dev\winterframework\util\log\Wlf4p;
 use ReflectionClass;
@@ -105,6 +107,10 @@ class DataSourceBuilder {
      */
     public function getDataSources(): array {
         return $this->dataSources;
+    }
+
+    public function getTransactionManager(): PlatformTransactionManager {
+        return new PdoTransactionManager($this->ctx->beanByClass(DataSource::class));
     }
 
     public function getPrimaryDataSource(): DataSource {

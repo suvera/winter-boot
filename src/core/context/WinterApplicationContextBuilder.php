@@ -30,6 +30,7 @@ use dev\winterframework\reflection\ClassResourceScanner;
 use dev\winterframework\stereotype\Module;
 use dev\winterframework\stereotype\ppa\Table;
 use dev\winterframework\stereotype\WinterBootApplication;
+use dev\winterframework\txn\PlatformTransactionManager;
 use dev\winterframework\util\concurrent\DefaultLockManager;
 use dev\winterframework\util\concurrent\LockManager;
 
@@ -179,7 +180,6 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         $this->beanProvider->registerInternalBean(
             new IdleCheckRegistry(), IdleCheckRegistry::class, false
         );
-
     }
 
     private function registerDataSources(): void {
@@ -216,6 +216,15 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
             && !$this->hasBeanByClass(PdoTemplateProvider::class)) {
             $this->addClass(PdoTemplateProvider::class);
         }
+
+        $this->beanProvider->registerInternalBeanMethod(
+            '',
+            PlatformTransactionManager::class,
+            $dsBuilder,
+            'getTransactionManager',
+            [],
+            false
+        );
 
     }
 

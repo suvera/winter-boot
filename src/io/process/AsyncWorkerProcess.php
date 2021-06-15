@@ -38,7 +38,7 @@ class AsyncWorkerProcess extends ServerWorkerProcess {
         self::logInfo("Async async-worker-$this->workerId has started successfully! " . getmypid());
         while (1) {
             $this->executor->executeAll($this->workerId);
-            usleep(200000);
+            \Co\System::sleep(0.2); //200000);
         }
     }
 

@@ -81,6 +81,9 @@ class PdoConnection extends AbstractConnection {
      * Implemented Methods
      */
     public function close($safe = false): void {
+        if ($this->pdo) {
+            self::logInfo('PDO Connection Closed -  safe ' . $safe);
+        }
         $this->pdo = null;
     }
 

@@ -110,9 +110,10 @@ class OciConnection extends AbstractConnection {
     public function close($safe = false): void {
         if ($this->oci) {
             oci_close($this->oci);
+            self::logInfo('OCI Connection Closed -  safe ' . $safe);
         }
         $this->oci = null;
-        self::logInfo('OCI Connection Closed -  safe ' . $safe);
+
     }
 
     public function getOci(): mixed {

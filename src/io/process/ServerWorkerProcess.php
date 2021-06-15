@@ -39,11 +39,14 @@ abstract class ServerWorkerProcess extends Process implements AttachableProcess 
     public function __invoke(Process $me): void {
         $this->process = $me;
 
-        /** @var IdleCheckRegistry $idleCheck */
-        $idleCheck = $this->appCtx->beanByClass(IdleCheckRegistry::class);
-        $idleCheck->initialize();
+        \Co\run(function () {
+            /** @var IdleCheckRegistry $idleCheck */
+            $idleCheck = $this->appCtx->beanByClass(IdleCheckRegistry::class);
+            $idleCheck->initialize();
 
-        $this->run();
+            $this->run();
+        });
+
     }
 
     abstract protected function run(): void;

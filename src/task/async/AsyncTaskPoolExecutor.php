@@ -70,7 +70,6 @@ class AsyncTaskPoolExecutor implements TaskPoolExecutor {
         while ($record = $store->dequeue()) {
             go(function () use ($store, $record, $appCtx, $workerId) {
                 self::logInfo("Processing Async call '" . $record->getId() . "' on async-worker-$workerId");
-                $id = intval($record->getId());
                 $className = $record->getClassName();
                 $methodName = $record->getMethodName();
                 $args = json_decode($record->getArguments(), true);

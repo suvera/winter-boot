@@ -113,7 +113,7 @@ final class ProxyGenerator {
                     if ($p->isDefaultValueConstant()) {
                         $param .= $p->getDefaultValueConstantName();
                     } else {
-                        $param .= $p->getDefaultValue();
+                        $param .= $p->getDefaultValue() ?? 'null';
                     }
                 } catch (ReflectionException $e) {
                     throw new WinterException('Could not create Proxy method '
@@ -156,6 +156,7 @@ final class ProxyGenerator {
 
         $code .= "\n    }";
 
+        //echo $code . "\n";
         return $code;
     }
 

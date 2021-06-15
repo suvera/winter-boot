@@ -11,6 +11,7 @@ use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\reflection\support\StereoTypeValidations;
 use dev\winterframework\stereotype\StereoType;
 use dev\winterframework\type\TypeAssert;
+use dev\winterframework\util\log\Wlf4p;
 use ReflectionNamedType;
 use ReflectionType;
 use ReflectionUnionType;
@@ -18,6 +19,7 @@ use TypeError;
 
 #[Attribute(Attribute::TARGET_METHOD)]
 class Async implements StereoType {
+    use Wlf4p;
     use StereoTypeValidations;
 
     public function init(object $ref): void {
@@ -57,17 +59,19 @@ class Async implements StereoType {
 
             foreach ($types as $t) {
                 if ($t->getName() == 'mixed') {
-                    throw new TypeError("#[Async] Parameter ' . $param->name 
-                    . ' has typed as 'mixed' at "
-                        . ReflectionUtil::getFqName($ref));
+                    $msg = "#[Async] Parameter '$param->name' has typed as 'mixed' at "
+                        . ReflectionUtil::getFqName($ref);
+                    self::logError($msg);
+                    //throw new TypeError($msg);
                 } else if (!($t->getName() == 'int'
                     || $t->getName() == 'float'
                     || $t->getName() == 'string'
                     || $t->getName() == 'bool'
                 )) {
-                    throw new TypeError("#[Async] Parameter ' . $param->name 
-                    . ' has typed as 'complex' at "
-                        . ReflectionUtil::getFqName($ref));
+                    $msg = "#[Async] Parameter '$param->name' has typed as 'complex' at "
+                        . ReflectionUtil::getFqName($ref);
+                    self::logError($msg);
+                    //throw new TypeError($msg);
                 }
             }
         }

@@ -278,7 +278,9 @@ class ClassResourceScanner {
             );
         } catch (Throwable $e) {
             self::logException($e);
-            return null;
+            //return null;
+            /** @noinspection PhpUnhandledExceptionInspection */
+            throw $e;
         }
     }
 
@@ -326,6 +328,7 @@ class ClassResourceScanner {
                     ) {
                         $meth->setProxyNeeded(true);
                         $res->setProxyNeeded(true);
+
                         if ($methAttr instanceof AopStereoType) {
                             $meth->setAopProxy(true);
                         }
