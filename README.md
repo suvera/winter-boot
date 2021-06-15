@@ -108,7 +108,7 @@ pecl install swoole
 pecl install rdkafka
 ```
 
-- Rdkafka extension is needed for  [Redis module](https://github.com/suvera/winter-modules/tree/master/winter-redis) to work
+- Redis extension is needed for  [Redis module](https://github.com/suvera/winter-modules/tree/master/winter-redis) to work
 
 ```shell
 pecl install redis
