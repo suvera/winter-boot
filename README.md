@@ -1,6 +1,6 @@
 # Winter Boot - PHP 8.0+ Framework
 
-Inspired by Spring Boot, you can build PHP applications in that style.
+Inspired by Spring Boot, you can build micro-services in PHP 8 in that style.
 
 **Application Startup:**
 
