@@ -39,6 +39,9 @@ abstract class ServerWorkerProcess extends Process implements AttachableProcess 
     public function __invoke(Process $me): void {
         $this->process = $me;
 
+        /**
+         * This is needed to run Timer to check idle connections
+         */
         \Co\run(function () {
             /** @var IdleCheckRegistry $idleCheck */
             $idleCheck = $this->appCtx->beanByClass(IdleCheckRegistry::class);

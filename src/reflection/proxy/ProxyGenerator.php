@@ -11,7 +11,7 @@ use dev\winterframework\reflection\ReflectionUtil;
 use ReflectionException;
 
 final class ProxyGenerator {
-    const PREFIX = 'Wx61BIkqR5Cl10fY';
+    const PREFIX = 'Pr0xy';
 
     private static ProxyGenerator $instance;
 
@@ -26,7 +26,7 @@ final class ProxyGenerator {
     public static function getProxyClassName(string $cls): string {
         $cls = str_replace('\\', '_', $cls);
 
-        return $cls . '_' . self::PREFIX;
+        return $cls . '' . self::PREFIX;
     }
 
     public function generateClass(ClassResource $class): string {

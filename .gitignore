@@ -20,6 +20,7 @@
 config/config.php
 test.log
 test.php
+test2.php
 testApp/
 composer.lock
 examples/MyApp/logs/*.log

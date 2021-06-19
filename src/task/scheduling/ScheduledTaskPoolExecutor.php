@@ -63,7 +63,7 @@ class ScheduledTaskPoolExecutor implements TaskPoolExecutor {
         self::logInfo("Scheduled Task '$id' enqueued $className::$methodName");
     }
 
-    public function executeAll(Process $worker, int $workerId) {
+    public function executeAll(int $workerId) {
         $table = $this->server->getScheduledTable($workerId);
         $appCtx = $this->appCtx;
 

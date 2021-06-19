@@ -7,7 +7,6 @@ use dev\winterframework\io\file\BasicFile;
 use dev\winterframework\io\file\FileMode;
 use dev\winterframework\type\TypeAssert;
 use RuntimeException;
-use Throwable;
 
 class FileInputStream implements InputStream {
     /**
@@ -18,7 +17,6 @@ class FileInputStream implements InputStream {
     /**
      * FileOutputStream constructor.
      * @param string|resource|BasicFile $file
-     * @throws Throwable
      */
     public function __construct(mixed $file) {
         if ($file instanceof BasicFile) {

@@ -9,13 +9,14 @@ class FileOutputStream implements OutputStream {
     /**
      * @var resource
      */
-    protected $fileResource;
+    protected mixed $fileResource;
+
+    protected ?string $filePath = null;
 
     /**
      * FileOutputStream constructor.
      * @param string|resource $file
      * @param bool $append
-     * @throws \Exception
      */
     public function __construct(mixed $file, bool $append = false) {
         if (is_resource($file)) {
@@ -25,6 +26,7 @@ class FileOutputStream implements OutputStream {
             if (!is_resource($this->fileResource)) {
                 throw new FileNotFoundException('Count not open file for writing');
             }
+            $this->filePath = $file;
         }
     }
 
@@ -41,6 +43,21 @@ class FileOutputStream implements OutputStream {
 
     public function flush(): bool {
         return fflush($this->fileResource);
+    }
+
+    public function destroy(): bool {
+        if (!$this->filePath) {
+            unlink($this->filePath);
+            $this->filePath = null;
+        }
+        return true;
+    }
+
+    public function getInputStream(): InputStream {
+        if ($this->filePath) {
+            return new FileInputStream($this->filePath);
+        }
+        return new FileInputStream($this->fileResource);
     }
 
 }

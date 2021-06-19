@@ -54,7 +54,7 @@ trait Wlf4p {
     }
 
     public static function logLog(int $level, string $message, array $context = []) {
-        $cls = preg_replace('/([a-zA-Z_])\w*\\\\/', '${1}.', static::class) . ' ';
+        $cls = preg_replace('/([a-zA-Z_])\w*(\\\\|_)/', '${1}.', static::class) . ' ';
 
         LoggerManager::getLogger()->addRecord($level, $cls . $message, $context);
     }

@@ -3,10 +3,11 @@ declare(strict_types=1);
 
 namespace dev\winterframework\io\stream;
 
-class PrintOutputStream implements OutputStream {
+class StringOutputStream implements OutputStream {
+    protected string $buffer = '';
 
     public function close(): void {
-        // nothing
+        $this->buffer = '';
     }
 
     public function write(string|int|float $data, int $length = null): int {
@@ -17,15 +18,14 @@ class PrintOutputStream implements OutputStream {
                 $length = 0;
             }
 
-            echo substr($data, 0, $length);
+            $this->buffer .= substr($data, 0, $length);
             return (strlen($data) > $length) ? $length : strlen($data);
         }
-        echo $data;
+        $this->buffer .= $data;
         return strlen($data);
     }
 
     public function flush(): bool {
-        flush();
         return true;
     }
 
@@ -34,6 +34,6 @@ class PrintOutputStream implements OutputStream {
     }
 
     public function getInputStream(): InputStream {
-        return new StringInputStream('');
+        return new StringInputStream($this->buffer);
     }
 }

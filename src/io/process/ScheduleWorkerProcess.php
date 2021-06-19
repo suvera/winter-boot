@@ -26,7 +26,7 @@ class ScheduleWorkerProcess extends ServerWorkerProcess {
         parent::__construct($wServer, $ctx);
         $this->executor = $executor;
         $this->workerId = $workerId;
-        
+
         $this->wServer->addScheduledTable(
             $this->workerId,
             $this->createWorkQueue()
@@ -44,8 +44,8 @@ class ScheduleWorkerProcess extends ServerWorkerProcess {
     protected function run(): void {
         self::logInfo("Scheduling sch-worker-$this->workerId has started successfully! " . getmypid());
         while (1) {
-            $this->executor->executeAll($this->process, $this->workerId);
-            usleep(200000);
+            $this->executor->executeAll($this->workerId);
+            \Co\System::sleep(0.2); //200000);
         }
     }
 

@@ -62,4 +62,13 @@ class SwooleOutputStream implements HttpOutputStream {
         return true;
     }
 
+    public function destroy(): bool {
+        return true;
+    }
+
+    public function getInputStream(): InputStream {
+        return new StringInputStream('');
+    }
+
+
 }
