@@ -42,47 +42,42 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
 
     /** @noinspection PhpUnusedParameterInspection */
     protected function startServer() {
-        $prop = $this->appCtxData->getPropertyContext();
-        $address = $prop->get('server.address', '127.0.0.1');
-        $port = $prop->get('server.port', '8080');
-
-        $http = new Server($address, $port);
-
         $wServer = new WinterServer($this->applicationContext, $this->appCtxData);
-        $wServer->setServer($http);
 
         $args = $this->getServerArgs();
         if (is_array($args)) {
             $wServer->setServerArgs($args);
-            $http->set($args);
         }
 
         $this->buildSharedServer($wServer);
-        $this->beginModules();
-
         $this->buildAsyncPlatform($wServer);
         $this->buildScheduledPlatform($wServer);
 
-        $http->on('request', [$this, 'serveRequest']);
-        $http->on('start', function ($server) {
+        $wServer->addEventCallback('request', [$this, 'serveRequest']);
+        $wServer->addEventCallback('start', function ($server) {
             self::logInfo("Http server started on $server->host:" . $server->port . ', pid:' . getmypid());
         });
 
-        $http->on('WorkerStart', function ($server) use ($wServer) {
+        $wServer->addEventCallback('WorkerStart', function ($server, int $workerId) use ($wServer) {
             /** @var IdleCheckRegistry $idleCheck */
             $idleCheck = $wServer->getAppCtx()->beanByClass(IdleCheckRegistry::class);
             $idleCheck->initialize();
-            self::logInfo("Http Worker started " . ', pid:' . getmypid());
+
+            if ($workerId < $server->setting['worker_num']) {
+                self::logInfo("Http Worker($workerId) started " . ', pid:' . getmypid());
+            } else {
+                self::logInfo("Task Worker($workerId) started " . ', pid:' . getmypid());
+            }
         });
 
-        $http->on('ManagerStart', function ($server) use ($wServer) {
+        $wServer->addEventCallback('ManagerStart', function ($server) use ($wServer) {
             /** @var IdleCheckRegistry $idleCheck */
             $idleCheck = $wServer->getAppCtx()->beanByClass(IdleCheckRegistry::class);
             $idleCheck->initialize();
             self::logInfo("Http Manager started " . ', pid:' . getmypid());
         });
 
-        $http->on('PipeMessage', function (Server $server, $srcWorkerId, $data) {
+        $wServer->addEventCallback('PipeMessage', function (Server $server, $srcWorkerId, $data) {
             if (substr($data, 0, 5) === 'json:') {
                 $json = json_decode(substr($data, 5), true);
                 switch ($json['cmd']) {
@@ -100,8 +95,9 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
             }
         });
 
-        self::logInfo("Starting Http server on $address:$port" . ', pid:' . getmypid());
-        $http->start();
+        $this->beginModules();
+
+        $wServer->start();
     }
 
     protected function getServerArgs(): array {
