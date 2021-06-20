@@ -201,7 +201,7 @@ class PdoResultSet extends AbstractResultSet {
     }
 
     public function getRow(): ?array {
-        return $this->row ? $this->row : null;
+        return $this->row ?: null;
     }
 
     public function getObject(int|string $column, string $class): ?object {
