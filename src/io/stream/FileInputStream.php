@@ -6,9 +6,12 @@ namespace dev\winterframework\io\stream;
 use dev\winterframework\io\file\BasicFile;
 use dev\winterframework\io\file\FileMode;
 use dev\winterframework\type\TypeAssert;
+use dev\winterframework\util\log\Wlf4p;
 use RuntimeException;
 
 class FileInputStream implements InputStream {
+    use Wlf4p;
+
     /**
      * @var resource
      */
@@ -21,7 +24,7 @@ class FileInputStream implements InputStream {
     public function __construct(mixed $file) {
         if ($file instanceof BasicFile) {
             if (!$file->canRead()) {
-                throw new RuntimeException('Count not open file for reading');
+                throw new RuntimeException('Could not open file for reading');
             }
             $this->fileResource = $file->openStream(FileMode::$READ_ONLY)->getStream();
         } else if (is_resource($file)) {
@@ -29,7 +32,8 @@ class FileInputStream implements InputStream {
         } else {
             $this->fileResource = fopen($file, 'rb');
             if (!is_resource($this->fileResource)) {
-                throw new RuntimeException('Count not open file for reading');
+                self::logError('Could not open file for reading ' . $file . ' ' . $this->fileResource);
+                throw new RuntimeException('Could not open file for reading ' . $file);
             }
         }
     }
@@ -43,7 +47,9 @@ class FileInputStream implements InputStream {
             TypeAssert::positiveInteger($length);
             return fread($this->fileResource, $length);
         } else {
-            return stream_get_contents($this->fileResource);
+            $contents = stream_get_contents($this->fileResource);
+            rewind($this->fileResource);
+            return $contents;
         }
     }
 

@@ -5,10 +5,13 @@ namespace dev\winterframework\stereotype;
 
 use Attribute;
 use dev\winterframework\reflection\ref\RefKlass;
+use dev\winterframework\reflection\support\StereoTypeValidations;
 use dev\winterframework\type\TypeAssert;
 
 #[Attribute(Attribute::TARGET_CLASS)]
 class Module implements StereoType {
+    use StereoTypeValidations;
+
     private string $className;
     private array $config = [];
     public string $name = '';
@@ -36,6 +39,8 @@ class Module implements StereoType {
     public function init(object $ref): void {
         /** @var RefKlass $ref */
         TypeAssert::typeOf($ref, RefKlass::class);
+
+        $this->cannotBeAbstractClass($ref, 'Module');
 
         if (!$this->title) {
             $this->title = $ref->getShortName();

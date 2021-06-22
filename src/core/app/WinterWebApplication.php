@@ -15,6 +15,8 @@ class WinterWebApplication extends WinterApplicationRunner implements WinterAppl
             $this->applicationContext
         );
 
+        $this->beginModules();
+        $this->onApplicationReady();
         $this->serveRequest();
     }
 

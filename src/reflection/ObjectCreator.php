@@ -71,6 +71,24 @@ class ObjectCreator {
                         );
                     }
 
+                    if (isset($props[$extName])) {
+
+                        if ($attr->isList()) {
+                            if (!is_array($props[$extName])) {
+                                throw new InvalidSyntaxException('Property "' . $refProp->getName()
+                                    . '" is defined as Array, but non-array value seen, at class ' . $ref->getName()
+                                );
+                            }
+                            $list = [];
+                            foreach ($props[$extName] as $value) {
+                                $list[] = ObjectCreator::createObject($attr->getListClass(), $value);
+                            }
+                            $props[$extName] = $list;
+                        } else if ($attr->isObject()) {
+                            $props[$extName] = ObjectCreator::createObject($attr->getObjectClass(), $props[$extName]);
+                        }
+                    }
+
                 } catch (InvalidSyntaxException $ex) {
                     throw $ex;
                 } catch (Throwable $e) {

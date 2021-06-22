@@ -23,6 +23,7 @@ use dev\winterframework\stereotype\cli\Command;
 use dev\winterframework\stereotype\Component;
 use dev\winterframework\stereotype\Configuration;
 use dev\winterframework\stereotype\Module;
+use dev\winterframework\stereotype\PostConstruct;
 use dev\winterframework\stereotype\Qualifier;
 use dev\winterframework\stereotype\RestController;
 use dev\winterframework\stereotype\Service;
@@ -313,16 +314,42 @@ final class WinterBeanProviderContext implements BeanProviderContext {
             $bean = $this->buildInstanceForClass($beanProvider);
         }
 
-        if ($beanProvider->hasInitMethod()) {
-            $initMethod = $beanProvider->getInitMethod();
-            $bean->$initMethod();
-        }
+        $this->postConstruct($bean, $beanProvider);
 
         $beanProvider->setCached($bean);
 
         $this->removeFromCircularDependency($beanProvider);
         return $bean;
     }
+
+    protected function postConstruct(object $bean, BeanProvider $beanProvider): void {
+
+        $methodsCalled = [];
+        if ($beanProvider->hasInitMethod()) {
+            $initMethod = $beanProvider->getInitMethod();
+            $bean->$initMethod();
+            $methodsCalled[$initMethod] = 1;
+        }
+        $ref = new RefKlass($bean);
+        foreach ($ref->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+            if (isset($methodsCalled[$method->getShortName()])) {
+                continue;
+            }
+            $pc = $method->getAttributes(PostConstruct::class);
+            if ($pc) {
+                $args = $this->buildMethodArguments($method);
+
+                try {
+                    $method->invokeArgs($bean, $args);
+                } catch (Throwable $e) {
+                    throw new WinterException("Could not call #[PostConstruct] method "
+                        . ReflectionUtil::getFqName($method), 0, $e);
+                }
+                $methodsCalled[$method->getShortName()] = 1;
+            }
+        }
+    }
+
 
     private function addToCircularDependency(BeanProvider $beanProvider): void {
         $beanId = spl_object_hash($beanProvider);
@@ -471,31 +498,10 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         ReflectionMethod $method,
         BeanProvider $beanProvider
     ): mixed {
-        $args = [];
         if ($beanProvider->hasMethodArgs()) {
             $args = $beanProvider->hasMethodArgs();
         } else {
-            foreach ($method->getParameters() as $parameter) {
-                /** @var ReflectionNamedType $type */
-                $type = $parameter->getType();
-
-                $this->validateBeanMethodParam($method, $parameter);
-
-                if ($type->isBuiltin()) {
-                    continue;
-                }
-
-                $qualifiers = $parameter->getAttributes(Qualifier::class);
-                if (!empty($qualifiers)) {
-                    /** @var Qualifier $attr */
-                    $attr = $qualifiers[0]->newInstance();
-                    $beanArg = $this->beanByName($attr->name);
-                } else {
-                    $beanArg = $this->beanByClass($type->getName());
-                }
-
-                $args[$parameter->getName()] = $beanArg;
-            }
+            $args = $this->buildMethodArguments($method);
         }
 
         try {
@@ -504,6 +510,33 @@ final class WinterBeanProviderContext implements BeanProviderContext {
             throw new WinterException("Could not call method "
                 . ReflectionUtil::getFqName($method), 0, $e);
         }
+    }
+
+    protected function buildMethodArguments(ReflectionMethod $method): array {
+        $args = [];
+        foreach ($method->getParameters() as $parameter) {
+            /** @var ReflectionNamedType $type */
+            $type = $parameter->getType();
+
+            $this->validateBeanMethodParam($method, $parameter);
+
+            if ($type->isBuiltin()) {
+                continue;
+            }
+
+            $qualifiers = $parameter->getAttributes(Qualifier::class);
+            if (!empty($qualifiers)) {
+                /** @var Qualifier $attr */
+                $attr = $qualifiers[0]->newInstance();
+                $beanArg = $this->beanByName($attr->name);
+            } else {
+                $beanArg = $this->beanByClass($type->getName());
+            }
+
+            $args[$parameter->getName()] = $beanArg;
+        }
+
+        return $args;
     }
 
     private function buildInstanceByMethod(
@@ -678,5 +711,4 @@ final class WinterBeanProviderContext implements BeanProviderContext {
             $this->beanClassFactory[$beanClassName][$beanClassName] = $beanProvider;
         }
     }
-
 }

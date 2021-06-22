@@ -9,4 +9,10 @@ interface Queue {
 
     public function poll(int $timeoutMs = 0): mixed;
 
+    public function isUnbounded(): bool;
+
+    public function isCountable(): bool;
+
+    public function size(): int;
+
 }

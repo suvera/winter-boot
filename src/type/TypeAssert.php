@@ -165,6 +165,18 @@ final class TypeAssert {
         }
     }
 
+    public static function arrayItemNotEmpty(array $array, string|int $key, string $msg = '') {
+        if (!isset($array[$key]) || empty($array[$key])) {
+            throw new TypeError($msg ? $msg : "Array must contain '$key'");
+        }
+    }
+
+    public static function arrayItemNotSet(array $array, string|int $key, string $msg = '') {
+        if (!isset($array[$key])) {
+            throw new TypeError($msg ? $msg : "Array item '$key' must be set");
+        }
+    }
+
     public static function notNull(string $name, mixed $value, string $msg = '') {
         if (empty($value)) {
             throw new TypeError($msg ? $msg : "Parameter '$name' value cannot be Null");

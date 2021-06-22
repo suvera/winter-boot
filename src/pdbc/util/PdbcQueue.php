@@ -85,4 +85,26 @@ class PdbcQueue implements Queue {
         return null;
     }
 
+    public function isUnbounded(): bool {
+        return true;
+    }
+
+    public function size(): int {
+        $sql = 'select count(1) from ' . $this->table->getName()
+            . ' where '
+            . $this->table->getProcessedColumn() . ' is null ';
+        $binds = [];
+
+        if ($this->extraFilter) {
+            $sql .= ' and (' . $this->extraFilter . ') ';
+            $binds = array_merge($binds, $this->extraBinds);
+        }
+
+        return $this->pdbc->queryForScalar($sql, $binds);
+    }
+
+    public function isCountable(): bool {
+        return true;
+    }
+
 }

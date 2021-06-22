@@ -96,6 +96,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         });
 
         $this->beginModules();
+        $this->onApplicationReady();
 
         $wServer->start();
     }
@@ -194,18 +195,6 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
                         'initialDelay' => $attr->initialDelay
                     ]
                 );
-            }
-        }
-    }
-
-    protected function beginModules(): void {
-        $appCtx = $this->applicationContext;
-
-        foreach ($appCtx->getModules() as $moduleName) {
-            $module = $appCtx->beanByClass($moduleName);
-
-            if ($module instanceof WinterModule) {
-                $module->begin($appCtx, $this->appCtxData);
             }
         }
     }

@@ -10,11 +10,30 @@ use dev\winterframework\type\TypeAssert;
 
 #[Attribute(Attribute::TARGET_PROPERTY)]
 class JsonProperty implements StereoType {
+    protected string $objectClass = '';
+
     public function __construct(
         public array|string $name = '',
         protected bool $required = false,
-        protected bool $nillable = false
+        protected bool $nillable = false,
+        protected string $listClass = ''
     ) {
+    }
+
+    public function isList(): bool {
+        return !empty($this->listClass);
+    }
+
+    public function getListClass(): string {
+        return $this->listClass;
+    }
+
+    public function isObject(): bool {
+        return !empty($this->objectClass);
+    }
+
+    public function getObjectClass(): string {
+        return $this->objectClass;
     }
 
     public function isRequired(): bool {
@@ -42,6 +61,11 @@ class JsonProperty implements StereoType {
         }
         if (!$ref->hasDefaultValue() && !$type->allowsNull()) {
             $this->required = true;
+        }
+
+        if (!$type->isVoidType() && !$type->isNoType() && !$type->isUnionType()
+            && !$type->isBuiltin()) {
+            $this->objectClass = $type->getName();
         }
     }
 }

@@ -15,6 +15,7 @@ use dev\winterframework\enums\Winter;
 use dev\winterframework\exception\NotWinterApplicationException;
 use dev\winterframework\exception\WinterException;
 use dev\winterframework\io\file\DirectoryScanner;
+use dev\winterframework\io\timer\IdleCheckRegistry;
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\ClassResources;
 use dev\winterframework\reflection\ClassResourceScanner;
@@ -24,6 +25,7 @@ use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\stereotype\cache\EnableCaching;
 use dev\winterframework\stereotype\Module;
+use dev\winterframework\stereotype\OnApplicationReady;
 use dev\winterframework\stereotype\task\EnableAsync;
 use dev\winterframework\stereotype\task\EnableScheduling;
 use dev\winterframework\stereotype\txn\EnableTransactionManagement;
@@ -273,7 +275,7 @@ abstract class WinterApplicationRunner {
                 if ($module->initMethod) {
                     $obj->{$module->initMethod}($this->applicationContext, $this->appCtxData);
                 }
-                
+
                 self::logInfo("Module [ $module->title ] loaded. ");
             }
         }
@@ -325,6 +327,38 @@ abstract class WinterApplicationRunner {
         }
 
         LoggerManager::buildInstance($data);
+    }
+
+    protected function beginModules(): void {
+        $appCtx = $this->applicationContext;
+
+        foreach ($appCtx->getModules() as $moduleName) {
+            $module = $appCtx->beanByClass($moduleName);
+
+            if ($module instanceof WinterModule) {
+                $module->begin($appCtx, $this->appCtxData);
+            }
+        }
+    }
+
+    protected function onApplicationReady(): void {
+        $readyEvents = $this->resources->getClassesByAttribute(OnApplicationReady::class);
+        /** @var ClassResource[] $resources */
+        $resources = [];
+        foreach ($readyEvents as $clsRes) {
+            /** @var ClassResource $clsRes */
+            $resources[$clsRes->getClass()->getName()] = $clsRes;
+        }
+
+        foreach ($resources as $resource) {
+            /** @var ApplicationReadyEvent $bean */
+            $bean = $this->applicationContext->beanByClass($resource->getClass()->getName());
+            $bean->onApplicationReady();
+        }
+
+        /** @var IdleCheckRegistry $idleCheck */
+        $idleCheck = $this->applicationContext->beanByClass(IdleCheckRegistry::class);
+        $idleCheck->initialize();
     }
 
     protected abstract function runBootApp(): void;

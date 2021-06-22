@@ -7,7 +7,9 @@ use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\reflection\ref\RefProperty;
 use dev\winterframework\reflection\ReflectionUtil;
+use ReflectionClass;
 use ReflectionNamedType;
+use ReflectionObject;
 use ReflectionParameter;
 use ReflectionProperty;
 use ReflectionUnionType;
@@ -227,5 +229,51 @@ trait StereoTypeValidations {
         string $stereoName
     ): void {
         $this->assertParameterOfType($param, $stereoName, 'array');
+    }
+
+    protected function mustImplementOneOf(
+        RefKlass|ReflectionClass|ReflectionObject $cls,
+        string $stereoName,
+        string ...$interfaces
+    ): void {
+
+        foreach ($interfaces as $interface) {
+            if ($cls->implementsInterface($interface)) {
+                return;
+            }
+        }
+
+        throw new TypeError("#[$stereoName] Attribute class "
+            . '"' . $cls->getName() . '"'
+            . ' must implement one of interfaces [' . json_encode($interfaces)
+        );
+    }
+
+
+    protected function mustHaveAttributeOneOf(
+        RefKlass $ref,
+        string $stereoName,
+        string ...$attributes
+    ): void {
+        foreach ($attributes as $attribute) {
+            if ($ref->getAttributes($attribute)) {
+                return;
+            }
+        }
+
+        throw new TypeError("#[$stereoName] Attribute class "
+            . '"' . $ref->getName() . '"'
+            . ' must have one of Attribute [' . json_encode($attributes)
+        );
+    }
+
+
+    protected function cannotBeAbstractClass(RefKlass $ref, string $stereoName): void {
+        if ($ref->isAbstract() || $ref->isInterface() || $ref->isTrait()) {
+            throw new TypeError("#[$stereoName] Attribute class "
+                . '"' . $ref->getName() . '"'
+                . ' must not be abstract/interface/trait '
+            );
+        }
     }
 }
