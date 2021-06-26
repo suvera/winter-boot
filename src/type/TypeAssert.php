@@ -75,11 +75,11 @@ final class TypeAssert {
         }
     }
 
-    public static function positiveNoZeroInteger(mixed $value) {
+    public static function positiveNoZeroInteger(mixed $value, string $msg = '') {
         self::integer($value);
 
         if ($value <= 0) {
-            throw new TypeError("Expected data type Positive Integer ( > 0), but got " . $value);
+            throw new TypeError($msg ? $msg : "Expected data type Positive Integer ( > 0), but got " . $value);
         }
     }
 

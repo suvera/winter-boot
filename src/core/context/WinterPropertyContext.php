@@ -105,6 +105,15 @@ final class WinterPropertyContext implements PropertyContext {
 
         foreach ($configFiles as $configFile) {
             $data = PropertyLoader::loadProperties($configFile);
+            if (isset($data['banner.location'])) {
+                if (is_string($data['banner.location'])) {
+                    if ($data['banner.location'][0] != '/') {
+                        $data['banner.location'] = $configFile . DIRECTORY_SEPARATOR . $data['banner.location'];
+                    }
+                } else {
+                    unset($data['banner.location']);
+                }
+            }
             $this->data = array_merge($this->data, $data);
         }
     }

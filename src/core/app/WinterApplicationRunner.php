@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace dev\winterframework\core\app;
 
+use Cascade\Cascade;
 use dev\winterframework\core\apc\ApcCache;
 use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\core\context\PropertyContext;
@@ -33,8 +34,12 @@ use dev\winterframework\stereotype\WinterBootApplication;
 use dev\winterframework\type\StringSet;
 use dev\winterframework\type\TypeAssert;
 use dev\winterframework\util\log\LoggerManager;
+use dev\winterframework\util\log\WinterConsoleLogFormatter;
 use dev\winterframework\util\log\Wlf4p;
 use dev\winterframework\util\PropertyLoader;
+use Monolog\Handler\StreamHandler;
+use Monolog\Logger;
+use Monolog\Processor\ProcessIdProcessor;
 
 abstract class WinterApplicationRunner {
     use Wlf4p;
@@ -48,12 +53,17 @@ abstract class WinterApplicationRunner {
     protected Psr4Namespaces $scanNamespaces;
     protected PropertyContext $propertyCtx;
     protected StringSet $attributesToScan;
+    protected Logger $console;
 
     public function __construct() {
         $this->scanner = ClassResourceScanner::getDefaultScanner();
     }
 
-    public final function run(string $appClass) {
+    public function getBootVersion(): string {
+        return '1.0.0-Dev';
+    }
+
+    public final function run(string $appClass): void {
         $this->bootApp = $this->buildBootApp($appClass);
         $this->processBootConfig();
 
@@ -66,6 +76,8 @@ abstract class WinterApplicationRunner {
             $this->bootConfig->configDirectory,
             $this->bootConfig->profile
         );
+        self::logInfo('Starting Application ' . $this->bootApp->getClass()->getShortName());
+        $this->showBanner();
 
         $this->scanAppNamespaces();
 
@@ -326,7 +338,27 @@ abstract class WinterApplicationRunner {
             return;
         }
 
+        $data['loggers']['winter_console_logger'] = [
+            'handlers' => ['winter_consoled'],
+            'processors' => ['winter_pid_processor']
+        ];
+        $data['formatters']['winter_console_formatter'] = [
+            'class' => WinterConsoleLogFormatter::class,
+            'format' => "%datetime% [%extra.process_id%] [%level_name%] - %message%\n"
+        ];
+        $data['handlers']['winter_consoled'] = [
+            'class' => StreamHandler::class,
+            'level' => 'INFO',
+            'formatter' => 'winter_console_formatter',
+            'processors' => ['winter_pid_processor'],
+            'stream' => 'php://stdout'
+        ];
+        $data['processors']['winter_pid_processor'] = [
+            'class' => ProcessIdProcessor::class
+        ];
+
         LoggerManager::buildInstance($data);
+        $this->console = Cascade::getLogger('winter_console_logger');
     }
 
     protected function beginModules(): void {
@@ -363,4 +395,7 @@ abstract class WinterApplicationRunner {
 
     protected abstract function runBootApp(): void;
 
+    protected function showBanner(): void {
+        // template
+    }
 }
