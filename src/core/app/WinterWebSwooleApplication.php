@@ -5,6 +5,8 @@ namespace dev\winterframework\core\app;
 
 use dev\winterframework\core\context\WinterServer;
 use dev\winterframework\core\context\WinterWebSwooleContext;
+use dev\winterframework\io\kv\KvConfig;
+use dev\winterframework\io\kv\KvServerProcess;
 use dev\winterframework\io\process\AsyncWorkerProcess;
 use dev\winterframework\io\process\ScheduleWorkerProcess;
 use dev\winterframework\io\timer\IdleCheckRegistry;
@@ -95,6 +97,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
             }
         });
 
+        $this->buildKvStore($wServer);
         $this->beginModules();
         $this->onApplicationReady();
 
@@ -241,6 +244,24 @@ EOQ;
         $bannerText = preg_replace('/[\s:]+$/', '', $bannerText);
 
         $this->console->info("\n" . $bannerText);
+    }
+
+    protected function buildKvStore(WinterServer $wServer): void {
+        $prop = $this->appCtxData->getPropertyContext();
+        $port = $prop->getInt('winter.kv.port', 0);
+        $address = $prop->getStr('winter.kv.address', '');
+        $phpBinary = $prop->getStr('winter.kv.phpBinary', '');
+        if ($port <= 0) {
+            return;
+        }
+        $config = new KvConfig(
+            $port,
+            $address ?: null,
+            $phpBinary ?: null
+        );
+
+        $kvPs = new KvServerProcess($wServer, $this->applicationContext, $config);
+        $wServer->getServer()->addProcess($kvPs);
     }
 
 }

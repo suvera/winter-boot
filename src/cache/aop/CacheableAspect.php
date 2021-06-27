@@ -28,6 +28,10 @@ class CacheableAspect implements WinterAspect {
                     . '", for the KEY: ' . $key);
                 $exCtx->stopExecution($cache->get($key)->get());
                 break;
+            } else {
+                self::logInfo(self::OPERATION . ': cache value *NOT* found in the "'
+                    . $cache->getName()
+                    . '", for the KEY: ' . $key);
             }
         }
     }
