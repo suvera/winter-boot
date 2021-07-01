@@ -9,6 +9,8 @@ use dev\winterframework\io\kv\KvConfig;
 use dev\winterframework\io\kv\KvServerProcess;
 use dev\winterframework\io\process\AsyncWorkerProcess;
 use dev\winterframework\io\process\ScheduleWorkerProcess;
+use dev\winterframework\io\queue\QueueConfig;
+use dev\winterframework\io\queue\QueueServerProcess;
 use dev\winterframework\io\timer\IdleCheckRegistry;
 use dev\winterframework\task\async\AsyncQueueStoreManager;
 use dev\winterframework\task\async\AsyncTaskPoolExecutor;
@@ -56,7 +58,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         $this->buildScheduledPlatform($wServer);
 
         $wServer->addEventCallback('request', [$this, 'serveRequest']);
-        $wServer->addEventCallback('start', function ($server) {
+        $wServer->addEventCallback('start', function ($server) use ($wServer) {
             self::logInfo("Http server started on $server->host:" . $server->port . ', pid:' . getmypid());
         });
 
@@ -98,6 +100,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         });
 
         $this->buildKvStore($wServer);
+        $this->buildQueueStore($wServer);
         $this->beginModules();
         $this->onApplicationReady();
 
@@ -250,7 +253,7 @@ EOQ;
         $prop = $this->appCtxData->getPropertyContext();
         $port = $prop->getInt('winter.kv.port', 0);
         $address = $prop->getStr('winter.kv.address', '');
-        $phpBinary = $prop->getStr('winter.kv.phpBinary', '');
+        $phpBinary = $prop->getStr('winter.phpBinary', '');
         if ($port <= 0) {
             return;
         }
@@ -262,6 +265,24 @@ EOQ;
 
         $kvPs = new KvServerProcess($wServer, $this->applicationContext, $config);
         $wServer->getServer()->addProcess($kvPs);
+    }
+
+    protected function buildQueueStore(WinterServer $wServer): void {
+        $prop = $this->appCtxData->getPropertyContext();
+        $port = $prop->getInt('winter.queue.port', 0);
+        $address = $prop->getStr('winter.queue.address', '');
+        $phpBinary = $prop->getStr('winter.phpBinary', '');
+        if ($port <= 0) {
+            return;
+        }
+        $config = new QueueConfig(
+            $port,
+            $address ?: null,
+            $phpBinary ?: null
+        );
+
+        $ps = new QueueServerProcess($wServer, $this->applicationContext, $config);
+        $wServer->getServer()->addProcess($ps);
     }
 
 }

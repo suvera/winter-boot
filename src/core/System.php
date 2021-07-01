@@ -37,7 +37,7 @@ final class System {
     }
 
     public static function getProperty(string $key, mixed $defaultValue = null): mixed {
-        return isset(self::$props[$key]) ? self::$props[$key] : $defaultValue;
+        return self::$props[$key] ?? $defaultValue;
     }
 
     public static function setProperty(string $key, mixed $value): void {
@@ -46,6 +46,15 @@ final class System {
 
     public static function setProperties(array $props): void {
         self::$props = $props;
+    }
+
+    public static function getPhpBinary(): string {
+        if (isset($_SERVER['_'])) {
+            return $_SERVER['_'];
+        } else if (isset($_ENV['_'])) {
+            return $_ENV['_'];
+        }
+        return 'php';
     }
 
 }

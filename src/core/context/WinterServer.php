@@ -5,6 +5,7 @@ namespace dev\winterframework\core\context;
 
 use dev\winterframework\util\Debug;
 use dev\winterframework\util\log\Wlf4p;
+use dev\winterframework\util\SocketUtil;
 use Swoole\HTTP\Server;
 use Swoole\Server\Port;
 use Throwable;
@@ -55,6 +56,10 @@ class WinterServer {
     public function setServer(Server $server): WinterServer {
         $this->server = $server;
         return $this;
+    }
+
+    public function isServerStarted(): bool {
+        return SocketUtil::isPortOpened($this->address, $this->port, 2);
     }
 
     public function getServerArgs(): array {

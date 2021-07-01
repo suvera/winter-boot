@@ -2,14 +2,14 @@
 /** @noinspection DuplicatedCode */
 declare(strict_types=1);
 
-use dev\winterframework\io\kv\KvServer;
+use dev\winterframework\io\queue\QueueServer;
 
 $dir = dirname(__DIR__);
-require_once($dir . '/src/io/kv/KvServer.php');
-require_once($dir . '/src/io/kv/KvCommand.php');
-require_once($dir . '/src/io/kv/KvRequest.php');
-require_once($dir . '/src/io/kv/KvResponse.php');
-require_once($dir . '/src/io/kv/KvException.php');
+require_once($dir . '/src/io/queue/QueueServer.php');
+require_once($dir . '/src/io/queue/QueueCommand.php');
+require_once($dir . '/src/io/queue/QueueRequest.php');
+require_once($dir . '/src/io/queue/QueueResponse.php');
+require_once($dir . '/src/io/queue/QueueException.php');
 require_once($dir . '/src/type/IntegerMinHeap.php');
 
 $stdin = fopen("php://stdin", 'r');
@@ -27,6 +27,6 @@ if (!is_int($port) || !$port || $port < 1 || $port > 65535) {
 
 $address = (isset($lines[1]) && $lines[1]) ? $lines[1] : '127.0.0.1';
 
-$kv = new KvServer([]);
+$kv = new QueueServer([]);
 
 $kv->start($port, $address);

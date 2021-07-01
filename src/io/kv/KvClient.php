@@ -23,7 +23,7 @@ class KvClient {
     }
 
     public function get(string $domain, string $key): mixed {
-        self::logInfo("Getting data from Shared KV store for $domain:$key");
+        self::logDebug("Getting data from Shared KV store for $domain:$key");
         $req = new KvRequest();
         $req->setCommand(KvCommand::GET);
         $req->setKey($key);
@@ -35,7 +35,7 @@ class KvClient {
     }
 
     public function put(string $domain, string $key, mixed $data, int $ttl = 0): bool {
-        self::logInfo("Storing to Shared KV store $domain:$key");
+        self::logDebug("Storing to Shared KV store $domain:$key");
         $req = new KvRequest();
         $req->setCommand(KvCommand::PUT);
         $req->setKey($key);

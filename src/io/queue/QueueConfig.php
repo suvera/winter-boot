@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 
-namespace dev\winterframework\io\kv;
+namespace dev\winterframework\io\queue;
 
 use dev\winterframework\core\System;
 
-class KvConfig {
+class QueueConfig {
 
     public function __construct(
         protected int $port,
@@ -13,7 +13,7 @@ class KvConfig {
         protected ?string $phpBinary = null
     ) {
         if (!is_int($port) || !$port || $port < 1 || $port > 65535) {
-            throw new KvException('KV Server port must be a number between 1 - 65535');
+            throw new QueueException('KV Server port must be a number between 1 - 65535');
         }
 
         if (!$this->address) {
@@ -22,7 +22,7 @@ class KvConfig {
 
         if ($this->phpBinary) {
             if (preg_match('/[^a-zA-Z0-9\-_\/]+/', $this->phpBinary)) {
-                throw new KvException('KV Server php binary path has special characters');
+                throw new QueueException('KV Server php binary path has special characters');
             }
         } else {
             $this->phpBinary = System::getPhpBinary();
