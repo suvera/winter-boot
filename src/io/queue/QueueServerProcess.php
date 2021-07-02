@@ -42,7 +42,8 @@ class QueueServerProcess extends MonitoringServerProcess {
 
         $lineArgs = [
             $this->config->getPort(),
-            $this->config->getAddress()
+            $this->config->getAddress(),
+            $this->config->getToken()
         ];
 
         $this->launchAndMonitor($cmd, $lineArgs);

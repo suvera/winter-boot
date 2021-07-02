@@ -5,12 +5,7 @@ declare(strict_types=1);
 use dev\winterframework\io\kv\KvServer;
 
 $dir = dirname(__DIR__);
-require_once($dir . '/src/io/kv/KvServer.php');
-require_once($dir . '/src/io/kv/KvCommand.php');
-require_once($dir . '/src/io/kv/KvRequest.php');
-require_once($dir . '/src/io/kv/KvResponse.php');
-require_once($dir . '/src/io/kv/KvException.php');
-require_once($dir . '/src/type/IntegerMinHeap.php');
+require_once($dir . '/vendor/autoload.php');
 
 $stdin = fopen("php://stdin", 'r');
 $lines = [];
@@ -26,7 +21,11 @@ if (!is_int($port) || !$port || $port < 1 || $port > 65535) {
 }
 
 $address = (isset($lines[1]) && $lines[1]) ? $lines[1] : '127.0.0.1';
+$token = (isset($lines[2])) ? $lines[2] : '';
 
-$kv = new KvServer([]);
+$kv = new KvServer(
+    $token,
+    []
+);
 
 $kv->start($port, $address);

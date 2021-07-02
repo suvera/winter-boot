@@ -507,7 +507,7 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         try {
             return $method->invokeArgs($bean, $args);
         } catch (Throwable $e) {
-            throw new WinterException("Could not call method "
+            throw new WinterException("Could not call method, " . $e->getMessage() . ' '
                 . ReflectionUtil::getFqName($method), 0, $e);
         }
     }

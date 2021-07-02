@@ -8,6 +8,7 @@ use dev\winterframework\core\System;
 class KvConfig {
 
     public function __construct(
+        protected string $token,
         protected int $port,
         protected ?string $address = null,
         protected ?string $phpBinary = null
@@ -41,4 +42,7 @@ class KvConfig {
         return $this->phpBinary;
     }
 
+    public function getToken(): string {
+        return $this->token;
+    }
 }

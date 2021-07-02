@@ -8,6 +8,7 @@ use dev\winterframework\core\System;
 class QueueConfig {
 
     public function __construct(
+        protected string $token,
         protected int $port,
         protected ?string $address = null,
         protected ?string $phpBinary = null
@@ -39,6 +40,10 @@ class QueueConfig {
 
     public function getPhpBinary(): string {
         return $this->phpBinary;
+    }
+
+    public function getToken(): string {
+        return $this->token;
     }
 
 }

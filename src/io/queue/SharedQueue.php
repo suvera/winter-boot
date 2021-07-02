@@ -10,20 +10,12 @@ use Throwable;
 class SharedQueue implements Queue {
     use Wlf4p;
 
-    protected ?QueueClient $client = null;
-
     public function __construct(
-        protected QueueConfig $config,
+        protected QueueSharedTemplate $client,
         protected string $queueName,
         protected int $capacity = 0,
         protected int $retries = 5
     ) {
-    }
-
-    protected function getClient(): void {
-        if (!isset($this->client)) {
-            $this->client = new QueueClient($this->config);
-        }
     }
 
     public function add(mixed $item, int $timeoutMs = 0): bool {
@@ -31,8 +23,6 @@ class SharedQueue implements Queue {
         $i = $this->retries;
         while ($i > 0) {
             try {
-                $this->getClient();
-
                 return $this->client->enqueue($this->queueName, $value);
             } catch (Throwable $e) {
                 self::logException($e);
@@ -48,7 +38,6 @@ class SharedQueue implements Queue {
         $i = $this->retries;
         while ($i > 0) {
             try {
-                $this->getClient();
                 $data = $this->client->dequeue($this->queueName);
                 if (is_null($data)) {
                     return null;
@@ -75,7 +64,6 @@ class SharedQueue implements Queue {
         $i = $this->retries;
         while ($i > 0) {
             try {
-                $this->getClient();
                 return $this->client->size($this->queueName);
             } catch (Throwable $e) {
                 self::logException($e);

@@ -4,16 +4,34 @@ declare(strict_types=1);
 namespace dev\winterframework\io\kv;
 
 use dev\winterframework\util\log\Wlf4p;
+use RuntimeException;
 use Swoole\Client;
 
-class KvClient {
+/**
+ * @property-read Client $client
+ */
+class KvClient implements KvTemplate {
     use Wlf4p;
 
-    protected Client $client;
+    protected Client $_client;
 
-    public function __construct(protected KvConfig $config) {
-        $this->client = new Client(SWOOLE_SOCK_TCP | SWOOLE_KEEP);
-        $this->connect();
+    public function __construct(
+        protected KvConfig $config
+    ) {
+    }
+
+    /** @noinspection PhpMixedReturnTypeCanBeReducedInspection */
+    public function __get(string $name): mixed {
+        if ($name === 'client') {
+            if (!isset($this->_client)) {
+                $this->_client = new Client(SWOOLE_SOCK_TCP | SWOOLE_KEEP);
+                if (!$this->_client->connect($this->config->getAddress(), $this->config->getPort(), -1)) {
+                    throw new KvException("KV Store Connection failed. Error: {$this->_client->errCode}");
+                }
+            }
+            return $this->_client;
+        }
+        throw new RuntimeException('Undefined property: KvClient::$name');
     }
 
     protected function connect(): void {
@@ -48,6 +66,20 @@ class KvClient {
         return ($resp->getData() == 'OK');
     }
 
+    public function putIfNot(string $domain, string $key, mixed $data, int $ttl = 0): bool {
+        self::logDebug("Storing to Shared KV store(putIfNot)  $domain:$key");
+        $req = new KvRequest();
+        $req->setCommand(KvCommand::PUT_IF_NOT);
+        $req->setKey($key);
+        $req->setData($data);
+        $req->setTtl($ttl);
+        $req->setDomain($domain);
+
+        $resp = $this->send($req);
+
+        return ($resp->getData() == 'OK');
+    }
+
     public function del(string $domain, string $key): bool {
         $req = new KvRequest();
         $req->setCommand(KvCommand::DEL);
@@ -60,7 +92,7 @@ class KvClient {
     }
 
     public function has(string $domain, string $key): bool {
-        self::logInfo("Checking key exist in Shared KV store $domain:$key");
+        self::logDebug("Checking key exist in Shared KV store $domain:$key");
         $req = new KvRequest();
         $req->setCommand(KvCommand::HAS_KEY);
         $req->setKey($key);
@@ -90,7 +122,8 @@ class KvClient {
         return $resp->getData() == 'OK';
     }
 
-    public function send(KvRequest $req): KvResponse {
+    protected function send(KvRequest $req): KvResponse {
+        $req->setToken($this->config->getToken());
         if (!$this->client->isConnected()) {
             $this->connect();
         }
@@ -99,12 +132,97 @@ class KvClient {
         $this->client->send($req . "\n");
         $data = $this->client->recv();
         //echo "RAW: $data\n";
+        $json = json_decode($data, true);
+        if ($json === false || $json[0] === KvResponse::FAILED) {
+            self::logError('KV Command failed ' . $data);
+        }
 
-        return KvResponse::jsonUnSerialize(json_decode($data, true));
+        return KvResponse::jsonUnSerialize($json);
     }
 
     public function __destruct() {
         $this->client->close();
     }
+
+    public function incr(string $domain, string $key, int|float $incVal = null): int|float {
+        $req = new KvRequest();
+        $req->setCommand(KvCommand::INCR);
+        $req->setKey($key);
+        $req->setDomain($domain);
+        $req->setData($incVal);
+
+        $resp = $this->send($req);
+
+        return $resp->getData();
+    }
+
+    public function decr(string $domain, string $key, int|float $decVal = null): int|float {
+        $req = new KvRequest();
+        $req->setCommand(KvCommand::DECR);
+        $req->setKey($key);
+        $req->setDomain($domain);
+        $req->setData($decVal);
+
+        $resp = $this->send($req);
+
+        return $resp->getData();
+    }
+
+    public function append(string $domain, string $key, string $append): int {
+        $req = new KvRequest();
+        $req->setCommand(KvCommand::APPEND);
+        $req->setKey($key);
+        $req->setDomain($domain);
+        $req->setData($append);
+
+        $resp = $this->send($req);
+
+        return $resp->getData();
+    }
+
+    public function getSet(string $domain, string $key, mixed $value): mixed {
+        $req = new KvRequest();
+        $req->setCommand(KvCommand::GETSET);
+        $req->setKey($key);
+        $req->setDomain($domain);
+        $req->setData($value);
+
+        $resp = $this->send($req);
+
+        return $resp->getData();
+    }
+
+    public function strLen(string $domain, string $key): int {
+        $req = new KvRequest();
+        $req->setCommand(KvCommand::STRLEN);
+        $req->setKey($key);
+        $req->setDomain($domain);
+
+        $resp = $this->send($req);
+
+        return $resp->getData();
+    }
+
+    public function keys(string $domain, string $key): array {
+        $req = new KvRequest();
+        $req->setCommand(KvCommand::KEYS);
+        $req->setKey($key);
+        $req->setDomain($domain);
+
+        $resp = $this->send($req);
+
+        return $resp->getData();
+    }
+
+    public function getAll(string $domain): array {
+        $req = new KvRequest();
+        $req->setCommand(KvCommand::GET_ALL);
+        $req->setDomain($domain);
+
+        $resp = $this->send($req);
+
+        return $resp->getData();
+    }
+
 
 }

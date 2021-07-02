@@ -39,6 +39,11 @@ class ActuatorEndPoints {
             'path' => 'mappings',
             'handler' => 'getMappings'
         ],
+        'management.endpoint.prometheus' => [
+            'enabled' => false,
+            'path' => 'prometheus',
+            'handler' => 'getPrometheus'
+        ],
     ];
 
     public static function getFormattedEndPoints(): array {

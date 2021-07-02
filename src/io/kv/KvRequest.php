@@ -12,13 +12,15 @@ class KvRequest implements JsonSerializable, Stringable {
     const TTL = 2;
     const DATA = 3;
     const DOMAIN = 4;
+    const TOKEN = 5;
 
     protected array $json = [
         self::CMD => 0,
         self::KEY => '',
         self::TTL => 0,
         self::DATA => null,
-        self::DOMAIN => ''
+        self::DOMAIN => '',
+        self::TOKEN => ''
     ];
 
     public function getCommand(): int {
@@ -59,6 +61,14 @@ class KvRequest implements JsonSerializable, Stringable {
 
     public function setDomain(string $domain): void {
         $this->json[self::DOMAIN] = $domain;
+    }
+
+    public function getToken(): string {
+        return $this->json[self::TOKEN];
+    }
+
+    public function setToken(string $token): void {
+        $this->json[self::TOKEN] = $token;
     }
 
     public function jsonSerialize(): array {

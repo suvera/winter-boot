@@ -4,16 +4,34 @@ declare(strict_types=1);
 namespace dev\winterframework\io\queue;
 
 use dev\winterframework\util\log\Wlf4p;
+use RuntimeException;
 use Swoole\Client;
 
-class QueueClient {
+/**
+ * @property-read Client $client
+ */
+class QueueClient implements QueueSharedTemplate {
     use Wlf4p;
 
-    protected Client $client;
+    protected Client $_client;
 
-    public function __construct(protected QueueConfig $config) {
-        $this->client = new Client(SWOOLE_SOCK_TCP | SWOOLE_KEEP);
-        $this->connect();
+    public function __construct(
+        protected QueueConfig $config
+    ) {
+    }
+
+    /** @noinspection PhpMixedReturnTypeCanBeReducedInspection */
+    public function __get(string $name): mixed {
+        if ($name === 'client') {
+            if (!isset($this->_client)) {
+                $this->_client = new Client(SWOOLE_SOCK_TCP | SWOOLE_KEEP);
+                if (!$this->_client->connect($this->config->getAddress(), $this->config->getPort(), -1)) {
+                    throw new QueueException("QUEUE Store Connection failed. Error: {$this->_client->errCode}");
+                }
+            }
+            return $this->_client;
+        }
+        throw new RuntimeException('Undefined property: QueueClient::$name');
     }
 
     protected function connect(): void {
@@ -75,7 +93,8 @@ class QueueClient {
         return $resp->getData();
     }
 
-    public function send(QueueRequest $req): QueueResponse {
+    protected function send(QueueRequest $req): QueueResponse {
+        $req->setToken($this->config->getToken());
         if (!$this->client->isConnected()) {
             $this->connect();
         }
@@ -84,8 +103,12 @@ class QueueClient {
         $this->client->send($req . "\n");
         $data = $this->client->recv();
         //echo "RAW: $data\n";
+        $json = json_decode($data, true);
+        if ($json === false || $json[0] === QueueResponse::FAILED) {
+            self::logError('Queue Command failed ' . $data);
+        }
 
-        return QueueResponse::jsonUnSerialize(json_decode($data, true));
+        return QueueResponse::jsonUnSerialize($json);
     }
 
     public function __destruct() {

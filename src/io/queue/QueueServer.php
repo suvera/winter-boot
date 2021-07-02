@@ -26,7 +26,10 @@ class QueueServer {
      */
     protected array $store = [];
 
-    public function __construct(array $config) {
+    public function __construct(
+        protected string $token,
+        array $config
+    ) {
         $this->config = array_merge($this->config, $config);
     }
 
@@ -57,6 +60,12 @@ class QueueServer {
             $req = QueueRequest::jsonUnSerialize($json);
         } catch (Throwable $e) {
             $resp->setError('Error: ' . $e->getMessage());
+            $server->send($fd, $resp . "\n");
+            return;
+        }
+
+        if ($req->getToken() !== $this->token) {
+            $resp->setError('Error: Token does not match');
             $server->send($fd, $resp . "\n");
             return;
         }

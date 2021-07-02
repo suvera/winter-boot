@@ -18,6 +18,9 @@ use dev\winterframework\core\web\format\DefaultResponseRenderer;
 use dev\winterframework\core\web\ResponseRenderer;
 use dev\winterframework\exception\ModuleException;
 use dev\winterframework\exception\NoUniqueBeanDefinitionException;
+use dev\winterframework\io\metrics\prometheus\KvAdapter;
+use dev\winterframework\io\metrics\prometheus\NoAdapter;
+use dev\winterframework\io\metrics\prometheus\PrometheusMetricRegistry;
 use dev\winterframework\io\timer\IdleCheckRegistry;
 use dev\winterframework\pdbc\DataSource;
 use dev\winterframework\pdbc\datasource\DataSourceBuilder;
@@ -33,6 +36,7 @@ use dev\winterframework\stereotype\WinterBootApplication;
 use dev\winterframework\txn\PlatformTransactionManager;
 use dev\winterframework\util\concurrent\DefaultLockManager;
 use dev\winterframework\util\concurrent\LockManager;
+use Prometheus\Storage\APC;
 
 abstract class WinterApplicationContextBuilder implements ApplicationContext {
     protected BeanProviderContext $beanProvider;
@@ -180,6 +184,8 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         $this->beanProvider->registerInternalBean(
             new IdleCheckRegistry(), IdleCheckRegistry::class, false
         );
+
+        $this->registerPrometheusBeans();
     }
 
     private function registerDataSources(): void {
@@ -288,6 +294,33 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
 
     public function getModules(): array {
         return array_keys($this->moduleRegistry);
+    }
+
+    protected function registerPrometheusBeans(): void {
+
+        $adapterBean = $this->getPropertyStr('winter.prometheus.bean', '');
+        $adapterClass = $this->getPropertyStr('winter.prometheus.beanClass', '');
+
+        if (!$adapterBean && !$adapterClass) {
+            $port = $this->getPropertyInt('winter.queue.port', 0);;
+            if ($port > 0) {
+                $adapterClass = KvAdapter::class;
+            } else if (extension_loaded('apcu')) {
+                $adapterClass = APC::class;
+            } else {
+                $adapterClass = NoAdapter::class;
+            }
+        }
+
+        $this->contextData->getBeanProvider()->registerInternalBean(
+            new PrometheusMetricRegistry(
+                $this,
+                $adapterBean,
+                $adapterClass
+            ),
+            PrometheusMetricRegistry::class,
+            false
+        );
     }
 
 }

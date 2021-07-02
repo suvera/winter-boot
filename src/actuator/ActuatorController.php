@@ -17,4 +17,6 @@ interface ActuatorController {
     public function getInfo(): ResponseEntity;
 
     public function getMappings(): ResponseEntity;
+
+    public function getPrometheus(): ResponseEntity;
 }

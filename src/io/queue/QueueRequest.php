@@ -10,11 +10,13 @@ class QueueRequest implements JsonSerializable, Stringable {
     const CMD = 0;
     const QUEUE = 1;
     const DATA = 2;
+    const TOKEN = 3;
 
     protected array $json = [
         self::CMD => 0,
         self::QUEUE => '',
-        self::DATA => null
+        self::DATA => null,
+        self::TOKEN => ''
     ];
 
     public function getCommand(): int {
@@ -32,13 +34,21 @@ class QueueRequest implements JsonSerializable, Stringable {
     public function setData(mixed $data): void {
         $this->json[self::DATA] = $data;
     }
-    
+
     public function getQueue(): string {
         return $this->json[self::QUEUE];
     }
 
     public function setQueue(string $domain): void {
         $this->json[self::QUEUE] = $domain;
+    }
+
+    public function getToken(): string {
+        return $this->json[self::TOKEN];
+    }
+
+    public function setToken(string $token): void {
+        $this->json[self::TOKEN] = $token;
     }
 
     public function jsonSerialize(): array {

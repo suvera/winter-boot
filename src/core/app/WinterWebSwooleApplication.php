@@ -5,12 +5,17 @@ namespace dev\winterframework\core\app;
 
 use dev\winterframework\core\context\WinterServer;
 use dev\winterframework\core\context\WinterWebSwooleContext;
+use dev\winterframework\io\kv\KvClient;
 use dev\winterframework\io\kv\KvConfig;
 use dev\winterframework\io\kv\KvServerProcess;
+use dev\winterframework\io\kv\KvTemplate;
+use dev\winterframework\io\metrics\prometheus\KvAdapter;
 use dev\winterframework\io\process\AsyncWorkerProcess;
 use dev\winterframework\io\process\ScheduleWorkerProcess;
+use dev\winterframework\io\queue\QueueClient;
 use dev\winterframework\io\queue\QueueConfig;
 use dev\winterframework\io\queue\QueueServerProcess;
+use dev\winterframework\io\queue\QueueSharedTemplate;
 use dev\winterframework\io\timer\IdleCheckRegistry;
 use dev\winterframework\task\async\AsyncQueueStoreManager;
 use dev\winterframework\task\async\AsyncTaskPoolExecutor;
@@ -23,6 +28,7 @@ use Swoole\Http\Request;
 use Swoole\Http\Response;
 use Swoole\HTTP\Server;
 use Swoole\Process;
+use function Ramsey\Uuid\v4;
 
 class WinterWebSwooleApplication extends WinterApplicationRunner implements WinterApplication {
 
@@ -258,9 +264,18 @@ EOQ;
             return;
         }
         $config = new KvConfig(
+            v4(),
             $port,
             $address ?: null,
             $phpBinary ?: null
+        );
+
+        $kvTpl = new KvClient($config);
+        $this->appCtxData->getBeanProvider()->registerInternalBean(
+            $kvTpl, KvTemplate::class, false
+        );
+        $this->appCtxData->getBeanProvider()->registerInternalBean(
+            new KvAdapter($kvTpl), KvAdapter::class, false
         );
 
         $kvPs = new KvServerProcess($wServer, $this->applicationContext, $config);
@@ -276,9 +291,14 @@ EOQ;
             return;
         }
         $config = new QueueConfig(
+            v4(),
             $port,
             $address ?: null,
             $phpBinary ?: null
+        );
+
+        $this->appCtxData->getBeanProvider()->registerInternalBean(
+            new QueueClient($config), QueueSharedTemplate::class, false
         );
 
         $ps = new QueueServerProcess($wServer, $this->applicationContext, $config);

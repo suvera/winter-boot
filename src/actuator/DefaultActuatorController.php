@@ -11,13 +11,16 @@ use dev\winterframework\core\context\WinterBeanProviderContext;
 use dev\winterframework\core\System;
 use dev\winterframework\core\web\DispatcherServlet;
 use dev\winterframework\core\web\route\RequestMappingRegistry;
+use dev\winterframework\io\metrics\prometheus\PrometheusMetricRegistry;
 use dev\winterframework\stereotype\RestController;
 use dev\winterframework\web\http\ResponseEntity;
 use dev\winterframework\web\MediaType;
+use Prometheus\RenderTextFormat;
 
 #[RestController]
 class DefaultActuatorController implements ActuatorController {
 
+    /** @noinspection PhpPropertyOnlyWrittenInspection */
     public function __construct(
         private ApplicationContextData $ctxData,
         private ApplicationContext $appCtx,
@@ -100,6 +103,16 @@ class DefaultActuatorController implements ActuatorController {
         $result = $this->requestMapping->getAll();
 
         $resp->setBody($result);
+        return $resp;
+    }
+
+    public function getPrometheus(): ResponseEntity {
+        $resp = ResponseEntity::ok()->withContentType(RenderTextFormat::MIME_TYPE);
+
+        /** @var PrometheusMetricRegistry $reg */
+        $reg = $this->appCtx->beanByClass(PrometheusMetricRegistry::class);
+
+        $resp->setBody($reg->getFormatted());
         return $resp;
     }
 
