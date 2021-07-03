@@ -147,3 +147,14 @@ composer require suvera/winter-modules
 ```
 
 You're Done!
+
+# Module Extensions
+
+This framework can be extended even further by using 
+**[https://github.com/suvera/winter-modules](https://github.com/suvera/winter-modules)**
+
+## How to create new module
+
+- Create a new module by extending [WinterModule](src/core/app/WinterModule.php)
+- Check the existing module for more infornation.
+
