@@ -60,14 +60,12 @@ class KvAdapter implements Adapter {
             $this->kvTemplate->put($this->domainHistogram, $this->metaKey($data), json_encode($this->metaData($data)));
         }
 
-        // Atomically increment the sum
         $this->kvTemplate->incr(
             $this->domainHistogram,
             $sumKey,
             $data['value']
         );
 
-        // Figure out in which bucket the observation belongs
         $bucketToIncrease = '+Inf';
         foreach ($data['buckets'] as $bucket) {
             if ($data['value'] <= $bucket) {
@@ -250,7 +248,6 @@ class KvAdapter implements Adapter {
                 'buckets' => $metaData['buckets'] ?? [],
             ];
 
-            // Add the Inf bucket so we can compute it later on
             $data['buckets'][] = '+Inf';
 
             $histogramBuckets = [];

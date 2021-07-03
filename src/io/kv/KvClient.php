@@ -25,7 +25,7 @@ class KvClient implements KvTemplate {
         if ($name === 'client') {
             if (!isset($this->_client)) {
                 $this->_client = new Client(SWOOLE_SOCK_TCP | SWOOLE_KEEP);
-                if (!$this->_client->connect($this->config->getAddress(), $this->config->getPort(), -1)) {
+                if (!$this->_client->connect($this->config->getAddress(), $this->config->getPort(), 0.1)) {
                     throw new KvException("KV Store Connection failed. Error: {$this->_client->errCode}");
                 }
             }

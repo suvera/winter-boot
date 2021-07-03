@@ -18,6 +18,7 @@ use dev\winterframework\core\web\format\DefaultResponseRenderer;
 use dev\winterframework\core\web\ResponseRenderer;
 use dev\winterframework\exception\ModuleException;
 use dev\winterframework\exception\NoUniqueBeanDefinitionException;
+use dev\winterframework\io\metrics\prometheus\DefaultPrometheusMetricProvider;
 use dev\winterframework\io\metrics\prometheus\KvAdapter;
 use dev\winterframework\io\metrics\prometheus\NoAdapter;
 use dev\winterframework\io\metrics\prometheus\PrometheusMetricRegistry;
@@ -300,6 +301,10 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
 
         $adapterBean = $this->getPropertyStr('winter.prometheus.bean', '');
         $adapterClass = $this->getPropertyStr('winter.prometheus.beanClass', '');
+        $providerClass = $this->getPropertyStr(
+            'winter.prometheus.metricProvider',
+            DefaultPrometheusMetricProvider::class
+        );
 
         if (!$adapterBean && !$adapterClass) {
             $port = $this->getPropertyInt('winter.queue.port', 0);;
@@ -316,7 +321,8 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
             new PrometheusMetricRegistry(
                 $this,
                 $adapterBean,
-                $adapterClass
+                $adapterClass,
+                $providerClass
             ),
             PrometheusMetricRegistry::class,
             false

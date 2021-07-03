@@ -13,6 +13,7 @@ use dev\winterframework\core\web\error\ErrorController;
 use dev\winterframework\core\web\route\RequestMappingRegistry;
 use dev\winterframework\exception\NullPointerException;
 use dev\winterframework\exception\WinterException;
+use dev\winterframework\io\metrics\prometheus\PrometheusMetricRegistry;
 use dev\winterframework\reflection\ObjectCreator;
 use dev\winterframework\stereotype\web\RequestBody;
 use dev\winterframework\stereotype\web\RequestParam;
@@ -139,8 +140,11 @@ class DispatcherServlet implements HttpRequestDispatcher {
     ): void {
         /** @var ResponseRenderer $renderer */
         $renderer = $this->appCtx->beanByClass(ResponseRenderer::class);
+        /** @var PrometheusMetricRegistry $metrics */
+        $metrics = $this->appCtx->beanByClass(PrometheusMetricRegistry::class);
         $interceptor = $this->ctxData->getInterceptorRegistry();
 
+        $timer = $metrics->startTimer('http_request_duration');
         if (!$this->preHandle($interceptor, $request, $response)) {
             $renderer->render($response, $request);
             return;
@@ -285,8 +289,8 @@ class DispatcherServlet implements HttpRequestDispatcher {
             $controller->postHandle($request, $response, $method->getDelegate());
         }
 
-
         $renderer->render($response, $request);
+        $timer->stop(['path' => $request->getUri(), 'method' => $request->getMethod()]);
 
         try {
             $this->afterCompletion($interceptor, $request, $response);
