@@ -131,6 +131,10 @@ class KvServer {
                 $this->execGetSet($req, $resp);
                 break;
 
+            case KvCommand::GETSET_IF_NOT:
+                $this->execGetSetIfNot($req, $resp);
+                break;
+
             case KvCommand::STRLEN:
                 $this->execStrLen($req, $resp);
                 break;
@@ -382,5 +386,18 @@ class KvServer {
             }
         }
         $resp->setData($data);
+    }
+
+    protected function execGetSetIfNot(KvRequest $req, KvResponse $resp): void {
+        $domain = $req->getDomain();
+        $key = $req->getKey();
+
+        if (isset($this->store[$domain][$key])) {
+            $resp->setData($this->store[$domain][$key][0]);
+            return;
+        }
+
+        $this->execPut($req, $resp);
+        $resp->setData(null);
     }
 }

@@ -24,5 +24,7 @@ class KvCommand {
 
     const PUT_IF_NOT = 15;
 
+    const GETSET_IF_NOT = 16;
+
     const PING = 99;
 }

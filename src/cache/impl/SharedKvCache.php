@@ -8,41 +8,24 @@ use dev\winterframework\cache\CacheConfiguration;
 use dev\winterframework\cache\ValueRetrievalException;
 use dev\winterframework\cache\ValueWrapper;
 use dev\winterframework\exception\IllegalStateException;
-use dev\winterframework\io\kv\KvClient;
-use dev\winterframework\io\kv\KvConfig;
+use dev\winterframework\io\kv\KvTemplate;
 use dev\winterframework\util\log\Wlf4p;
 use Throwable;
 
 class SharedKvCache implements Cache {
     use Wlf4p;
 
-    protected ?KvClient $client = null;
-
     public function __construct(
+        protected KvTemplate $client,
         protected string $name,
-        protected KvConfig $kvConfig,
         protected ?CacheConfiguration $config = null
     ) {
         if (is_null($this->config)) {
             $this->config = new CacheConfiguration();
         }
-        $this->getClient();
-    }
-
-    protected function getClient(): void {
-        try {
-            $this->client = new KvClient($this->kvConfig);
-        } catch (Throwable $e) {
-            self::logException($e);
-        }
     }
 
     public function clear(): void {
-        $this->getClient();
-        if (!$this->client) {
-            return;
-        }
-
         try {
             $this->client->delAll($this->name);
         } catch (Throwable $e) {
@@ -51,10 +34,6 @@ class SharedKvCache implements Cache {
     }
 
     public function evict(string $key): bool {
-        $this->getClient();
-        if (!$this->client) {
-            return false;
-        }
         try {
             return $this->client->del($this->name, $key);
         } catch (Throwable $e) {
@@ -64,11 +43,6 @@ class SharedKvCache implements Cache {
     }
 
     public function has(string $key): bool {
-        $this->getClient();
-        if (!$this->client) {
-            return false;
-        }
-
         try {
             return $this->client->has($this->name, $key);
         } catch (Throwable $e) {
@@ -78,11 +52,6 @@ class SharedKvCache implements Cache {
     }
 
     public function get(string $key): ValueWrapper {
-        $this->getClient();
-        if (!$this->client) {
-            return SimpleValueWrapper::$NULL_VALUE;
-        }
-
         $data = null;
         try {
             $data = $this->client->get($this->name, $key);
@@ -140,16 +109,21 @@ class SharedKvCache implements Cache {
         return true;
     }
 
-    public function put(string $key, mixed $value): void {
+    protected function calcTtl(): int {
         $ttl = 0;
         if ($this->config->expireAfterWriteMs > 0) {
             $ttl = intval(ceil($this->config->expireAfterWriteMs / 1000));
         }
 
-        $this->getClient();
-        if (!$this->client) {
+        return $ttl;
+    }
+
+    public function put(string $key, mixed $value): void {
+        if (is_null($value)) {
             return;
         }
+        $ttl = $this->calcTtl();
+
         $value = serialize($value);
         try {
             $this->client->put($this->name, $key, $value, $ttl);
@@ -159,10 +133,17 @@ class SharedKvCache implements Cache {
     }
 
     public function putIfAbsent(string $key, mixed $value): ValueWrapper {
-        if ($this->has($key)) {
-            return $this->get($key);
+        if (is_null($value)) {
+            return SimpleValueWrapper::$NULL_VALUE;
         }
-        $this->put($key, $value);
+        $ttl = $this->calcTtl();
+        $value = serialize($value);
+
+        try {
+            $this->client->putIfNot($this->name, $key, $value, $ttl);
+        } catch (Throwable $e) {
+            self::logException($e);
+        }
         return new SimpleValueWrapper($value);
     }
 

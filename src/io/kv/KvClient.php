@@ -80,6 +80,20 @@ class KvClient implements KvTemplate {
         return ($resp->getData() == 'OK');
     }
 
+    public function getSetIfNot(string $domain, string $key, mixed $data, int $ttl = 0): mixed {
+        self::logDebug("Storing to Shared KV store(getSetIfNot)  $domain:$key");
+        $req = new KvRequest();
+        $req->setCommand(KvCommand::GETSET_IF_NOT);
+        $req->setKey($key);
+        $req->setData($data);
+        $req->setTtl($ttl);
+        $req->setDomain($domain);
+
+        $resp = $this->send($req);
+
+        return $resp->getData();
+    }
+
     public function del(string $domain, string $key): bool {
         $req = new KvRequest();
         $req->setCommand(KvCommand::DEL);

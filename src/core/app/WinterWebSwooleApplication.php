@@ -259,15 +259,18 @@ EOQ;
         $prop = $this->appCtxData->getPropertyContext();
         $port = $prop->getInt('winter.kv.port', 0);
         $address = $prop->getStr('winter.kv.address', '');
+        $token = $prop->getStr('winter.kv.token', v4());
+        $diskPath = $prop->getStr('winter.kv.diskPath', '');
         $phpBinary = $prop->getStr('winter.phpBinary', '');
         if ($port <= 0) {
             return;
         }
         $config = new KvConfig(
-            v4(),
+            $token,
             $port,
             $address ?: null,
-            $phpBinary ?: null
+            $phpBinary ?: null,
+            $diskPath
         );
 
         $kvTpl = new KvClient($config);
@@ -286,15 +289,18 @@ EOQ;
         $prop = $this->appCtxData->getPropertyContext();
         $port = $prop->getInt('winter.queue.port', 0);
         $address = $prop->getStr('winter.queue.address', '');
+        $token = $prop->getStr('winter.queue.token', v4());
+        $diskPath = $prop->getStr('winter.kv.diskPath', '');
         $phpBinary = $prop->getStr('winter.phpBinary', '');
         if ($port <= 0) {
             return;
         }
         $config = new QueueConfig(
-            v4(),
+            $token,
             $port,
             $address ?: null,
-            $phpBinary ?: null
+            $phpBinary ?: null,
+            $diskPath
         );
 
         $this->appCtxData->getBeanProvider()->registerInternalBean(

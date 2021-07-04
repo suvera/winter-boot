@@ -26,6 +26,8 @@ interface KvTemplate {
 
     public function getSet(string $domain, string $key, mixed $value): mixed;
 
+    public function getSetIfNot(string $domain, string $key, mixed $data, int $ttl = 0): mixed;
+
     public function strLen(string $domain, string $key): int;
 
     public function keys(string $domain, string $key): array;

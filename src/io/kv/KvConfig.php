@@ -11,7 +11,8 @@ class KvConfig {
         protected string $token,
         protected int $port,
         protected ?string $address = null,
-        protected ?string $phpBinary = null
+        protected ?string $phpBinary = null,
+        protected ?string $diskPath = null
     ) {
         if (!is_int($port) || !$port || $port < 1 || $port > 65535) {
             throw new KvException('KV Server port must be a number between 1 - 65535');

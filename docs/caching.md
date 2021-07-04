@@ -69,33 +69,67 @@ cacheResolver |  | default to framework Managed | Bean derived from CacheResolve
 
 Cache containers are managed by *CacheManager* , so, CacheManager is mandatory to create cache containers.
 
-by default, framework provides **default** cache manager.
+by default, framework provides **default** cache manager which uses in-memory cache by default.
 
-#### Example:
+Framework also provides Local KV Caching mechanism.
+
+#### SharedKvCache Implementation 
+
+Caching mechanism implemented using local KV store. This is local to node only. All processes share same KV store.
+
 
 ```phpt
 
 #[Configuration]
 class CacheConfig {
 
-    #[Bean("redisCacheManager")]
-    public function getRedisCacheManager(): CacheManager {
-        $cache1 = new RedisCache(
+    #[Bean]
+    public function getCacheManager(KvTemplate $kvTemplate): CacheManager {
+    
+        $cache1 = new SharedKvCache(
             "stock-prices",                  // Cache Name
             CacheConfiguration::get(
                 maximumSize: 5000,           // only 5000 entries allowed, once reached LRU evict happens
                 expireAfterWriteMs: 600000,  // Milliseconds, expires item after 10 mins after written
-                expireAfterAccessMs: 600000, // Milliseconds, expires item after 10 mins since last access
             )
         );
         
+        $manager = new SimpleCacheManager();
+        $manager->addCache($cache1);
+        return $manager;
+    }
+
+}
+```
+
+#### RedisCache Implementation
+
+RedisCache is distributed, all nodes in your cluster may refer to same redis store.
+
+- RedisCache is available in [RedisModule](https://github.com/suvera/winter-modules/tree/master/winter-data-redis)
+
+
+```phpt
+#[Configuration]
+class CacheConfig {
+
+    #[Bean("redisCacheManager")]
+    public function getRedisCacheManager(PhpRedisTemplate $redisTpl): CacheManager {
+        $cache1 = new RedisCache(
+            $redisTpl,
+            "stock-prices",                  // Cache Name
+            CacheConfiguration::get(
+                maximumSize: 5000,           // only 5000 entries allowed, once reached LRU evict happens
+                expireAfterWriteMs: 600000,  // Milliseconds, expires item after 10 mins after written
+            )
+        );
         
         $cache2 = new RedisCache(
+            $redisTpl,
             "company-names",            // Cache Name
             CacheConfiguration::get(
                 maximumSize: -1,         // Unlimted entries
                 expireAfterWriteMs: -1,  // Unlimited time
-                expireAfterAccessMs: -1,  // Unlimited time
             )
         );
         
@@ -109,18 +143,11 @@ class CacheConfig {
 
 }
 
-
-class RedisCache implements Cache {
-}
-
-
 // Above can be used like this
 #[Cacheable(cacheNames: "stock-prices", cacheManager: "redisCacheManager")]
 public function getStockPrice(stirng $symbol): mixed {
     return some_value;
 }
-
-
 ```
 
 ## 3. CachePut
