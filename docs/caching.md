@@ -87,6 +87,7 @@ class CacheConfig {
     public function getCacheManager(KvTemplate $kvTemplate): CacheManager {
     
         $cache1 = new SharedKvCache(
+            $kvTemplate,
             "stock-prices",                  // Cache Name
             CacheConfiguration::get(
                 maximumSize: 5000,           // only 5000 entries allowed, once reached LRU evict happens
