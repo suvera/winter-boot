@@ -6,6 +6,7 @@ namespace dev\winterframework\io\queue;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\core\context\WinterServer;
 use dev\winterframework\io\process\MonitoringServerProcess;
+use dev\winterframework\io\process\ProcessType;
 use dev\winterframework\util\SocketUtil;
 
 class QueueServerProcess extends MonitoringServerProcess {
@@ -16,10 +17,26 @@ class QueueServerProcess extends MonitoringServerProcess {
         protected QueueConfig $config
     ) {
         parent::__construct($wServer, $ctx);
-        
+
         if (SocketUtil::isPortOpened($this->config->getAddress(), $this->config->getPort())) {
             throw new QueueException('QUEUE Server port ' . $this->config->getPort() . ' already in use');
         }
+    }
+
+    public function getProcessType(): int {
+        return ProcessType::QUEUE_MONITOR;
+    }
+
+    public function getProcessId(): string {
+        return 'queue-monitor';
+    }
+
+    public function getChildProcessId(): string {
+        return 'queue-server';
+    }
+
+    public function getChildProcessType(): int {
+        return ProcessType::QUEUE_SERVER;
     }
 
     protected function onProcessStart(): void {
@@ -36,14 +53,14 @@ class QueueServerProcess extends MonitoringServerProcess {
     }
 
     protected function run(): void {
-
         $cmd = $this->config->getPhpBinary() . ' '
             . dirname(dirname(dirname(__DIR__))) . '/bin/queue-server.php';
 
         $lineArgs = [
             $this->config->getPort(),
             $this->config->getAddress(),
-            $this->config->getToken()
+            $this->config->getToken(),
+            $this->wServer->getServer()->master_pid
         ];
 
         $this->launchAndMonitor($cmd, $lineArgs);

@@ -37,7 +37,7 @@ class DataSourceConfig {
     private int $rowsPrefetch = 100;
 
     #[JsonProperty("connection.idleTimeout")]
-    private int $idleTimeout = 0;
+    private int $idleTimeout = 600;
 
     public function getName(): string {
         return $this->name;

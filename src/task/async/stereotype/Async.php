@@ -9,6 +9,8 @@ use dev\winterframework\exception\AnnotationException;
 use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\reflection\support\StereoTypeValidations;
+use dev\winterframework\stereotype\Bean;
+use dev\winterframework\stereotype\RestController;
 use dev\winterframework\stereotype\StereoType;
 use dev\winterframework\type\TypeAssert;
 use dev\winterframework\util\log\Wlf4p;
@@ -31,6 +33,18 @@ class Async implements StereoType {
         if (!extension_loaded('swoole')) {
             throw new AnnotationException("Annotation #[' . $stereoName 
                 . '] requires *swoole* extension in PHP runtime "
+                . ReflectionUtil::getFqName($ref));
+        }
+
+        if ($ref->getDeclaringClass()->getAttributes(RestController::class)) {
+            throw new AnnotationException("Annotation #[' . $stereoName 
+                . '] Cannot be declared on #[RestController] at "
+                . ReflectionUtil::getFqName($ref));
+        }
+
+        if ($ref->getAttributes(Bean::class)) {
+            throw new AnnotationException("Annotation #[' . $stereoName 
+                . '] Cannot be declared along with #[Bean] at "
                 . ReflectionUtil::getFqName($ref));
         }
 

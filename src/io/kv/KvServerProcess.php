@@ -6,6 +6,7 @@ namespace dev\winterframework\io\kv;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\core\context\WinterServer;
 use dev\winterframework\io\process\MonitoringServerProcess;
+use dev\winterframework\io\process\ProcessType;
 use dev\winterframework\util\SocketUtil;
 
 class KvServerProcess extends MonitoringServerProcess {
@@ -20,6 +21,22 @@ class KvServerProcess extends MonitoringServerProcess {
         if (SocketUtil::isPortOpened($this->config->getAddress(), $this->config->getPort())) {
             throw new KvException('KV Server port ' . $this->config->getPort() . ' already in use');
         }
+    }
+
+    public function getProcessType(): int {
+        return ProcessType::KV_MONITOR;
+    }
+
+    public function getProcessId(): string {
+        return 'kv-monitor';
+    }
+
+    public function getChildProcessId(): string {
+        return 'kv-server';
+    }
+
+    public function getChildProcessType(): int {
+        return ProcessType::KV_SERVER;
     }
 
     protected function onProcessStart(): void {
@@ -43,7 +60,8 @@ class KvServerProcess extends MonitoringServerProcess {
         $lineArgs = [
             $this->config->getPort(),
             $this->config->getAddress(),
-            $this->config->getToken()
+            $this->config->getToken(),
+            $this->wServer->getServer()->master_pid
         ];
 
         $this->launchAndMonitor($cmd, $lineArgs);

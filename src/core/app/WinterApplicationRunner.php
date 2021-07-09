@@ -54,6 +54,7 @@ abstract class WinterApplicationRunner {
     protected PropertyContext $propertyCtx;
     protected StringSet $attributesToScan;
     protected Logger $console;
+    protected string $configDir = '';
 
     public function __construct() {
         $this->scanner = ClassResourceScanner::getDefaultScanner();
@@ -140,6 +141,9 @@ abstract class WinterApplicationRunner {
     private function processBootConfig(): void {
         /** @var WinterBootApplication $bootConfig */
         $bootConfig = $this->bootApp->getAttribute(WinterBootApplication::class);
+        if (!empty($this->configDir)) {
+            $bootConfig->configDirectory = [$this->configDir];
+        }
         if (empty($bootConfig->configDirectory)) {
             throw new WinterException('configDirectory is empty for application '
                 . ReflectionUtil::getFqName($this->bootApp));

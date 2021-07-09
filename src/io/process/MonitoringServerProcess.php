@@ -18,6 +18,16 @@ abstract class MonitoringServerProcess extends ServerWorkerProcess {
      */
     protected mixed $proc;
 
+    public function __destruct() {
+        if ($this->proc) {
+            proc_close($this->proc);
+        }
+    }
+
+    abstract public function getChildProcessId(): string;
+
+    abstract public function getChildProcessType(): int;
+
     abstract protected function onProcessStart(): void;
 
     abstract protected function onProcessError(): void;
@@ -36,8 +46,15 @@ abstract class MonitoringServerProcess extends ServerWorkerProcess {
 
         $process = proc_open($cmd, $descriptorSpec, $this->streams);
 
+        //self::logInfo("Command: $cmd");
         if (is_resource($process)) {
             $this->proc = $process;
+
+            $status = proc_get_status($this->proc);
+            if (isset($status['pid'])) {
+                $this->wServer->addPid($this->getChildProcessId(), intval($status['pid']), $this->getChildProcessType());
+            }
+
             $this->onProcessStart();
         } else {
             self::logError('Could not span process');

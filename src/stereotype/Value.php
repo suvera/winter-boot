@@ -15,12 +15,13 @@ use TypeError;
 class Value implements StereoType {
     private string $targetName;
     private string $targetType = '';
+    private bool $nullable = false;
     private RefProperty $refOwner;
     private bool $targetStatic = false;
 
     public function __construct(
         public string $name,
-        public ?string $defaultValue = null
+        public int|float|string|bool|null|array $defaultValue = null
     ) {
         $this->name = trim($this->name);
     }
@@ -35,6 +36,10 @@ class Value implements StereoType {
 
     public function getRefOwner(): RefProperty {
         return $this->refOwner;
+    }
+
+    public function isNullable(): bool {
+        return $this->nullable;
     }
 
     public function isTargetStatic(): bool {
@@ -68,9 +73,15 @@ class Value implements StereoType {
             } else {
                 $this->targetType = $type->getName();
             }
+
+            $this->nullable = $type->allowsNull();
         }
+
         $this->refOwner = $ref;
         $this->targetStatic = $this->refOwner->isStatic();
         $this->targetName = $ref->getName();
+        if ($this->defaultValue === null && $ref->hasDefaultValue()) {
+            $this->defaultValue = $ref->getDefaultValue();
+        }
     }
 }

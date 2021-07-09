@@ -11,6 +11,10 @@ use dev\winterframework\type\ImmutableMap;
 final class System {
     private static ImmutableMap $theUnmodifiableEnvironment;
     private static array $props = [];
+    private static array $phpBinaries = [
+        '/usr/bin/php',
+        '/usr/local/bin/php'
+    ];
 
     public static function exit(int $status = 0): void {
         //echo "<pre>\n" . (microtime(true) - $GLOBALS['time']) . " seconds.\n";
@@ -49,10 +53,14 @@ final class System {
     }
 
     public static function getPhpBinary(): string {
-        if (isset($_SERVER['_'])) {
-            return $_SERVER['_'];
-        } else if (isset($_ENV['_'])) {
-            return $_ENV['_'];
+        if (isset($_ENV['PHP_BINARY'])) {
+            return $_ENV['PHP_BINARY'];
+        } else {
+            foreach (self::$phpBinaries as $php) {
+                if (is_file($php)) {
+                    return $php;
+                }
+            }
         }
         return 'php';
     }

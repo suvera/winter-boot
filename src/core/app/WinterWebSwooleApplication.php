@@ -11,6 +11,7 @@ use dev\winterframework\io\kv\KvServerProcess;
 use dev\winterframework\io\kv\KvTemplate;
 use dev\winterframework\io\metrics\prometheus\KvAdapter;
 use dev\winterframework\io\process\AsyncWorkerProcess;
+use dev\winterframework\io\process\ProcessType;
 use dev\winterframework\io\process\ScheduleWorkerProcess;
 use dev\winterframework\io\queue\QueueClient;
 use dev\winterframework\io\queue\QueueConfig;
@@ -33,6 +34,16 @@ use function Ramsey\Uuid\v4;
 class WinterWebSwooleApplication extends WinterApplicationRunner implements WinterApplication {
 
     protected WinterWebSwooleContext $webContext;
+    protected SwooleAppArguments $args;
+
+    public function __construct() {
+        $this->args = new SwooleAppArguments();
+        $configDir = $this->args->get('configDir', null);
+        if ($configDir) {
+            $this->configDir = $configDir;
+        }
+        parent::__construct();
+    }
 
     protected function runBootApp(): void {
         $this->webContext = new WinterWebSwooleContext(
@@ -50,7 +61,6 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         $this->webContext->getDispatcher()->dispatch($wrapperReq, $wrapperResp);
     }
 
-    /** @noinspection PhpUnusedParameterInspection */
     protected function startServer() {
         $wServer = new WinterServer($this->applicationContext, $this->appCtxData);
 
@@ -64,27 +74,43 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         $this->buildScheduledPlatform($wServer);
 
         $wServer->addEventCallback('request', [$this, 'serveRequest']);
-        $wServer->addEventCallback('start', function ($server) use ($wServer) {
-            self::logInfo("Http server started on $server->host:" . $server->port . ', pid:' . getmypid());
+
+        $wServer->addEventCallback('start', function (Server $server) use ($wServer) {
+            posix_setpgid(getmypid(), $server->master_pid);
+            $wServer->addPid('master', $server->master_pid, ProcessType::MASTER);
+            self::logInfo("Http server started on $server->host:" . $server->port . ', pid:' . getmypid()
+                . ', master_pid:' . $server->master_pid);
         });
 
-        $wServer->addEventCallback('WorkerStart', function ($server, int $workerId) use ($wServer) {
+        $wServer->addEventCallback('WorkerStart', function (Server $server, int $workerId) use ($wServer) {
+            posix_setpgid(getmypid(), $server->master_pid);
+
             /** @var IdleCheckRegistry $idleCheck */
             $idleCheck = $wServer->getAppCtx()->beanByClass(IdleCheckRegistry::class);
             $idleCheck->initialize();
 
             if ($workerId < $server->setting['worker_num']) {
-                self::logInfo("Http Worker($workerId) started " . ', pid:' . getmypid());
+                $psType = ProcessType::HTTP_WORKER;
+                self::logInfo("Http Worker($workerId) started " . ', pid:' . getmypid()
+                    . ', master_pid:' . $server->master_pid);
             } else {
-                self::logInfo("Task Worker($workerId) started " . ', pid:' . getmypid());
+                $psType = ProcessType::TASK_WORKER;
+                self::logInfo("Task Worker($workerId) started " . ', pid:' . getmypid()
+                    . ', master_pid:' . $server->master_pid);
             }
+
+            $wServer->addPid('worker-' . $workerId, getmypid(), $psType);
         });
 
-        $wServer->addEventCallback('ManagerStart', function ($server) use ($wServer) {
+        $wServer->addEventCallback('ManagerStart', function (Server $server) use ($wServer) {
+            posix_setpgid(getmypid(), $server->master_pid);
+            $wServer->addPid('manager', getmypid(), ProcessType::MANAGER);
+
             /** @var IdleCheckRegistry $idleCheck */
             $idleCheck = $wServer->getAppCtx()->beanByClass(IdleCheckRegistry::class);
             $idleCheck->initialize();
-            self::logInfo("Http Manager started " . ', pid:' . getmypid());
+            self::logInfo("Http Manager started " . ', pid:' . getmypid()
+                . ', master_pid:' . $server->master_pid);
         });
 
         $wServer->addEventCallback('PipeMessage', function (Server $server, $srcWorkerId, $data) {
@@ -154,7 +180,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         for ($workerId = 1; $workerId <= $executor->getPoolSize(); $workerId++) {
             $queueManager->addQueueStoreDefault($workerId);
             $asyncPs = new AsyncWorkerProcess($wServer, $appCtx, $executor, $workerId);
-            $wServer->getServer()->addProcess($asyncPs);
+            $wServer->addProcess($asyncPs);
         }
     }
 
@@ -179,7 +205,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
 
         for ($workerId = 1; $workerId <= $executor->getPoolSize(); $workerId++) {
             $schPs = new ScheduleWorkerProcess($wServer, $appCtx, $executor, $workerId);
-            $wServer->getServer()->addProcess($schPs);
+            $wServer->addProcess($schPs);
         }
 
         $this->buildScheduledRegistry($executor);
@@ -282,7 +308,7 @@ EOQ;
         );
 
         $kvPs = new KvServerProcess($wServer, $this->applicationContext, $config);
-        $wServer->getServer()->addProcess($kvPs);
+        $wServer->addProcess($kvPs);
     }
 
     protected function buildQueueStore(WinterServer $wServer): void {
@@ -308,7 +334,7 @@ EOQ;
         );
 
         $ps = new QueueServerProcess($wServer, $this->applicationContext, $config);
-        $wServer->getServer()->addProcess($ps);
+        $wServer->addProcess($ps);
     }
 
 }

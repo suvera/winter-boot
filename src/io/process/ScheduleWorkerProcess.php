@@ -41,8 +41,17 @@ class ScheduleWorkerProcess extends ServerWorkerProcess {
         return $this->workerId;
     }
 
+    public function getProcessType(): int {
+        return ProcessType::SCHED_WORKER;
+    }
+
+    public function getProcessId(): string {
+        return 'sched-' . $this->workerId;
+    }
+
     protected function run(): void {
         self::logInfo("Scheduling sch-worker-$this->workerId has started successfully! " . getmypid());
+        
         while (1) {
             $this->executor->executeAll($this->workerId);
             \Co\System::sleep(0.2); //200000);

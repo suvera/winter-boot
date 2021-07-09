@@ -16,8 +16,7 @@
   ],
   "autoload": {
     "psr-4": {
-      "dev\\winterframework\\": "src/",
-      "test\\winterframework\\": "srcTest/"
+      "dev\\winterframework\\": "src/"
     }
   },
   "minimum-stability": "dev",
@@ -29,12 +28,12 @@
   ],
   "require": {
     "symfony/yaml": "5.x-dev",
-    "phpunit/phpunit": "10.0.x-dev",
     "monolog/monolog": "2.x-dev",
     "theorchard/monolog-cascade": "0.5.x-dev",
     "swoole/ide-helper": "@dev",
     "lastguest/murmurhash": "dev-master",
     "ramsey/uuid": "4.x-dev",
-    "promphp/prometheus_client_php": "^2.2"
+    "promphp/prometheus_client_php": "^2.2",
+    "vanilla/garden-cli": "dev-master"
   }
 }

@@ -7,8 +7,6 @@ use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\stereotype\Module;
 
 interface ApplicationContext {
-    const FACTORY_BEAN_PREFIX = "&";
-
     public function getId(): string;
 
     public function getApplicationName(): string;

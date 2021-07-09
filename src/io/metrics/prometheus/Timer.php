@@ -14,6 +14,15 @@ class Timer {
         $this->time = microtime(true);
     }
 
+    public function getName(): string {
+        return $this->name;
+    }
+
+    public function setName(string $name): self {
+        $this->name = $name;
+        return $this;
+    }
+
     public function stop(array $labels = []): void {
         $this->registry->observe($this->name, (microtime(true) - $this->time), $labels);
     }

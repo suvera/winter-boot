@@ -36,13 +36,23 @@ abstract class ServerWorkerProcess extends Process implements AttachableProcess 
         return $this->process;
     }
 
+    abstract public function getProcessType(): int;
+
+    abstract public function getProcessId(): string;
+
     public function __invoke(Process $me): void {
         $this->process = $me;
+
+        posix_setpgid(getmypid(), $this->wServer->getServer()->master_pid);
+
+        $this->wServer->addPid($this->getProcessId(), getmypid(), $this->getProcessType());
 
         /**
          * This is needed to run Timer to check idle connections
          */
         \Co\run(function () {
+            WinterServer::registerProcessSignals();
+
             /** @var IdleCheckRegistry $idleCheck */
             $idleCheck = $this->appCtx->beanByClass(IdleCheckRegistry::class);
             $idleCheck->initialize();

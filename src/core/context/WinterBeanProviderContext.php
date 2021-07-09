@@ -457,24 +457,28 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         $autoValue->getRefOwner()->setAccessible(true);
 
         $ymlName = substr($autoValue->name, 2, -1);
+        $val = null;
+
         if ($this->ctxData->getPropertyContext()->has($ymlName)) {
-
             $val = $this->ctxData->getPropertyContext()->get($ymlName);
+        }
 
-        } else if (isset($autoValue->defaultValue)) {
+        if (is_null($val)) {
+            if (isset($autoValue->defaultValue)) {
 
-            $val = TypeCast::parseValue($autoValue->getTargetType(), $ymlName);
+                $val = TypeCast::parseValue($autoValue->getTargetType(), $autoValue->defaultValue);
 
-        } else if (!$autoValue->getRefOwner()->hasDefaultValue()) {
+            } else if (!$autoValue->isNullable()) {
 
-            throw new WinterException('Could not find config property #[Value] "'
-                . $autoValue->name
-                . '", so, Could not instantiate object for class '
-                . get_class($bean)
-            );
+                throw new WinterException('Could not find config property #[Value] "'
+                    . $autoValue->name
+                    . '", so, Could not instantiate object for class '
+                    . get_class($bean)
+                );
 
-        } else {
-            return;
+            } else {
+                return;
+            }
         }
 
         if ($autoValue->isTargetStatic()) {

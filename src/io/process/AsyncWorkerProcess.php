@@ -34,7 +34,16 @@ class AsyncWorkerProcess extends ServerWorkerProcess {
         return $this->workerId;
     }
 
+    public function getProcessType(): int {
+        return ProcessType::ASYNC_WORKER;
+    }
+
+    public function getProcessId(): string {
+        return 'async-' . $this->workerId;
+    }
+
     protected function run(): void {
+
         self::logInfo("Async async-worker-$this->workerId has started successfully! " . getmypid());
         while (1) {
             $this->executor->executeAll($this->workerId);

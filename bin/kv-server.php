@@ -22,6 +22,10 @@ if (!is_int($port) || !$port || $port < 1 || $port > 65535) {
 
 $address = (isset($lines[1]) && $lines[1]) ? $lines[1] : '127.0.0.1';
 $token = (isset($lines[2])) ? $lines[2] : '';
+$pgId = (isset($lines[3])) ? $lines[3] : 0;
+if ($pgId) {
+    posix_setpgid(getmypid(), intval($pgId));
+}
 
 $kv = new KvServer(
     $token,
