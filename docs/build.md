@@ -87,7 +87,7 @@ Create a new Phing target,  name it with ex: **phar**
 
     <WinterPhar
         destfile="target/phar/${buildFileName}.phar"
-        basedir="../"
+        basedir="./"
     >
         <!-- Service Start-Up script, see example: https://github.com/suvera/winter-tests/tree/master/examples/MyApp/bin -->
         <Stub name="service" scriptPath="bin/service.php"/>
