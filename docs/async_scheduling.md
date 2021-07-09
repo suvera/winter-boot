@@ -122,5 +122,5 @@ winter:
 
 ## Example
 
-Check out the example application [MyApp](../examples/)
+Check out the example application [MyApp](https://github.com/suvera/winter-tests/tree/master/examples)
 
