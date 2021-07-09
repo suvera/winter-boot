@@ -15,6 +15,7 @@ require_once(__DIR__ . '/RpmScriptlet.php');
 require_once(__DIR__ . '/RpmDefine.php');
 require_once(__DIR__ . '/RmdirTask.php');
 require_once(__DIR__ . '/InitDFile.php');
+require_once(__DIR__ . '/WinterPharTask.php');
 
 class RpmBuildTask extends Task {
 

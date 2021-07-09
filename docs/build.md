@@ -1,0 +1,189 @@
+# Build & Deployment
+
+Framework supports **[Phing](https://www.phing.info/)** build system
+
+- Phing Version >= 3.0.0
+
+- Download **Phar** file from [https://github.com/phingofficial/phing/releases/](https://github.com/phingofficial/phing/releases/)
+
+- Copy Phar file to
+```shell
+cp phing-3.0.0-RC2.phar /usr/local/bin/
+```
+- Create symlink to bin directory
+
+```shell
+ln -s /usr/local/bin/phing-3.0.0-RC2.phar /usr/bin/phing
+```
+
+- Now **phing** command should work!
+
+
+#### Supported Features
+
+1. Phar binary support for your micro-service
+2. RPM binary support
+3. init.d script support
+
+
+## Phing
+
+#### build.properties
+
+```text
+app.id=example-service
+app.version=1.0.0
+app.release=DEV
+app.name=My Example Micro-Service
+app.group=Development/Services
+app.summary=My Example Application
+app.url=https://www.your.url
+app.license=Your License
+
+company.name=Example Company
+```
+
+
+#### build.xml
+
+in **build.xml**, add following code
+
+```xml
+<property file="build.properties"/>
+
+<!-- This is mandatory -->
+<includepath classpath="./vendor/winter-boot/build/phing"/>
+
+<property name="buildFileName" value="${app.id}-${app.version}-${app.release}"/>
+
+
+<!-- Add Winter Phing Tasks -->
+<taskdef name="RpmBuild" classname="RpmBuildTask"/>
+<taskdef name="WinterPhar" classname="WinterPharTask"/>
+<taskdef name="Rmdir" classname="RmdirTask"/>
+
+```
+
+
+### Phar binary
+
+Create a new Phing target,  name it with ex: **phar**
+
+```xml
+<fileset dir="." id="phpSources" defaultexcludes="true">
+    <include name="src/**"/>
+    <include name="vendor/**"/>
+
+    <exclude name="**/vendor/phpunit/**"/>
+    <exclude name="**/vendor/sebastian/**"/>
+    <exclude name="**/.git/**"/>
+    <exclude name="**/.github/**"/>
+</fileset>
+
+<target name="phar" description="Build Phar file">
+    <echo>Building PHAR ...</echo>
+
+    <mkdir dir="target/phar"/>
+
+    <WinterPhar
+        destfile="target/phar/${buildFileName}.phar"
+        basedir="../"
+    >
+        <!-- Service Start-Up script, see example: https://github.com/suvera/winter-tests/tree/master/examples/MyApp/bin -->
+        <Stub name="service" scriptPath="bin/service.php"/>
+
+        <fileset refid="phpSources"/>
+        
+        <metadata>
+            <element name="version" value="${app.version}"/>
+            <element name="authors">
+                <element name="${company.name}"/>
+            </element>
+        </metadata>
+    </WinterPhar>
+    
+    <echo>PHAR Generated!</echo>
+</target>
+
+```
+
+To generate Phar, run below command
+
+```shell
+phing phar
+```
+
+
+### RPM binary
+
+Create a new Phing target,  name it with ex: **rpm**
+
+```xml
+<target name="rpm" description="Build RPM" depends="phar">
+    <echo>Building RPM ...</echo>
+
+    <mkdir dir="target/scripts"/>
+    <mkdir dir="target/rpm"/>
+
+    <RpmBuild
+        topDir="target/rpm"
+        name="${app.id}"
+        version="${app.version}"
+        release="${app.release}"
+        group="${app.group}"
+        distribution=""
+        license="${app.license}"
+        url="${app.url}"
+        summary="${app.summary}"
+        defaultDirmode="755"
+        defaultFilemode="644"
+        defaultUsername="root"
+        defaultGroupname="root"
+    >
+
+        <!-- to generate init.d script -->
+        <InitDFile
+            destFile="target/scripts/${app.id}"
+            serviceName="${app.id}"
+            appBinary="/usr/local/${app.id}/${buildFileName}.phar"
+            configDir="/etc/${app.id}"
+            adminPort="9091"
+            adminTokenFile=""
+            logFile="/var/log/${app.id}.log"
+            pidFile="/var/run/${app.id}.pid"
+            username="root"
+            installDir="/etc/init.d"
+        />
+
+        <RpmFile localFile="target/phar/${buildFileName}.phar" installDir="/usr/local/${app.id}"/>
+    </RpmBuild>
+</target>
+```
+
+
+To generate RPM, run below command
+
+```shell
+phing rpm
+```
+
+
+RPM file will be generated in the folders **target/rpm/RPMS/**
+
+- Installing RPM will also install phar file as mentioned in above tasks
+- Installing RPM will also install init.d script
+- Start service with init.d script
+
+```shell
+
+/etc/init.d/example-service start
+
+/etc/init.d/example-service stop
+
+/etc/init.d/example-service status
+
+/etc/init.d/example-service restart
+
+```
+
+

@@ -34,10 +34,10 @@ use function Ramsey\Uuid\v4;
 class WinterWebSwooleApplication extends WinterApplicationRunner implements WinterApplication {
 
     protected WinterWebSwooleContext $webContext;
-    protected SwooleAppArguments $args;
+    protected WinterCliArguments $args;
 
     public function __construct() {
-        $this->args = new SwooleAppArguments();
+        $this->args = new WinterCliArguments();
         $configDir = $this->args->get('configDir', null);
         if ($configDir) {
             $this->configDir = $configDir;

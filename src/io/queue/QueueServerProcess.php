@@ -53,8 +53,17 @@ class QueueServerProcess extends MonitoringServerProcess {
     }
 
     protected function run(): void {
-        $cmd = $this->config->getPhpBinary() . ' '
-            . dirname(dirname(dirname(__DIR__))) . '/bin/queue-server.php';
+
+        $phar = \Phar::running(false);
+
+        if ($phar) {
+            $scriptPath = $phar . ' -s "queue-server"';
+        } else {
+            $scriptPath = dirname(dirname(dirname(__DIR__))) . '/bin/queue-server.php';
+        }
+
+        $cmd = $this->config->getPhpBinary() . ' ' . $scriptPath;
+        self::logInfo($cmd);
 
         $lineArgs = [
             $this->config->getPort(),

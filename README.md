@@ -159,3 +159,32 @@ This framework can be extended even further by using
 - Create a new module by extending [WinterModule](src/core/app/WinterModule.php)
 - Check the existing module for more infornation.
 
+
+# Build & Deployment
+
+Framework Support **[Phing](https://www.phing.info/)** build system
+
+- Phing Version >= 3.0.0
+
+- Download **Phar** file from [https://github.com/phingofficial/phing/releases/](https://github.com/phingofficial/phing/releases/)
+
+- Copy Phar file to 
+```shell
+cp phing-3.0.0-RC2.phar /usr/local/bin/
+```
+- Create symlink to bin directory
+
+```shell
+ln -s /usr/local/bin/phing-3.0.0-RC2.phar /usr/bin/phing
+```
+
+- Now **phing** command should work!
+
+
+### How to build service
+
+- Phar binary support for your micro-service
+- RPM binary support
+- init.d script support
+
+Go through this document **[Building Service](docs/build.md)**

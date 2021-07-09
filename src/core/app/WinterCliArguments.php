@@ -6,7 +6,7 @@ namespace dev\winterframework\core\app;
 use Garden\Cli\Args;
 use Garden\Cli\Cli;
 
-class SwooleAppArguments {
+class WinterCliArguments {
     protected Args $args;
 
     /**
@@ -16,7 +16,8 @@ class SwooleAppArguments {
         $cli = new Cli();
 
         $cli->description('Service arguments')
-            ->opt('configDir:c', 'Config directory.', false);
+            ->opt('configDir:c', 'Config directory.', false)
+            ->opt('stub:s', 'Stub name to execute', false);
 
         $this->args = $cli->parse($_SERVER['argv'], true);
     }
