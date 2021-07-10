@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use dev\winterframework\io\queue\QueueServer;
 
-$dir = dirname(dirname(__DIR__));
+$dir = dirname(dirname(dirname(__DIR__)));
 require_once($dir . '/autoload.php');
 
 $stdin = fopen("php://stdin", 'r');
