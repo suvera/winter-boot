@@ -119,25 +119,8 @@ pecl install redis
 
 
 ## composer.json
-Add following repositories into **composer.json**
 
-```json
-
-"repositories": [
-    {
-        "type": "vcs",
-        "url": "https://github.com/suvera/winter-boot"
-    },
-    {
-        "type": "vcs",
-        "url": "https://github.com/suvera/winter-modules"
-    }
-]
-
-
-```
-
-Now install framework with below commands
+Install framework with composer
 
 ```shell
 

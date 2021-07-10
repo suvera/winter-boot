@@ -3,7 +3,9 @@
     "description": "Winter Boot Framework",
     "type": "library",
     "keywords": [
-        "php8 framework"
+        "php8 framework",
+        "winter-boot",
+        "winterboot"
     ],
     "homepage": "https://suvera.github.io/",
     "config": {
