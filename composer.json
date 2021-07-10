@@ -1,39 +1,40 @@
 {
-  "name": "suvera/winter-boot",
-  "description": "Winter Boot Framework",
-  "type": "library",
-  "config": {
-    "platform": {
-      "php": "8.0"
+    "name": "suvera/winter-boot",
+    "description": "Winter Boot Framework",
+    "type": "library",
+    "keywords": "php8 framework",
+    "homepage": "https://suvera.github.io/",
+    "config": {
+        "platform": {
+            "php": "8.0"
+        }
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Suvera"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "dev\\winterframework\\": "src/"
+        }
+    },
+    "minimum-stability": "dev",
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/suvera/monolog-cascade"
+        }
+    ],
+    "require": {
+        "symfony/yaml": "5.x-dev",
+        "monolog/monolog": "2.x-dev",
+        "theorchard/monolog-cascade": "0.5.x-dev",
+        "swoole/ide-helper": "@dev",
+        "lastguest/murmurhash": "dev-master",
+        "ramsey/uuid": "4.x-dev",
+        "promphp/prometheus_client_php": "^2.2",
+        "vanilla/garden-cli": "dev-master"
     }
-  },
-  "license": "Apache",
-  "authors": [
-    {
-      "name": "Suvera",
-      "email": "rana.ram@gmail.com"
-    }
-  ],
-  "autoload": {
-    "psr-4": {
-      "dev\\winterframework\\": "src/"
-    }
-  },
-  "minimum-stability": "dev",
-  "repositories": [
-    {
-      "type": "vcs",
-      "url": "https://github.com/suvera/monolog-cascade"
-    }
-  ],
-  "require": {
-    "symfony/yaml": "5.x-dev",
-    "monolog/monolog": "2.x-dev",
-    "theorchard/monolog-cascade": "0.5.x-dev",
-    "swoole/ide-helper": "@dev",
-    "lastguest/murmurhash": "dev-master",
-    "ramsey/uuid": "4.x-dev",
-    "promphp/prometheus_client_php": "^2.2",
-    "vanilla/garden-cli": "dev-master"
-  }
 }
