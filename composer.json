@@ -2,7 +2,9 @@
     "name": "suvera/winter-boot",
     "description": "Winter Boot Framework",
     "type": "library",
-    "keywords": "php8 framework",
+    "keywords": [
+        "php8 framework"
+    ],
     "homepage": "https://suvera.github.io/",
     "config": {
         "platform": {
@@ -15,6 +17,9 @@
             "name": "Suvera"
         }
     ],
+    "support": {
+        "issues": "https://github.com/suvera/winter-boot/issues"
+    },
     "autoload": {
         "psr-4": {
             "dev\\winterframework\\": "src/"
