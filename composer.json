@@ -29,10 +29,6 @@
     },
     "minimum-stability": "dev",
     "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/suvera/monolog-cascade"
-        }
     ],
     "require": {
         "symfony/yaml": "5.4.x-dev",
