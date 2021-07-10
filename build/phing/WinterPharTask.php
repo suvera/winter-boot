@@ -319,18 +319,10 @@ class WinterPharTask extends MatchingTask {
 
         $code = '<?php' . PHP_EOL;
 
-        $winterRelDir = str_replace($this->buildBaseDir, '', $this->winterDir);
-        $winterRelDir = str_replace('\\', '/', $winterRelDir);
-        $winterRelDir = trim($winterRelDir, '/');
-
-        if ($winterRelDir) {
-            $winterRelDir = '/' . $winterRelDir;
-        }
-
         $code .= <<<EOQ
 use dev\winterframework\core\app\WinterCliArguments;
 
-require_once(__DIR__ . '$winterRelDir/vendor/autoload.php');
+require_once(__DIR__ . '/vendor/autoload.php');
 
 \$cli = new WinterCliArguments();
 

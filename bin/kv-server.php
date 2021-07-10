@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 use dev\winterframework\io\kv\KvServer;
 
-$dir = dirname(__DIR__);
-require_once($dir . '/vendor/autoload.php');
+require_once(__DIR__ . '/../vendor/autoload.php');
 
 $stdin = fopen("php://stdin", 'r');
 $lines = [];
