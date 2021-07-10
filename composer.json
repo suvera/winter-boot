@@ -37,7 +37,7 @@
     "require": {
         "symfony/yaml": "5.4.x-dev",
         "monolog/monolog": "2.x-dev",
-        "theorchard/monolog-cascade": "0.5.x-dev",
+        "suvera/monolog-cascade": "0.5.x-dev",
         "swoole/ide-helper": "@dev",
         "lastguest/murmurhash": "dev-master",
         "ramsey/uuid": "4.x-dev",
