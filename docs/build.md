@@ -52,7 +52,7 @@ in **build.xml**, add following code
 <property file="build.properties"/>
 
 <!-- This is mandatory -->
-<includepath classpath="./vendor/winter-boot/build/phing"/>
+<includepath classpath="./vendor/suvera/winter-boot/build/phing"/>
 
 <property name="buildFileName" value="${app.id}-${app.version}-${app.release}"/>
 

@@ -64,16 +64,12 @@ curl "http://localhost/api/v2/users" -d "name=Abc&email=mail"
 
 ```
 
-# Example Application
+# Example Micro-service
 
-
-Check out the example application here [MyApp](https://github.com/suvera/winter-tests/tree/master/examples)
+Check out the example application here [example-service](https://github.com/suvera/winter-example-service)
 
 
 # Documentation
-
-
-Documentation
 
 - [StereoTypes & Dependency Injection](docs/dependency_stereo_types.md)
 - [Configuration](docs/configuration.md)
@@ -88,10 +84,11 @@ Documentation
 - [Json and XML](docs/json_xml.md)
 - [Async and Scheduling support](docs/async_scheduling.md)
 - [Shared In-Memory Stores](docs/local_store.md)
+- [Building Service](docs/build.md)
+
 
 
 # Installation
-
 
 1) Install PHP 8.0 (or greater)
 
@@ -118,7 +115,7 @@ pecl install redis
 
 
 
-## composer.json
+## Composer
 
 Install framework with composer
 
