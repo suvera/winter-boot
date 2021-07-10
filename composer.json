@@ -35,7 +35,7 @@
         }
     ],
     "require": {
-        "symfony/yaml": "5.x-dev",
+        "symfony/yaml": "5.4.x-dev",
         "monolog/monolog": "2.x-dev",
         "theorchard/monolog-cascade": "0.5.x-dev",
         "swoole/ide-helper": "@dev",
