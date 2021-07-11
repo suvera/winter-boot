@@ -137,7 +137,7 @@ This framework can be extended even further by using
 ## How to create new module
 
 - Create a new module by extending [WinterModule](src/core/app/WinterModule.php)
-- Check the existing module for more infornation.
+- Check the existing module for more information.
 
 
 # Build & Deployment

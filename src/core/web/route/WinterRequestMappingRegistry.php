@@ -3,11 +3,9 @@ declare(strict_types=1);
 
 namespace dev\winterframework\core\web\route;
 
-use dev\winterframework\core\apc\ApcCache;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\core\web\MatchedRequestMapping;
-use dev\winterframework\enums\Winter;
 use dev\winterframework\exception\DuplicatePathException;
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\MethodResource;
@@ -50,29 +48,8 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
         private ApplicationContextData $ctxData,
         private ApplicationContext $appCtx
     ) {
-        $key = $this->ctxData->getBootApp()->getClass()->getName() . '.reqMap';
-        if (ApcCache::isEnabled()) {
-            if (ApcCache::exists($key)
-                && !$this->ctxData->getPropertyContext()->getBool('winter.route.cacheDisabled', false)
-            ) {
-                list(self::$byId, self::$byRegex, self::$byUriMethod, self::$fullTextIndex)
-                    = ApcCache::get($key);
-            }
-        }
         if (empty(self::$byId)) {
             $this->processResources();
-        }
-
-        if (ApcCache::isEnabled()) {
-            $ttl = $this->ctxData->getPropertyContext()->getInt(
-                'winter.route.cacheTime',
-                Winter::ROUTE_CACHE_TTL
-            );
-            ApcCache::cache(
-                $key,
-                [self::$byId, self::$byRegex, self::$byUriMethod, self::$fullTextIndex],
-                $ttl > 0 ? $ttl : Winter::ROUTE_CACHE_TTL
-            );
         }
     }
 
@@ -240,7 +217,7 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
                         && $regex[0] === '/'
                         && preg_match($regex, $part, $newMatches)
                     ) {
-                        $textIndex = $textIndex[$regex];
+                        $textIndex = $others;
                         $matches = array_merge($matches, $newMatches);
                         $found = true;
                         break;
@@ -269,7 +246,7 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
         $path = trim($path, '/');
 
         if (isset(self::$cachedPaths[$path])) {
-            foreach (self::$cachedPaths[$path] as $method => $def) {
+            foreach (self::$cachedPaths[$path] as $def) {
                 unset(self::$byRegex[$def['regex']]);
             }
 

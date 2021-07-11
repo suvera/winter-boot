@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace dev\winterframework\core\app;
 
 use Cascade\Cascade;
-use dev\winterframework\core\apc\ApcCache;
 use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\core\context\PropertyContext;
 use dev\winterframework\core\context\ShutDownRegistry;
 use dev\winterframework\core\context\WinterApplicationContext;
 use dev\winterframework\core\context\WinterPropertyContext;
 use dev\winterframework\core\web\config\InterceptorRegistry;
-use dev\winterframework\enums\Winter;
 use dev\winterframework\exception\NotWinterApplicationException;
 use dev\winterframework\exception\WinterException;
 use dev\winterframework\io\file\DirectoryScanner;
@@ -175,16 +173,6 @@ abstract class WinterApplicationRunner {
     }
 
     private function scanAppNamespaces(): void {
-        $key = $this->bootApp->getClass()->getName() . '.resources';
-        if (ApcCache::isEnabled()) {
-            //ApcCache::delete($key);
-            if (ApcCache::exists($key)
-                && !$this->propertyCtx->getBool('winter.namespaces.cacheDisabled', false)) {
-                $this->resources = ApcCache::get($key);
-                $this->attributesToScan = ApcCache::get($key . '.attrs');
-            }
-        }
-
         if (!isset($this->resources)) {
             $this->initModules();
 
@@ -196,18 +184,8 @@ abstract class WinterApplicationRunner {
                 $this->bootConfig->autoload,
                 $this->bootConfig->scanExcludeNamespaces
             );
-            //print_r($this->resources);
-
-            if (ApcCache::isEnabled()) {
-                $ttl = $this->propertyCtx->getInt(
-                    'winter.namespaces.cacheTime',
-                    Winter::NAMESPACE_CACHE_TTL
-                );
-                ApcCache::cache($key, $this->resources, $ttl > 0 ? $ttl : Winter::NAMESPACE_CACHE_TTL);
-                ApcCache::cache($key . '.attrs', $this->attributesToScan,
-                    $ttl > 0 ? $ttl : Winter::NAMESPACE_CACHE_TTL);
-            }
         }
+
         //print_r($this->resources);
     }
 
