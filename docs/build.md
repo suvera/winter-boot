@@ -89,8 +89,8 @@ Create a new Phing target,  name it with ex: **phar**
         destfile="target/phar/${buildFileName}.phar"
         basedir="./"
     >
-        <!-- Service Start-Up script, see example: https://github.com/suvera/winter-tests/tree/master/examples/MyApp/bin -->
-        <Stub name="service" scriptPath="bin/service.php"/>
+        <!-- Service Start-Up script, see example: https://github.com/suvera/winter-example-service/tree/master/bin -->
+        <Stub name="service" scriptPath="bin/example-service.php"/>
 
         <fileset refid="phpSources"/>
         
@@ -186,4 +186,6 @@ RPM file will be generated in the folders **target/rpm/RPMS/**
 
 ```
 
+
+See example [build.xml](https://github.com/suvera/winter-example-service)
 
