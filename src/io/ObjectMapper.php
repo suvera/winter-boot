@@ -16,7 +16,7 @@ interface ObjectMapper {
 
     public function readValueFromFile(FileStream|File $file, string $class, bool $validate = false): object;
 
-    public function writeValueToFile(object $object, FileStream|File $file): void;
+    public function writeValueToFile(object $object, string $filePath): void;
 
     public function writeValue(object $object): string;
 }

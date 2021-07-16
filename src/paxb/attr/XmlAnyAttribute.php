@@ -48,7 +48,7 @@ class XmlAnyAttribute implements XmlStereoType {
 
         $this->cannotBeStaticProperty($ref, 'XmlAnyAttribute');
         $this->assertParameterIsArray($ref->getDelegate(), 'XmlAnyAttribute');
-
+        
         $this->cannotBeCombinedWith(
             $ref,
             'XmlAnyAttribute',

@@ -22,10 +22,17 @@ class XmlBeanAnnotations {
         return $this->classResource;
     }
 
+    /**
+     * @return XmlBeanAnnotation[][]
+     */
     public function getAttributes(): array {
         return $this->attributes;
     }
 
+    /**
+     * @param string $className
+     * @return XmlBeanAnnotation[]
+     */
     public function getAttributesBy(string $className): array {
         return $this->attributes[$className] ?? [];
     }

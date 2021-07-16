@@ -7,9 +7,11 @@ use dev\winterframework\io\file\File;
 use dev\winterframework\io\file\FileStream;
 use dev\winterframework\io\file\InMemoryFileSystem;
 use dev\winterframework\io\ObjectMapper;
+use dev\winterframework\paxb\bind\ObjectToXmlWriter;
 use dev\winterframework\paxb\bind\XmlReaderObjectCreator;
 use dev\winterframework\paxb\bind\XmlSchemaCreator;
 use XMLReader;
+use XMLWriter;
 
 class XmlObjectMapper implements ObjectMapper {
 
@@ -148,14 +150,30 @@ class XmlObjectMapper implements ObjectMapper {
         return $creator->create($validate);
     }
 
+    public function writeValueToFile(object $object, string $filePath): void {
+        $writer = new XMLWriter();
+        $writer->openURI($filePath);
+        $writer->setIndent(true);
+        $writer->startDocument("1.0", 'UTF-8');
 
-    public function writeValueToFile(object $object, FileStream|File $file): void {
-        // TODO:
+        $w = new ObjectToXmlWriter($writer, $object);
+        $w->create();
+
+        $writer->endDocument();
+        $writer->flush();
     }
 
     public function writeValue(object $object): string {
-        // TODO:
-        return '';
+        $writer = new XMLWriter();
+        $writer->openMemory();
+        $writer->setIndent(true);
+        $writer->startDocument("1.0", 'UTF-8');
+
+        $w = new ObjectToXmlWriter($writer, $object);
+        $w->create();
+
+        $writer->endDocument();
+        return $writer->outputMemory();
     }
 
 }

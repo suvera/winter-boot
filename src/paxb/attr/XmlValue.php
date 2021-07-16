@@ -25,7 +25,8 @@ class XmlValue implements XmlStereoType {
 
     public function __construct(
         protected string $valueAdapter = '',
-        protected array $filters = []
+        protected array $filters = [],
+        protected bool $cData = false
     ) {
         if ($this->valueAdapter) {
             $this->validateValueAdapter($this->valueAdapter, 'XmlValue');
@@ -34,6 +35,10 @@ class XmlValue implements XmlStereoType {
 
     public function getFilters(): array {
         return $this->filters;
+    }
+
+    public function isCData(): bool {
+        return $this->cData;
     }
 
     public function getValueAdapter(): string {
