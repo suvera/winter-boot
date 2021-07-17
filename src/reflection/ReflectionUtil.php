@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace dev\winterframework\reflection;
 
 use dev\winterframework\exception\AnnotationException;
+use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ref\ReflectionAbstract;
+use dev\winterframework\reflection\support\ParameterType;
 use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionFunction;
@@ -192,5 +194,28 @@ class ReflectionUtil {
             throw new AnnotationException('Could not build Annotation object '
                 . $attribute->getName(), 0, $e);
         }
+    }
+
+    public static function classToPropertiesTemplate(string $clsName, array &$seen = []): array {
+        $ref = RefKlass::getInstance($clsName);
+        $props = $ref->getProperties(~ReflectionProperty::IS_STATIC);
+        $arr = [];
+        foreach ($props as $prop) {
+            $type = ParameterType::fromType($prop->getType());
+            if ($type->isDateTimeType()
+                || $type->isBuiltin()
+                || $type->isUnionType()
+                || $type->isNoType()
+                || $type->isVoidType()
+                || $type->isMixedType()
+                || isset($seen[$prop->getName()])
+            ) {
+                $arr[$prop->getName()] = $type->getName();
+            } else {
+                $seen[$prop->getName()] = true;
+                $arr[$prop->getName()] = self::classToPropertiesTemplate($type->getName(), $seen);
+            }
+        }
+        return $arr;
     }
 }

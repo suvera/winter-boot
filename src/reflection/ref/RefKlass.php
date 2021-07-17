@@ -7,6 +7,7 @@ namespace dev\winterframework\reflection\ref;
 use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionMethod;
+use ReflectionProperty;
 
 /**
  * @method string __toString()
@@ -26,7 +27,7 @@ use ReflectionMethod;
  * @method ReflectionMethod[] getMethods(int $filter = null)
  * @method bool hasProperty(string $name)
  * @method mixed getProperty(string $name)
- * @method mixed getProperties(int $filter = null)
+ * @method ReflectionProperty[] getProperties(int $filter = null)
  * @method bool hasConstant(string $name)
  * @method mixed getConstants(int $filter = null)
  * @method mixed getReflectionConstants(int $filter = null)

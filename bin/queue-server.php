@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 use dev\winterframework\io\queue\QueueServer;
 
-$dir = dirname(dirname(dirname(__DIR__)));
+if (isset($_SERVER['WINTER_VENDOR_HOME'])) {
+    $dir = $_SERVER['WINTER_VENDOR_HOME'];
+} else {
+    $dir = dirname(dirname(dirname(__DIR__)));
+}
 require_once($dir . '/autoload.php');
 
 $stdin = fopen("php://stdin", 'r');

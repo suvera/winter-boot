@@ -12,7 +12,11 @@ use dev\winterframework\core\System;
 use dev\winterframework\core\web\DispatcherServlet;
 use dev\winterframework\core\web\route\RequestMappingRegistry;
 use dev\winterframework\io\metrics\prometheus\PrometheusMetricRegistry;
+use dev\winterframework\reflection\ReflectionUtil;
+use dev\winterframework\reflection\support\ParameterType;
 use dev\winterframework\stereotype\RestController;
+use dev\winterframework\stereotype\web\RequestMapping;
+use dev\winterframework\stereotype\web\RequestParam;
 use dev\winterframework\web\http\ResponseEntity;
 use dev\winterframework\web\MediaType;
 use Prometheus\RenderTextFormat;
@@ -102,7 +106,49 @@ class DefaultActuatorController implements ActuatorController {
 
         $result = $this->requestMapping->getAll();
 
-        $resp->setBody($result);
+        $arr = [];
+        foreach ($result as $mapping) {
+            /** @var RequestMapping $mapping */
+            if ($mapping->isRestController()) {
+                continue;
+            }
+
+            $reqBody = $mapping->getRequestBody();
+            $bodyType = null;
+            if ($reqBody) {
+                $bodyType = $reqBody->getVariableType();
+                if ($bodyType !== 'string') {
+                    $bodyType = ReflectionUtil::classToPropertiesTemplate($bodyType);
+                }
+            }
+            $reqParams = $mapping->getRequestParams();
+            $params = [];
+            foreach ($reqParams as $reqParam) {
+                /** @var RequestParam $reqParam */
+                $params[$reqParam->name] = implode('|', $reqParam->getVariableType()->getNames());
+            }
+
+            $retType = ParameterType::fromType($mapping->getRefOwner()->getReturnType());
+
+            foreach ($mapping->getUriPaths() as $uriPath) {
+                $normalized = $uriPath->getRaw();
+
+                $arr[] = [
+                    'path' => $normalized,
+                    'method' => array_values($mapping->method),
+                    'name' => $mapping->name,
+                    'consumes' => $mapping->consumes,
+                    'produces' => $mapping->produces,
+                    'request' => [
+                        'body' => $bodyType,
+                        'params' => $params
+                    ],
+                    'response' => implode('|', $retType->getNames())
+                ];
+            }
+        }
+
+        $resp->setBody($arr);
         return $resp;
     }
 

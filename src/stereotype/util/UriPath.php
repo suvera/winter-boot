@@ -36,4 +36,13 @@ class UriPath extends ArrayList {
             }, $this->values)
         );
     }
+
+    public function getRaw(): string {
+        return implode(
+            '/',
+            array_map(function (UriPathPart $p) {
+                return $p->getPart();
+            }, $this->values)
+        );
+    }
 }

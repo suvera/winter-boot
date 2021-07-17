@@ -24,6 +24,8 @@ class ParameterType {
      */
     private array $unionTypes = [];
 
+    private array $names = [];
+
     public function __construct(
         private string $name,
         private bool $allowsNull,
@@ -51,7 +53,9 @@ class ParameterType {
     }
 
     public static function fromNamedType(ReflectionNamedType $type): ParameterType {
-        return new ParameterType($type->getName(), $type->allowsNull(), $type->isBuiltin());
+        $obj = new ParameterType($type->getName(), $type->allowsNull(), $type->isBuiltin());
+        $obj->names[] = $type->getName();
+        return $obj;
     }
 
     public static function fromUnionType(ReflectionUnionType $type): ParameterType {
@@ -63,6 +67,8 @@ class ParameterType {
                 $primary = $typeObj;
             }
             $primary->unionTypes[] = $typeObj;
+            $primary->names[] = $typeObj->getName();
+
             if ($subType->allowsNull()) {
                 $primary->allowsNull = true;
             }
@@ -79,6 +85,10 @@ class ParameterType {
         return $this->name == '';
     }
 
+    public function isMixedType(): bool {
+        return $this->name == 'mixed';
+    }
+
     public function isVoidType(): bool {
         return strtolower($this->name) == 'void';
     }
@@ -93,6 +103,10 @@ class ParameterType {
 
     public function getName(): string {
         return $this->name;
+    }
+
+    public function getNames(): array {
+        return $this->names;
     }
 
     public function hasType(string $type): bool {

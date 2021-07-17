@@ -162,7 +162,7 @@ class RequestMapping implements StereoType {
     }
 
     public function getRequestBody(): ?RequestBody {
-        return isset($this->requestBody) ? $this->requestBody : null;
+        return $this->requestBody ?? null;
     }
 
     public function isRestController(): bool {
