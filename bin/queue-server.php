@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use dev\winterframework\io\queue\QueueServer;
 
-if (isset($_SERVER['WINTER_VENDOR_HOME'])) {
+if (isset($_SERVER['WINTER_VENDOR_HOME']) && $_SERVER['WINTER_VENDOR_HOME']) {
     $dir = $_SERVER['WINTER_VENDOR_HOME'];
 } else {
     $dir = dirname(dirname(dirname(__DIR__)));

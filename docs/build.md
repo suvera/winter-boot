@@ -86,8 +86,13 @@ Create a new Phing target,  name it with ex: **phar**
     <mkdir dir="target/phar"/>
 
     <WinterPhar
-        destfile="target/phar/${buildFileName}.phar"
         basedir="./"
+        topDir="target/phar"
+        name="${app.id}"
+        version="${app.version}"
+        release="${app.release}"
+        summary="${app.summary}"
+        outFileProperty="phar.Filename"
     >
         <!-- Service Start-Up script, see example: https://github.com/suvera/winter-example-service/tree/master/bin -->
         <Stub name="service" scriptPath="bin/example-service.php"/>
@@ -145,7 +150,7 @@ Create a new Phing target,  name it with ex: **rpm**
         <InitDFile
             destFile="target/scripts/${app.id}"
             serviceName="${app.id}"
-            appBinary="/usr/local/${app.id}/${buildFileName}.phar"
+            appBinary="/usr/local/${app.id}/${phar.Filename}.phar"
             configDir="/etc/${app.id}"
             adminPort="9091"
             adminTokenFile=""
@@ -155,7 +160,7 @@ Create a new Phing target,  name it with ex: **rpm**
             installDir="/etc/init.d"
         />
 
-        <RpmFile localFile="target/phar/${buildFileName}.phar" installDir="/usr/local/${app.id}"/>
+        <RpmFile localFile="target/phar/${phar.Filename}.phar" installDir="/usr/local/${app.id}"/>
     </RpmBuild>
 </target>
 ```

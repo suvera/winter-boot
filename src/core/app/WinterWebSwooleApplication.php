@@ -262,8 +262,8 @@ EOQ;
         $labels = [
             '${winterBoot.name}' => 'Winter Boot',
             '${winterBoot.version}' => $this->getBootVersion(),
-            '${app.name}' => $this->propertyCtx->getStr('winter.application.name', ''),
-            '${app.version}' => $this->propertyCtx->getStr('winter.application.version', ''),
+            '${app.name}' => $this->applicationContext->getApplicationName(),
+            '${app.version}' => $this->applicationContext->getApplicationVersion(),
             '${php.name}' => 'PHP',
             '${php.version}' => phpversion() . ', ' . php_sapi_name(),
         ];

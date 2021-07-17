@@ -19,7 +19,13 @@ class WinterPharTask extends MatchingTask {
     protected string $winterDir;
     protected string $buildBaseDir;
 
-    protected File $destinationFile;
+    protected string $name;
+    protected string $version;
+    protected string $release = '';
+    protected string $summary = '';
+    protected string $outFileProperty = 'phar.Filename';
+
+    protected File $topDir;
     protected int $compression = Phar::NONE;
     protected File $baseDirectory;
     protected File $key;
@@ -29,6 +35,45 @@ class WinterPharTask extends MatchingTask {
     protected PharMetadata $metadata;
     protected string $alias;
 
+    public function getName(): string {
+        return $this->name;
+    }
+
+    public function setName(string $name): void {
+        $this->name = $name;
+    }
+
+    public function getVersion(): string {
+        return $this->version;
+    }
+
+    public function setVersion(string $version): void {
+        $this->version = $version;
+    }
+
+    public function getRelease(): string {
+        return $this->release;
+    }
+
+    public function setRelease(string $release): void {
+        $this->release = $release;
+    }
+
+    public function getSummary(): string {
+        return $this->summary;
+    }
+
+    public function setSummary(string $summary): void {
+        $this->summary = $summary;
+    }
+
+    public function getOutFileProperty(): string {
+        return $this->outFileProperty;
+    }
+
+    public function setOutFileProperty(string $outFileProperty): void {
+        $this->outFileProperty = $outFileProperty;
+    }
 
     /**
      * @throws
@@ -123,11 +168,12 @@ class WinterPharTask extends MatchingTask {
         return '';
     }
 
-    /**
-     * Destination (output) file.
-     */
-    public function setDestFile(File $destinationFile): void {
-        $this->destinationFile = $destinationFile;
+    public function getTopDir(): ?File {
+        return $this->topDir;
+    }
+
+    public function setTopDir(File $topDir): void {
+        $this->topDir = $topDir;
     }
 
     /**
@@ -171,17 +217,28 @@ class WinterPharTask extends MatchingTask {
     protected function build(): void {
         $this->checkPreconditions();
 
+        $fileName = $this->name
+            . '-' . $this->version
+            . ($this->release ? '-' . $this->release : '');
+        $baseFile = $this->topDir->getAbsolutePath()
+            . DIRECTORY_SEPARATOR
+            . $fileName;
+
+        $pharFile = $baseFile . '.phar';
+
+        $this->project->setNewProperty($this->outFileProperty, $fileName);
+
         try {
             $this->log(
-                'Building package: ' . $this->destinationFile->__toString()
+                'Building package: ' . $pharFile
             );
 
             // Delete old package, if exists.
-            if ($this->destinationFile->exists()) {
-                $this->destinationFile->delete();
+            if (file_exists($pharFile)) {
+                unlink($pharFile);
             }
 
-            $phar = $this->buildPhar();
+            $phar = $this->buildPhar($pharFile);
             $phar->startBuffering();
 
             $baseDirectory = realpath($this->baseDirectory->getPath());
@@ -222,7 +279,7 @@ class WinterPharTask extends MatchingTask {
                 // Get the details so we can get the public key and write that out
                 // alongside the phar.
                 $details = openssl_pkey_get_details($private);
-                file_put_contents($this->destinationFile . '.pubkey', $details['key']);
+                file_put_contents($baseFile . '.pubkey', $details['key']);
             } else {
                 $phar->setSignatureAlgorithm($this->signatureAlgorithm);
             }
@@ -251,16 +308,16 @@ class WinterPharTask extends MatchingTask {
             );
         }
 
-        if (null === $this->destinationFile) {
-            throw new BuildException('destfile attribute must be set!', $this->getLocation());
+        if (null === $this->topDir) {
+            throw new BuildException('topDir attribute must be set!', $this->getLocation());
         }
 
-        if ($this->destinationFile->exists() && $this->destinationFile->isDirectory()) {
-            throw new BuildException('destfile is a directory!', $this->getLocation());
+        if ($this->topDir->exists() && !$this->topDir->isDirectory()) {
+            throw new BuildException('topDir is NOT a directory!', $this->topDir->getAbsolutePath());
         }
 
-        if (!$this->destinationFile->canWrite()) {
-            throw new BuildException('Can not write to the specified destfile!', $this->getLocation());
+        if (!$this->topDir->canWrite()) {
+            throw new BuildException('Can not write to the specified topDir!', $this->topDir->getAbsolutePath());
         }
         if (null !== $this->baseDirectory) {
             if (!$this->baseDirectory->exists()) {
@@ -295,8 +352,8 @@ class WinterPharTask extends MatchingTask {
     /**
      * Build and configure Phar object.
      */
-    private function buildPhar(): Phar {
-        $phar = new Phar($this->destinationFile->getAbsolutePath());
+    private function buildPhar(string $pharFile): Phar {
+        $phar = new Phar($pharFile);
 
         $this->buildBootUp($phar);
 
@@ -319,15 +376,27 @@ class WinterPharTask extends MatchingTask {
 
         $code = '<?php' . PHP_EOL;
 
+        $name = var_export($this->name, true);
+        $version = $this->version . '' . ($this->release ? '-' . $this->release : '');
+        $version = var_export($version, true);
+        $release = var_export($this->release, true);
+
         $code .= <<<EOQ
 use dev\winterframework\core\app\WinterCliArguments;
+
+\$GLOBALS['winter.application.id'] = $name;
+\$GLOBALS['winter.application.version'] = $version;
+\$GLOBALS['winter.application.release'] = $release;
 
 require_once(__DIR__ . '/vendor/autoload.php');
 
 \$cli = new WinterCliArguments();
 
-
 EOQ;
+
+        if ($this->summary) {
+            $code .= "\$GLOBALS['winter.application.name'] = " . var_export($this->summary, true) . ";\n\n";
+        }
 
         $default = '';
         $stubs = [];

@@ -11,6 +11,8 @@ interface ApplicationContext {
 
     public function getApplicationName(): string;
 
+    public function getApplicationVersion(): string;
+
     public function getStartupDate(): int;
 
     public function beanByName(string $name): mixed;
