@@ -55,6 +55,10 @@ class WinterServer {
         $this->pidManager->addPid($id, $pid, $psType);
     }
 
+    public function getPidManager(): ServerPidManager {
+        return $this->pidManager;
+    }
+
     public function getAppCtx(): ApplicationContext {
         return $this->appCtx;
     }
@@ -162,30 +166,6 @@ class WinterServer {
     }
 
     public static function registerProcessSignals(): void {
-
-        if (self::$processSignalsRegistered) {
-            return;
-        }
-
-        self::$processSignalsRegistered = true;
-
-        /*
-        Process::signal(SIGTERM, function () {
-            WinterServer::onProcessSignal(SIGTERM);
-        });
-        Process::signal(SIGKILL, function () {
-            WinterServer::onProcessSignal(SIGKILL);
-        });
-        Process::signal(SIGINT, function () {
-            WinterServer::onProcessSignal(SIGINT);
-        });
-        Process::signal(SIGQUIT, function () {
-            WinterServer::onProcessSignal(SIGQUIT);
-        });
-        Process::signal(SIGHUP, function () {
-            WinterServer::onProcessSignal(SIGHUP);
-        });
-        */
     }
 
     public function shutdown(string $message = null, Throwable $ex = null): void {

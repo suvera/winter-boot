@@ -51,7 +51,6 @@ abstract class ServerWorkerProcess extends Process implements AttachableProcess 
          * This is needed to run Timer to check idle connections
          */
         \Co\run(function () {
-            WinterServer::registerProcessSignals();
 
             /** @var IdleCheckRegistry $idleCheck */
             $idleCheck = $this->appCtx->beanByClass(IdleCheckRegistry::class);

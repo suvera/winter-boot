@@ -24,6 +24,10 @@ class ServerPidManager {
         $this->pidTable = $table;
     }
 
+    public function getPidTable(): Table {
+        return $this->pidTable;
+    }
+
     public function addPid(string $id, int $pid, int $psType): void {
         $this->pidTable[$id] = ['pid' => $pid, 'type' => $psType];
     }

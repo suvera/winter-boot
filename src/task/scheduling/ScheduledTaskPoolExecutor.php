@@ -5,13 +5,13 @@ namespace dev\winterframework\task\scheduling;
 
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\core\context\WinterServer;
+use dev\winterframework\exception\SchedulingTaskException;
 use dev\winterframework\stereotype\Autowired;
 use dev\winterframework\stereotype\Component;
 use dev\winterframework\stereotype\Value;
 use dev\winterframework\task\TaskPoolExecutor;
 use dev\winterframework\task\TaskPoolExecutorTrait;
 use dev\winterframework\util\log\Wlf4p;
-use Swoole\Process;
 use Throwable;
 
 #[Component]
@@ -47,6 +47,10 @@ class ScheduledTaskPoolExecutor implements TaskPoolExecutor {
         $nextRun = time();
         if ($initialDelay > 0) {
             $nextRun += $initialDelay;
+        }
+
+        if (!isset($tables[$workerId])) {
+            throw new SchedulingTaskException('Could not find Shared Table for Scheduling worker ' . $workerId);
         }
 
         $id = $tables[$workerId]->insert([

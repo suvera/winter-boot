@@ -44,6 +44,16 @@ class ActuatorEndPoints {
             'path' => 'prometheus',
             'handler' => 'getPrometheus'
         ],
+        'management.endpoint.scheduledtasks' => [
+            'enabled' => false,
+            'path' => 'scheduledtasks',
+            'handler' => 'getScheduledTasks'
+        ],
+        'management.endpoint.heapdump' => [
+            'enabled' => false,
+            'path' => 'heapdump',
+            'handler' => 'getHeapDump'
+        ],
     ];
 
     public static function getFormattedEndPoints(): array {

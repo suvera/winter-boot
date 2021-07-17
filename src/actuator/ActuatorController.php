@@ -19,4 +19,8 @@ interface ActuatorController {
     public function getMappings(): ResponseEntity;
 
     public function getPrometheus(): ResponseEntity;
+
+    public function getScheduledTasks(): ResponseEntity;
+
+    public function getHeapDump(): ResponseEntity;
 }

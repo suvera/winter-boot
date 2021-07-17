@@ -8,10 +8,12 @@ use dev\winterframework\actuator\stereotype\InfoInformer;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\core\context\WinterBeanProviderContext;
+use dev\winterframework\core\context\WinterServer;
 use dev\winterframework\core\System;
 use dev\winterframework\core\web\DispatcherServlet;
 use dev\winterframework\core\web\route\RequestMappingRegistry;
 use dev\winterframework\io\metrics\prometheus\PrometheusMetricRegistry;
+use dev\winterframework\io\process\ProcessUtil;
 use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\reflection\support\ParameterType;
 use dev\winterframework\stereotype\RestController;
@@ -148,7 +150,10 @@ class DefaultActuatorController implements ActuatorController {
             }
         }
 
-        $resp->setBody($arr);
+        $resp->setBody([
+            'total' => count($arr),
+            'mappings' => $arr
+        ]);
         return $resp;
     }
 
@@ -161,5 +166,84 @@ class DefaultActuatorController implements ActuatorController {
         $resp->setBody($reg->getFormatted());
         return $resp;
     }
+
+    public function getScheduledTasks(): ResponseEntity {
+        $resp = ResponseEntity::ok()->withContentType(MediaType::APPLICATION_JSON);
+        /** @var WinterServer $wServer */
+        $wServer = $this->appCtx->beanByClass(WinterServer::class);
+
+        $tables = $wServer->getScheduledTables();
+        $arr = [];
+
+        foreach ($tables as $workerId => $table) {
+
+            foreach ($table as $id => $row) {
+                $bucket = 'custom';
+                $interval = 0;
+                if ($row['fixedDelay'] > 0) {
+                    $bucket = 'fixedDelay';
+                    $interval = $row['fixedDelay'];
+                } else if ($row['fixedRate'] > 0) {
+                    $bucket = 'fixedRate';
+                    $interval = $row['fixedRate'];
+                }
+                if (!isset($arr[$bucket])) {
+                    $arr[$bucket] = [];
+                }
+
+                $arr[$bucket][] = [
+                    'runnable' => [
+                        'target' => $row['className'],
+                        'method' => $row['methodName']
+                    ],
+                    'initialDelay' => [],
+                    'interval' => $interval,
+                    'lastRun' => $row['lastRun'],
+                    'nextRun' => $row['nextRun'],
+                    'inProgress' => $row['inProgress'],
+                    'id' => $id,
+                    'workerId' => $workerId
+                ];
+            }
+        }
+
+        $resp->setBody($arr ?: '{}');
+        return $resp;
+    }
+
+    public function getHeapDump(): ResponseEntity {
+        $resp = ResponseEntity::ok()->withContentType(MediaType::APPLICATION_JSON);
+        /** @var WinterServer $wServer */
+        $wServer = $this->appCtx->beanByClass(WinterServer::class);
+
+        $table = $wServer->getPidManager()->getPidTable();
+        $arr = [];
+
+        foreach ($table as $id => $row) {
+
+            $bucket = ProcessUtil::getProcessTypeName($row['type']);
+            $pid = intval($row['pid']);
+
+            if (!isset($arr[$bucket])) {
+                $arr[$bucket] = [];
+            }
+
+            $info = [
+                'pid' => $pid,
+                'winterId' => $id
+            ];
+
+            $pi = ProcessUtil::getPidInfo($pid);
+            if ($pi) {
+                $info = array_merge($info, $pi->getArray());
+            }
+
+            $arr[$bucket][] = $info;
+        }
+
+        $resp->setBody($arr ?: '{}');
+        return $resp;
+    }
+
 
 }
