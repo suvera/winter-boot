@@ -259,11 +259,14 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
 EOQ;
         }
 
+        $appName = $GLOBALS['winter.application.name'] ?? $this->propertyCtx->getStr('winter.application.name', '');
+        $appVersion = $GLOBALS['winter.application.version'] ?? $this->propertyCtx->getStr('winter.application.version', '');
+
         $labels = [
             '${winterBoot.name}' => 'Winter Boot',
             '${winterBoot.version}' => $this->getBootVersion(),
-            '${app.name}' => $this->applicationContext->getApplicationName(),
-            '${app.version}' => $this->applicationContext->getApplicationVersion(),
+            '${app.name}' => $appName,
+            '${app.version}' => $appVersion,
             '${php.name}' => 'PHP',
             '${php.version}' => phpversion() . ', ' . php_sapi_name(),
         ];
