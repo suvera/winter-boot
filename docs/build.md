@@ -34,7 +34,6 @@ ln -s /usr/local/bin/phing-3.0.0-RC2.phar /usr/bin/phing
 app.id=example-service
 app.version=1.0.0
 app.release=DEV
-app.name=My Example Micro-Service
 app.group=Development/Services
 app.summary=My Example Application
 app.url=https://www.your.url

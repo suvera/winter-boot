@@ -49,7 +49,11 @@ abstract class ServerWorkerProcess extends Process implements AttachableProcess 
 
         $this->wServer->addPid($this->getProcessId(), getmypid(), $this->getProcessType());
 
-        \Co::set(['hook_flags' => SWOOLE_HOOK_FILE]);
+        \Co::set([
+            'hook_flags' => SWOOLE_HOOK_FILE | SWOOLE_HOOK_SLEEP | SWOOLE_HOOK_TCP
+                | SWOOLE_HOOK_SSL | SWOOLE_HOOK_STREAM_FUNCTION | SWOOLE_HOOK_TLS | SWOOLE_HOOK_SOCKETS
+                | SWOOLE_HOOK_UDP | SWOOLE_HOOK_UNIX | SWOOLE_HOOK_UDG | SWOOLE_HOOK_PROC
+        ]);
 
         /**
          * This is needed to run Timer to check idle connections

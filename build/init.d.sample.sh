@@ -23,7 +23,7 @@ ADMIN_TOKEN_FILE="<<adminTokenFile>>"
 LOG_FILE="<<logFile>>"
 PID_FILE="<<pidFile>>"
 PHP_BINARY="<<phpBinary>>"
-CMD_OPTIONS=" $SERVICE "
+CMD_OPTIONS=" $SERVICE -c $CONFIG_DIR "
 WAIT_COUNTDOWN=30
 
 if [ -f "/etc/init.d/functions" ]; then
