@@ -7,12 +7,10 @@ use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\core\context\WinterServer;
 use dev\winterframework\core\context\WinterTable;
 use dev\winterframework\task\scheduling\ScheduledTaskPoolExecutor;
-use dev\winterframework\util\log\Wlf4p;
 use Swoole\Atomic;
 use Swoole\Table;
 
 class ScheduleWorkerProcess extends ServerWorkerProcess {
-    use Wlf4p;
 
     protected ScheduledTaskPoolExecutor $executor;
     protected string|int $workerId;
@@ -51,7 +49,7 @@ class ScheduleWorkerProcess extends ServerWorkerProcess {
 
     protected function run(): void {
         self::logInfo("Scheduling sch-worker-$this->workerId has started successfully! " . getmypid());
-        
+
         while (1) {
             $this->executor->executeAll($this->workerId);
             \Co\System::sleep(0.2); //200000);

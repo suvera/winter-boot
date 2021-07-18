@@ -7,10 +7,8 @@ namespace dev\winterframework\io\process;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\core\context\WinterServer;
 use dev\winterframework\task\async\AsyncTaskPoolExecutor;
-use dev\winterframework\util\log\Wlf4p;
 
 class AsyncWorkerProcess extends ServerWorkerProcess {
-    use Wlf4p;
 
     protected AsyncTaskPoolExecutor $executor;
     protected string|int $workerId;

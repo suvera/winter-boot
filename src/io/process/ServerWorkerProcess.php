@@ -6,9 +6,11 @@ namespace dev\winterframework\io\process;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\core\context\WinterServer;
 use dev\winterframework\io\timer\IdleCheckRegistry;
+use dev\winterframework\util\log\Wlf4p;
 use Swoole\Process;
 
 abstract class ServerWorkerProcess extends Process implements AttachableProcess {
+    use Wlf4p;
 
     protected WinterServer $wServer;
     protected ApplicationContext $appCtx;
@@ -46,6 +48,8 @@ abstract class ServerWorkerProcess extends Process implements AttachableProcess 
         posix_setpgid(getmypid(), $this->wServer->getServer()->master_pid);
 
         $this->wServer->addPid($this->getProcessId(), getmypid(), $this->getProcessType());
+
+        \Co::set(['hook_flags' => SWOOLE_HOOK_FILE]);
 
         /**
          * This is needed to run Timer to check idle connections

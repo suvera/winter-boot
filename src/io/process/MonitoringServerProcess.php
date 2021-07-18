@@ -3,10 +3,7 @@ declare(strict_types=1);
 
 namespace dev\winterframework\io\process;
 
-use dev\winterframework\util\log\Wlf4p;
-
 abstract class MonitoringServerProcess extends ServerWorkerProcess {
-    use Wlf4p;
 
     /**
      * @var resource[]
