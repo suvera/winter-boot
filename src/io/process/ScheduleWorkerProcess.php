@@ -6,9 +6,9 @@ namespace dev\winterframework\io\process;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\core\context\WinterServer;
 use dev\winterframework\core\context\WinterTable;
+use dev\winterframework\io\shm\ShmTable;
 use dev\winterframework\task\scheduling\ScheduledTaskPoolExecutor;
 use Swoole\Atomic;
-use Swoole\Table;
 
 class ScheduleWorkerProcess extends ServerWorkerProcess {
 
@@ -59,16 +59,19 @@ class ScheduleWorkerProcess extends ServerWorkerProcess {
     protected function createWorkQueue(): WinterTable {
         $capacity = $this->executor->getQueueCapacity();
 
-        $table = new Table($capacity);
-        $table->column('className', Table::TYPE_STRING, 128);
-        $table->column('methodName', Table::TYPE_STRING, 64);
-        $table->column('nextRun', Table::TYPE_INT);
-        $table->column('fixedDelay', Table::TYPE_INT);
-        $table->column('fixedRate', Table::TYPE_INT);
-        $table->column('initialDelay', Table::TYPE_INT);
-        $table->column('inProgress', Table::TYPE_INT);
-        $table->column('lastRun', Table::TYPE_INT);
-        $table->create();
+        $table = new ShmTable(
+            $capacity,
+            [
+                ['className', ShmTable::TYPE_STRING, 128],
+                ['methodName', ShmTable::TYPE_STRING, 64],
+                ['nextRun', ShmTable::TYPE_INT],
+                ['fixedDelay', ShmTable::TYPE_INT],
+                ['fixedRate', ShmTable::TYPE_INT],
+                ['initialDelay', ShmTable::TYPE_INT],
+                ['inProgress', ShmTable::TYPE_INT],
+                ['lastRun', ShmTable::TYPE_INT]
+            ]
+        );
 
         self::logInfo("Shared Scheduling Table Capacity: $capacity, Memory: "
             . $table->getMemorySize() . ' bytes');

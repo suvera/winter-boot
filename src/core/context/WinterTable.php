@@ -3,23 +3,23 @@ declare(strict_types=1);
 
 namespace dev\winterframework\core\context;
 
+use dev\winterframework\io\shm\ShmTable;
 use Swoole\Atomic;
-use Swoole\Table;
 
 class WinterTable {
-    private Table $table;
+    private ShmTable $table;
     private Atomic $counter;
 
-    public function __construct(Table $table, Atomic $counter) {
+    public function __construct(ShmTable $table, Atomic $counter) {
         $this->table = $table;
         $this->counter = $counter;
     }
 
-    public function getTable(): Table {
+    public function getTable(): ShmTable {
         return $this->table;
     }
 
-    public function setTable(Table $table): WinterTable {
+    public function setTable(ShmTable $table): WinterTable {
         $this->table = $table;
         return $this;
     }
@@ -46,6 +46,5 @@ class WinterTable {
         $this->counter = $counter;
         return $this;
     }
-
 
 }

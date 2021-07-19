@@ -4,27 +4,28 @@ declare(strict_types=1);
 namespace dev\winterframework\io\server;
 
 use dev\winterframework\core\context\ApplicationContext;
+use dev\winterframework\io\shm\ShmTable;
 use dev\winterframework\util\log\Wlf4p;
 use Swoole\Process;
-use Swoole\Table;
 
 class ServerPidManager {
     use Wlf4p;
 
-    private Table $pidTable;
+    private ShmTable $pidTable;
 
     public function __construct(
         protected ApplicationContext $ctx
     ) {
-        $table = new Table(1024);
-        $table->column('pid', Table::TYPE_INT);
-        $table->column('type', Table::TYPE_INT);
-        $table->create();
-
-        $this->pidTable = $table;
+        $this->pidTable = new ShmTable(
+            1024,
+            [
+                ['pid', ShmTable::TYPE_INT],
+                ['type', ShmTable::TYPE_INT]
+            ]
+        );
     }
 
-    public function getPidTable(): Table {
+    public function getPidTable(): ShmTable {
         return $this->pidTable;
     }
 

@@ -77,7 +77,8 @@ class ScheduledTaskPoolExecutor implements TaskPoolExecutor {
                 continue;
             }
 
-            $database[$id]['inProgress'] = 1;
+            $database->put($id, ['inProgress' => 1]);
+
             go(function () use ($table, $id, $appCtx, $workerId) {
                 self::logInfo("Executing Scheduled task '$id' on sch-worker-$workerId ");
 
@@ -91,19 +92,25 @@ class ScheduledTaskPoolExecutor implements TaskPoolExecutor {
                 } catch (Throwable $e) {
                     self::logException($e);
                 }
+
                 $database = $table->getTable();
-                $database[$id]['inProgress'] = 0;
+                $set = [
+                    'inProgress' => 0
+                ];
 
                 if ($row['fixedDelay'] > 0) {
-                    $database[$id]['lastRun'] = time();
-                    $database[$id]['nextRun'] = time() + $row['fixedDelay'];
+                    $set['lastRun'] = time();
+                    $set['nextRun'] = time() + $row['fixedDelay'];
                     //self::logInfo("fixedDelay Scheduling $workerId, NextRun Updated: " . time() + $row['fixedDelay']);
                 }
+                $database->put($id, $set);
             });
 
             if ($row['fixedRate'] > 0) {
-                $database[$id]['lastRun'] = time();
-                $database[$id]['nextRun'] = time() + $row['fixedRate'];
+                $database->put($id, [
+                    'lastRun' => time(),
+                    'nextRun' => time() + $row['fixedRate']
+                ]);
                 //self::logInfo("fixedRate Scheduling $workerId, NextRun Updated: " . time() + $row['fixedDelay']);
             }
         }

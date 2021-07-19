@@ -4,14 +4,14 @@ declare(strict_types=1);
 namespace dev\winterframework\util\async;
 
 use dev\winterframework\core\context\ApplicationContext;
+use dev\winterframework\io\shm\ShmTable;
 use dev\winterframework\util\log\Wlf4p;
 use Swoole\Atomic;
-use Swoole\Table;
 
 class AsyncInMemoryQueue implements AsyncQueueStore {
     use Wlf4p;
 
-    private Table $table;
+    private ShmTable $table;
     private Atomic $counter;
 
     public function __construct(
@@ -22,17 +22,17 @@ class AsyncInMemoryQueue implements AsyncQueueStore {
     ) {
         $this->counter = new Atomic(1);
 
-        $table = new Table($this->capacity);
-        $table->column('timestamp', Table::TYPE_INT);
-        $table->column('workerId', Table::TYPE_INT);
-        $table->column('className', Table::TYPE_STRING, 128);
-        $table->column('methodName', Table::TYPE_STRING, 64);
-        $table->column('arguments', Table::TYPE_STRING, $argSize);
-        $table->create();
-
-        self::logInfo("Shared Async Table Capacity: $capacity, Memory: " . $table->getMemorySize() . ' bytes');
-
-        $this->table = $table;
+        $this->table = new ShmTable(
+            $this->capacity,
+            [
+                ['timestamp', ShmTable::TYPE_INT],
+                ['workerId', ShmTable::TYPE_INT],
+                ['className', ShmTable::TYPE_STRING, 128],
+                ['methodName', ShmTable::TYPE_STRING, 64],
+                ['arguments', ShmTable::TYPE_STRING, $argSize]
+            ]
+        );
+        self::logInfo("Shared Async Table Capacity: $capacity, Memory: " . $this->table->getMemorySize() . ' bytes');
     }
 
     public function enqueue(AsyncQueueRecord $record): int {
@@ -83,7 +83,7 @@ class AsyncInMemoryQueue implements AsyncQueueStore {
     }
 
     public function size(): int {
-        return $this->table->count();
+        return $this->table->getRowCount();
     }
 
 }

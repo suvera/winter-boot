@@ -169,7 +169,7 @@ class WinterServer {
     }
 
     public function shutdown(string $message = null, Throwable $ex = null): void {
-        $msg = '';
+        $msg = 'Shutting down the server ';
         if ($message) {
             $msg .= "$message\n";
         }
@@ -178,11 +178,8 @@ class WinterServer {
             $msg .= Debug::exceptionBacktrace($ex);
         }
 
-        $worker_id = 1 - $this->server->worker_id;
-        $this->server->sendMessage(
-            'json:' . json_encode(['cmd' => 'shutdown', 'message' => $msg]),
-            $worker_id
-        );
+        self::logError($msg);
+        $this->pidManager->killAll();
     }
 
 }
