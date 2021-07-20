@@ -310,7 +310,7 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
             $port = $this->getPropertyInt('winter.queue.port', 0);;
             if ($port > 0) {
                 $adapterClass = KvAdapter::class;
-            } else if (extension_loaded('apcu')) {
+            } else if (extension_loaded('apcu') && apcu_enabled()) {
                 $adapterClass = APC::class;
             } else {
                 $adapterClass = NoAdapter::class;
