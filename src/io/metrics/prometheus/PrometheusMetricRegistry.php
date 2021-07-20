@@ -45,7 +45,10 @@ class PrometheusMetricRegistry {
     protected function getRegistry(): void {
         if ($this->adapterBean) {
             $adapter = $this->ctx->beanByName($this->adapterBean);
-        } else if ($this->adapterClass === InMemory::class || $this->adapterClass === APC::class) {
+        } else if ($this->adapterClass === InMemory::class
+            || $this->adapterClass === APC::class
+            || $this->adapterClass === NoAdapter::class
+        ) {
             $cls = $this->adapterClass;
             $adapter = new $cls();
         } else {
