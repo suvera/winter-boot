@@ -32,6 +32,12 @@ management:
         mappings:
             enabled: true,
             path: "acme/mappings"
+        scheduledtasks:
+            enabled: true,
+            path: "acme/scheduledtasks"
+        heapdump:
+            enabled: true,
+            path: "acme/heapdump"
 ```
 
 Calling an endPoint

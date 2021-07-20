@@ -20,4 +20,29 @@ class ExceptionUtils {
         return false;
     }
 
+    public static function inExceptions(Throwable $exception, array $exceptionList): bool {
+        if (empty($exceptionList)) {
+            return false;
+        }
+        
+        $objects = [$exception];
+        $prev = $exception;
+        do {
+            $prev = $prev->getPrevious();
+            if ($prev == null) {
+                break;
+            }
+            $objects[] = $prev;
+        } while (1);
+
+        foreach ($exceptionList as $exCls) {
+            foreach ($objects as $exObj) {
+                if ($exObj instanceof $exCls) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
 }
