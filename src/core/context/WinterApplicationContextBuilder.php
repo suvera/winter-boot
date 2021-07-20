@@ -306,7 +306,7 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         );
 
         if (!$adapterBean && !$adapterClass) {
-            $port = $this->getPropertyInt('winter.queue.port', 0);;
+            $port = $this->getPropertyInt('winter.kv.port', 0);;
             if ($port > 0) {
                 $adapterClass = KvAdapter::class;
             } else {
