@@ -37,7 +37,6 @@ use dev\winterframework\stereotype\WinterBootApplication;
 use dev\winterframework\txn\PlatformTransactionManager;
 use dev\winterframework\util\concurrent\DefaultLockManager;
 use dev\winterframework\util\concurrent\LockManager;
-use Prometheus\Storage\APC;
 
 abstract class WinterApplicationContextBuilder implements ApplicationContext {
     protected BeanProviderContext $beanProvider;
@@ -310,8 +309,6 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
             $port = $this->getPropertyInt('winter.queue.port', 0);;
             if ($port > 0) {
                 $adapterClass = KvAdapter::class;
-            } else if (extension_loaded('apcu') && apcu_enabled()) {
-                $adapterClass = APC::class;
             } else {
                 $adapterClass = NoAdapter::class;
             }
