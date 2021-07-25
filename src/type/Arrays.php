@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace dev\winterframework\type;
 
+use TypeError;
+
 final class Arrays {
     public static array $EMPTY_ARRAY = [];
 
@@ -36,5 +38,11 @@ final class Arrays {
             }
         }
         return $result;
+    }
+
+    public static function assertKey(array $arr, string|int $key, string $msg): void {
+        if (!isset($arr[$key])) {
+            throw new TypeError("'$key' does not exist, " . $msg);
+        }
     }
 }

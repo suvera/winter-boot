@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace dev\winterframework\reflection;
 
 use dev\winterframework\exception\AnnotationException;
+use dev\winterframework\exception\MissingExtensionException;
 use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ref\ReflectionAbstract;
 use dev\winterframework\reflection\support\ParameterType;
@@ -217,5 +218,11 @@ class ReflectionUtil {
             }
         }
         return $arr;
+    }
+
+    public static function assertPhpExtension(string $extName): void {
+        if (!extension_loaded($extName)) {
+            throw new MissingExtensionException("KafkaModule requires *$extName* extension in PHP runtime");
+        }
     }
 }
