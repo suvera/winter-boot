@@ -27,5 +27,4 @@ final class YamlParser {
 
         return Arrays::flattenByKey($data);
     }
-
 }
