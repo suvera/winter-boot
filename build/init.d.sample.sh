@@ -137,7 +137,33 @@ start() {
         return 1;
     fi
 
+    TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
     green "[$TIMESTAMP] Started PID=$PID" | tee -a $LOG_FILE
+    echo "[$TIMESTAMP] Monitoring for $WAIT_COUNTDOWN seconds " | tee -a $LOG_FILE
+
+    counter=1
+    while [ `kill -0 $pid > /dev/null 2>&1 && echo 1` ]
+    do
+        if [ $counter -eq $WAIT_COUNTDOWN ]; then
+            break
+        fi
+        sleep 1
+        echo -e ".\c"
+
+        (( counter++ ))
+    done
+
+    TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
+    echo
+    if [ $counter -eq $WAIT_COUNTDOWN ]; then
+        green "[$TIMESTAMP] '${SERVICE_NAME}' started!" | tee -a $LOG_FILE
+    else
+        tail "$LOG_FILE"
+        echo
+        red "[$TIMESTAMP] ERROR: '${SERVICE_NAME}' failed to start, check error log $LOG_FILE" | tee -a $LOG_FILE
+        RET_VAL=1
+        return 1;
+    fi
 
     RET_VAL=0
     return 0;

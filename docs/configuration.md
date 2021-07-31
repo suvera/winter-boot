@@ -40,7 +40,7 @@ datasource:
         username:
         password:
         validationQuery: SELECT 'Databse Connected'
-        driverClass: dev\\winterframework\\pdbc\\pdo\\PdoDataSource
+        driverClass: dev\winterframework\pdbc\pdo\PdoDataSource
         connection:
             persistent: true
             errorMode: ERRMODE_EXCEPTION
