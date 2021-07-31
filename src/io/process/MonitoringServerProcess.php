@@ -50,6 +50,23 @@ abstract class MonitoringServerProcess extends ServerWorkerProcess {
             $status = proc_get_status($this->proc);
             if (isset($status['pid'])) {
                 $this->wServer->addPid($this->getChildProcessId(), intval($status['pid']), $this->getChildProcessType());
+                $childPids = ProcessUtil::getChildPids($status['pid']);
+
+                $i = 0;
+                foreach ($childPids as $pid) {
+                    if ($pid == $status['pid']) {
+                        continue;
+                    }
+                    $psId = $this->getChildProcessId() . '-' . ($i++);
+                    $info = ProcessUtil::getPidInfo($pid);
+                    if ($info) {
+                        self::logInfo(' #### **** Process started "' . $psId . '" pid:' . $pid
+                            . ', threads:' . $info->getThreads()
+                            . ' ' . $info->getName());
+                    }
+                    posix_setpgid($pid, $this->wServer->getServer()->master_pid);
+                    $this->wServer->addPid($psId, $pid, $this->getChildProcessType());
+                }
             }
 
             $this->onProcessStart();
@@ -91,7 +108,7 @@ abstract class MonitoringServerProcess extends ServerWorkerProcess {
                 $data = $this->readFromStream($stream);
                 foreach (explode("\n", $data) as $line) {
                     if ($line) {
-                        self::logDebug('KV: ' . $line);
+                        self::logDebug(' ' . $line);
                     }
                 }
 
@@ -100,7 +117,7 @@ abstract class MonitoringServerProcess extends ServerWorkerProcess {
                 $data = $this->readFromStream($stream);
                 foreach (explode("\n", $data) as $line) {
                     if ($line) {
-                        self::logError('KV: ' . $line);
+                        self::logError(' ' . $line);
                     }
                 }
 

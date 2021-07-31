@@ -46,6 +46,11 @@ loggers:
     myLogger:
         handlers: [ info_file_handler ]
         processors: [ web_processor ]
+        custom_level:
+            some\namepsace\SomeClass: DEBUG
+            another\namepsace\AnotherClass: ERROR
+            other\namespace: INFO
+            other\namespace\Class: NONE
 formatters:
     dashed:
         class: Monolog\Formatter\LineFormatter
@@ -70,6 +75,8 @@ processors:
 
 
 ```
+
+**custom_level** can be configured per class, to control the logging levels at class level. 
 
 More info about logging configuration can be found here [monolog-cascade](https://github.com/suvera/monolog-cascade)
 

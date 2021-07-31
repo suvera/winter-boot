@@ -25,7 +25,7 @@ final class LoggerManager {
 
     public static function getLogger(): MonoLogger {
         self::getInstance();
-        Wlf4p::$LOGGER = self::$instance->logger;
+        LogWrapper::$LOGGER = self::$instance->logger;
         return self::$instance->logger;
     }
 
@@ -36,9 +36,11 @@ final class LoggerManager {
         self::getInstance();
 
         $defaultName = null;
+        $customLevels = [];
         if (isset($data['loggers']) && is_array($data['loggers'])) {
             foreach ($data['loggers'] as $loggerName => $loggerOptions) {
                 $defaultName = $loggerName;
+                $customLevels = $loggerOptions['custom_level'] ?? [];
                 break;
             }
         }
@@ -46,7 +48,7 @@ final class LoggerManager {
         Cascade::fileConfig($data);
 
         self::$instance->logger = Cascade::getLogger($defaultName);
-        Wlf4p::$LOGGER = self::$instance->logger;
+        Wlf4p::setLogger(self::$instance->logger, $customLevels);
     }
 
     public function addHandler(HandlerInterface $handler): void {

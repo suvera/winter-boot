@@ -42,18 +42,25 @@ abstract class ServerWorkerProcess extends Process implements AttachableProcess 
 
     abstract public function getProcessId(): string;
 
+    protected function onProcessInvoke(): void {
+        // template
+    }
+
     public function __invoke(Process $me): void {
         $this->process = $me;
 
-        posix_setpgid(getmypid(), $this->wServer->getServer()->master_pid);
+        $myPid = getmypid();
 
-        $this->wServer->addPid($this->getProcessId(), getmypid(), $this->getProcessType());
+        posix_setpgid($myPid, $this->wServer->getServer()->master_pid);
+        $this->wServer->addPid($this->getProcessId(), $myPid, $this->getProcessType());
 
         \Co::set([
             'hook_flags' => SWOOLE_HOOK_FILE | SWOOLE_HOOK_SLEEP | SWOOLE_HOOK_TCP
                 | SWOOLE_HOOK_SSL | SWOOLE_HOOK_STREAM_FUNCTION | SWOOLE_HOOK_TLS | SWOOLE_HOOK_SOCKETS
                 | SWOOLE_HOOK_UDP | SWOOLE_HOOK_UNIX | SWOOLE_HOOK_UDG | SWOOLE_HOOK_PROC
         ]);
+
+        $this->onProcessInvoke();
 
         /**
          * This is needed to run Timer to check idle connections

@@ -64,15 +64,15 @@ curl "http://localhost/api/v2/users" -d "name=Abc&email=mail"
 
 ```
 
-# Example Micro-service
+# 1.  Example Micro-service
 
 Check out the example application here [example-service](https://github.com/suvera/winter-example-service)
 
-# Installation
+# 2. Installation
 
 1) Install PHP 8.0 (or greater)
 
-2) Install following extensions - they are optional but required for few features to work
+2) Install following extensions - they are optional but required advanced features to work
 
 - [Asynchronous functions](https://github.com/suvera/winter-boot/blob/master/docs/async_scheduling.md) #[Async] and #[Scheduled] to work, swoole extension needed.
     
@@ -109,23 +109,13 @@ composer require suvera/winter-modules
 
 You're Done!
 
-# Module Extensions
-
-This framework can be extended even further by using 
-**[https://github.com/suvera/winter-modules](https://github.com/suvera/winter-modules)**
-
-### How to create new module
-
-- Create a new module by extending [WinterModule](src/core/app/WinterModule.php)
-- Check the any existing module for reference **[winter-modules](https://github.com/suvera/winter-modules)**
-
-# Build & Deployment
+# 3. Build & Deployment
 
 Framework Support **[Phing](https://www.phing.info/)** build system
 
 Go through this document **[Building Service](docs/build.md)**
 
-# Documentation
+# 4. Documentation
 
 - [StereoTypes & Dependency Injection](docs/dependency_stereo_types.md)
 - [Configuration](docs/configuration.md)
@@ -141,9 +131,20 @@ Go through this document **[Building Service](docs/build.md)**
 - [Async and Scheduling support](docs/async_scheduling.md)
 - [Shared In-Memory Stores](docs/local_store.md)
 - [Building & Deployment](docs/build.md)
+
+# 5. Module Extensions
+
+This framework can be extended even further by using
+**[https://github.com/suvera/winter-modules](https://github.com/suvera/winter-modules)**
+
+### How to create new module
+
+Create a new module by extending [WinterModule](src/core/app/WinterModule.php). 
+Check below any existing module for reference
+
 - [Redis Module](https://github.com/suvera/winter-modules/tree/master/winter-data-redis)
 - [Apache Kafka Module](https://github.com/suvera/winter-modules/tree/master/winter-kafka)
 - [DTCE Module](https://github.com/suvera/winter-modules/tree/master/winter-dtce)
 - [S3 Module](https://github.com/suvera/winter-modules/tree/master/winter-s3)
-- [In-memory databases integrated](https://github.com/suvera/winter-memdb) - Apache Ignite, Redis Memcached, RocksDB, etc ... 
+- [Memdb Module](https://github.com/suvera/winter-memdb) - In-memory databases integrated, such as Apache Ignite, Redis, Memcached, RocksDB, etc ... 
 - Service Discovery - Consul, Netflix Eureka, etc...

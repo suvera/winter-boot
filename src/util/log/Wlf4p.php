@@ -8,7 +8,29 @@ use Monolog\Logger as MonoLogger;
 use Throwable;
 
 trait Wlf4p {
-    public static MonoLogger $LOGGER;
+
+    public static function setLogger(
+        MonoLogger $logger,
+        array $log_levels = []
+    ) {
+        LogWrapper::$LOGGER = $logger;
+        LogWrapper::$LOG_LEVELS = $log_levels;
+        LogWrapper::$LOG_LEVEL_NAMES = [];
+        LogWrapper::$LOG_CACHED_LEVELS = [];
+
+        if (!LogWrapper::$LOG_LEVEL_NAMES) {
+            LogWrapper::$LOG_LEVEL_NAMES = LoggerManager::getLogger()->getLevels();
+        }
+
+        foreach (LogWrapper::$LOG_LEVELS as $clsPath => $clsLevel) {
+            $clsLevel = strtoupper($clsLevel);
+            if ($clsLevel === 'NONE') {
+                LogWrapper::$LOG_CACHED_LEVELS[$clsPath] = PHP_INT_MAX;
+            } else {
+                LogWrapper::$LOG_CACHED_LEVELS[$clsPath] = LogWrapper::$LOG_LEVEL_NAMES[$clsLevel] ?? 0;
+            }
+        }
+    }
 
     public static function logEmergency(string $message, array $context = []) {
         self::logLog(MonoLogger::EMERGENCY, $message, $context);
@@ -54,7 +76,31 @@ trait Wlf4p {
     }
 
     public static function logLog(int $level, string $message, array $context = []) {
-        $cls = preg_replace('/([a-zA-Z_])\w*(\\\\|_)/', '${1}.', static::class) . ' ';
+        $clsName = static::class;
+
+        if (!isset(LogWrapper::$LOG_CACHED_LEVELS[$clsName])) {
+            LogWrapper::$LOG_CACHED_LEVELS[$clsName] = 0;
+
+            $longest = 0;
+            $lvl = 0;
+            foreach (LogWrapper::$LOG_LEVELS as $clsPath => $clsLevel) {
+                if (!str_starts_with($clsName, $clsPath)) {
+                    continue;
+                }
+                if ($longest < strlen($clsPath)) {
+                    $longest = strlen($clsPath);
+                    $lvl = LogWrapper::$LOG_CACHED_LEVELS[$clsPath];
+                }
+            }
+            LogWrapper::$LOG_CACHED_LEVELS[$clsName] = $lvl;
+        }
+
+        if ($level < LogWrapper::$LOG_CACHED_LEVELS[$clsName]) {
+            return;
+        }
+
+        /** @noinspection RegExpSingleCharAlternation */
+        $cls = preg_replace('/([a-zA-Z_])\w*(\\\\|_)/', '${1}.', $clsName) . ' ';
 
         LoggerManager::getLogger()->addRecord($level, $cls . $message, $context);
     }

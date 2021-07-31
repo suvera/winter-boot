@@ -89,4 +89,39 @@ class ProcessUtil {
 
         return $pi;
     }
+
+    public static function getChildPids(int|string $pid) : array {
+        $pid = intval($pid);
+        if ($pid <= 0) {
+            return [];
+        }
+
+        $path = "/proc/$pid/task/$pid/children";
+
+        $lines = file($path);
+        if ($lines === false) {
+            return [];
+        }
+
+        $list = [];
+        foreach ($lines as $line) {
+            $line = trim($line, '\0');
+            $pids = preg_split('/\s+/', $line);
+            foreach ($pids as $pd) {
+                $pd = intval($pd);
+                if ($pd > 0) {
+                    $list[] = $pd;
+                }
+            }
+        }
+
+        foreach (array_values($list) as $pd) {
+            $pids = self::getChildPids($pd);
+            if ($pids) {
+                $list = array_merge($list, $pids);
+            }
+        }
+
+        return $list;
+    }
 }

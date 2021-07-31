@@ -220,9 +220,23 @@ class ReflectionUtil {
         return $arr;
     }
 
+    public static function phpExtension(string $extName): bool {
+        return extension_loaded($extName);
+    }
+
     public static function assertPhpExtension(string $extName): void {
         if (!extension_loaded($extName)) {
-            throw new MissingExtensionException("KafkaModule requires *$extName* extension in PHP runtime");
+            throw new MissingExtensionException("missing *$extName* extension in PHP runtime");
         }
+    }
+
+    public static function assertPhpAnyExtension(array $extNames): void {
+        foreach ($extNames as $extName) {
+            if (extension_loaded($extName)) {
+                return;
+            }
+        }
+        throw new MissingExtensionException("Require one of [" . implode(', ', $extNames)
+            . "] extension in PHP runtime");
     }
 }
