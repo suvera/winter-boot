@@ -43,12 +43,14 @@ Annotating a method of a *service/component* bean with **#[Async]** will make it
 
 
 ```phpt
-
-#[Async]
-public function someAsyncMethodName(): void {
-    echo "method Executed asynchronously by " . getmypid();
+#[Service]
+class FooService {
+    
+    #[Async]
+    public function someAsyncMethodName(): void {
+        echo "method Executed asynchronously by " . getmypid();
+    }
 }
-
 ```
 
 ### Configuration
@@ -93,12 +95,14 @@ Annotating a method of a *service/component* bean with **#[Scheduled]** will mak
 
 
 ```phpt
+#[Component]
+class SomeScheduler {
 
-#[Scheduled(fixedDelay: 20, initialDelay: 10)]
-public function someScheduledMethodName(): void {
-    echo 'I generate a unique Id on every 20 seconds ' . uniqid();
+    #[Scheduled(fixedDelay: 20, initialDelay: 10)]
+    public function someScheduledMethodName(): void {
+        echo 'I generate a unique Id on every 20 seconds ' . uniqid();
+    }
 }
-
 ```
 
 
@@ -122,5 +126,5 @@ winter:
 
 ## Example
 
-Check out the example application [MyApp](https://github.com/suvera/winter-tests/tree/master/examples)
+Check out the example application [Example Service](https://github.com/suvera/winter-example-service)
 
