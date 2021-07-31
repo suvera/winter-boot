@@ -72,9 +72,7 @@ Check out the example application here [example-service](https://github.com/suve
 
 1) Install PHP 8.0 (or greater)
 
-2) Install following extensions - they are optional but required advanced features to work
-
-- [Asynchronous functions](https://github.com/suvera/winter-boot/blob/master/docs/async_scheduling.md) #[Async] and #[Scheduled] to work, swoole extension needed.
+2) [Asynchronous functions](https://github.com/suvera/winter-boot/blob/master/docs/async_scheduling.md) #[Async] and #[Scheduled] to work, `swoole` extension needed.
     
 ```shell
 pecl install swoole
