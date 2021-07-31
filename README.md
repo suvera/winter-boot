@@ -79,20 +79,6 @@ Check out the example application here [example-service](https://github.com/suve
 ```shell
 pecl install swoole
 ```
-    
-- Rdkafka extension is needed for  [Kafka module](https://github.com/suvera/winter-modules/tree/master/winter-kafka) to work
-
-```shell
-pecl install rdkafka
-```
-
-- Redis extension is needed for  [Redis module](https://github.com/suvera/winter-modules/tree/master/winter-redis) to work
-
-```shell
-pecl install redis
-```
-
-
 
 
 ## Composer
