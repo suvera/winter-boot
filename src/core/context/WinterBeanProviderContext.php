@@ -225,7 +225,7 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         $className = $aliasable->getName();
         $interfaces = $aliasable->getInterfaces();
 
-        if (substr($className, -4) == 'Impl') {
+        if (str_ends_with($className, 'Impl')) {
             foreach ($interfaces as $interface) {
                 $aliases[$interface->getName()] = $interface->getName();
             }
@@ -269,18 +269,17 @@ final class WinterBeanProviderContext implements BeanProviderContext {
     }
 
     public function beanByNameClass(string $name, string $class): ?object {
-        if (!isset($this->beanNameFactory[$name]) && !isset($this->beanClassFactory[$class])) {
-            throw new BeansException($class);
+        if (!isset($this->beanNameFactory[$name])) {
+            throw new BeansException($name);
         }
 
-        /** @noinspection PhpUnusedLocalVariableInspection */
-        foreach ($this->beanClassFactory[$class] as $beanClass => $resource) {
-            if ($this->beanNameFactory[$name]->equals($resource)) {
-                return $this->getInstance($resource);
-            }
+        $obj = $this->getInstance($this->beanNameFactory[$name]);
+
+        if (!$obj instanceof $class) {
+            throw new BeansException($name . ' of type ' . $class);
         }
 
-        throw new BeansException($name . ' of type ' . $class);
+        return $obj;
     }
 
     public function hasBeanByName(string $name): bool {
@@ -640,7 +639,6 @@ final class WinterBeanProviderContext implements BeanProviderContext {
             $autowired = $prop->getAttributes(Autowired::class);
             if (count($autowired) > 0) {
                 $prop->setAccessible(true);
-                /** @noinspection PhpPossiblePolymorphicInvocationInspection */
                 $prop->setValue($bean, $this->beanByClass($prop->getType()->getName()));
             }
         }

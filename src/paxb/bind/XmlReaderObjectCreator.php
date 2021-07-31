@@ -84,13 +84,15 @@ class XmlReaderObjectCreator {
                         }
 
                         $depth++;
-                        //echo "\n" . 'Element: ' . $this->reader->name, ', depth:' . $depth . "\n";
+                        //echo "\n" . __LINE__ . ') Element: ' . $this->reader->name, ', depth:' . $depth;
+                        //echo ", isEmpty: $isEmpty\n";
+
                         try {
                             if (!isset($objectStore[$depth])) {
                                 list($curObj, $curCls)
                                     = $this->initObjectFromElement($objectStore[$depth - 1], $classStore[$depth - 1]);
 
-                                //echo get_class($curObj) . "\n";
+                                //echo __LINE__ . ') ' . get_class($curObj) . "\n";
                                 if (!is_null($curObj)) {
                                     $objectStore[$depth] = $curObj;
                                     $classStore[$depth] = $curCls;
@@ -103,6 +105,7 @@ class XmlReaderObjectCreator {
                             self::logDebug($e->getMessage());
                             $depth--;
                             $this->reader->next();
+                            continue 3;
                         }
 
                         if ($isEmpty) {
