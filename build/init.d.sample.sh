@@ -142,7 +142,7 @@ start() {
     echo "[$TIMESTAMP] Monitoring for $WAIT_COUNTDOWN seconds " | tee -a $LOG_FILE
 
     counter=1
-    while [ `kill -0 $pid > /dev/null 2>&1 && echo 1` ]
+    while [ `kill -0 $PID > /dev/null 2>&1 && echo 1` ]
     do
         if [ $counter -eq $WAIT_COUNTDOWN ]; then
             break
