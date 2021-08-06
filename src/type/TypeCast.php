@@ -6,7 +6,7 @@ namespace dev\winterframework\type;
 
 class TypeCast {
 
-    public static function parseValue(string $type, string $val): float|null|bool|int|string {
+    public static function parseValue(string $type, mixed $val): mixed {
         if ("null" === $val) {
             return null;
         }

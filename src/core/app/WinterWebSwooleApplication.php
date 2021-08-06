@@ -18,6 +18,10 @@ use dev\winterframework\io\queue\QueueConfig;
 use dev\winterframework\io\queue\QueueServerProcess;
 use dev\winterframework\io\queue\QueueSharedTemplate;
 use dev\winterframework\io\timer\IdleCheckRegistry;
+use dev\winterframework\reflection\ClassResource;
+use dev\winterframework\stereotype\cli\DaemonThread;
+use dev\winterframework\stereotype\task\EnableAsync;
+use dev\winterframework\stereotype\task\EnableScheduling;
 use dev\winterframework\task\async\AsyncQueueStoreManager;
 use dev\winterframework\task\async\AsyncTaskPoolExecutor;
 use dev\winterframework\task\scheduling\ScheduledTaskPoolExecutor;
@@ -38,7 +42,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
 
     public function __construct() {
         $this->args = new WinterCliArguments();
-        $configDir = $this->args->get('configDir', null);
+        $configDir = $this->args->get('configDir');
         if ($configDir) {
             $this->configDir = $configDir;
         }
@@ -70,8 +74,12 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         }
 
         $this->buildSharedServer($wServer);
-        $this->buildAsyncPlatform($wServer);
-        $this->buildScheduledPlatform($wServer);
+        if ($this->bootApp->getAttribute(EnableAsync::class) != null) {
+            $this->buildAsyncPlatform($wServer);
+        }
+        if ($this->bootApp->getAttribute(EnableScheduling::class) != null) {
+            $this->buildScheduledPlatform($wServer);
+        }
 
         $wServer->addEventCallback('request', [$this, 'serveRequest']);
 
@@ -114,7 +122,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         });
 
         $wServer->addEventCallback('PipeMessage', function (Server $server, $srcWorkerId, $data) {
-            if (substr($data, 0, 5) === 'json:') {
+            if (str_starts_with($data, 'json:')) {
                 $json = json_decode(substr($data, 5), true);
                 switch ($json['cmd']) {
                     case 'shutdown':
@@ -134,6 +142,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         $this->buildKvStore($wServer);
         $this->buildQueueStore($wServer);
         $this->beginModules();
+        $this->beginDaemonThreads($wServer);
         $this->onApplicationReady();
 
         $wServer->start();
@@ -340,4 +349,18 @@ EOQ;
         $wServer->addProcess($ps);
     }
 
+    protected function beginDaemonThreads(WinterServer $wServer): void {
+        $daemonClasses = $this->resources->getClassesByAttribute(DaemonThread::class);
+        /** @var ClassResource[] $resources */
+        $resources = [];
+        foreach ($daemonClasses as $clsRes) {
+            /** @var ClassResource $clsRes */
+            $resources[$clsRes->getClass()->getName()] = $clsRes;
+        }
+
+        foreach ($resources as $resource) {
+            $ps = $resource->getClass()->newInstance($wServer, $this->applicationContext);
+            $wServer->addProcess($ps);
+        }
+    }
 }

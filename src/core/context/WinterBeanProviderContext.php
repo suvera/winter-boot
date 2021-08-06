@@ -438,18 +438,7 @@ final class WinterBeanProviderContext implements BeanProviderContext {
     }
 
     private function injectAutowired(Autowired $autoWired, object $bean): void {
-        if ($autoWired->name) {
-            $childBean = $this->beanByNameClass($autoWired->name, $autoWired->getTargetType());
-        } else {
-            $childBean = $this->beanByClass($autoWired->getTargetType());
-        }
-
-        $autoWired->getRefOwner()->setAccessible(true);
-        if ($autoWired->isTargetStatic()) {
-            $autoWired->getRefOwner()->setValue($childBean);
-        } else {
-            $autoWired->getRefOwner()->setValue($bean, $childBean);
-        }
+        ReflectionUtil::performAutoWired($this->appCtx, $autoWired, $bean);
     }
 
     private function injectAutoValue(Value $autoValue, object $bean): void {
@@ -465,7 +454,15 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         if (is_null($val)) {
             if (isset($autoValue->defaultValue)) {
 
-                $val = TypeCast::parseValue($autoValue->getTargetType(), $autoValue->defaultValue);
+                try {
+                    $val = TypeCast::parseValue($autoValue->getTargetType(), $autoValue->defaultValue);
+                } catch (Throwable $e) {
+                    throw new WinterException('Invalid Type defined for config property #[Value] "'
+                        . $autoValue->name
+                        . '" (' . $autoValue->getTargetType() . ' - ' . $e->getMessage() . '), so, Could not instantiate object for class '
+                        . get_class($bean), 0, $e
+                    );
+                }
 
             } else if (!$autoValue->isNullable()) {
 

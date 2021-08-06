@@ -245,10 +245,25 @@ trait StereoTypeValidations {
 
         throw new TypeError("#[$stereoName] Attribute class "
             . '"' . $cls->getName() . '"'
-            . ' must implement one of interfaces [' . json_encode($interfaces)
+            . ' must implement one of interfaces [' . json_encode($interfaces) . '] '
         );
     }
 
+    protected function mustExtends(
+        RefKlass|ReflectionClass|ReflectionObject $cls,
+        string $stereoName,
+        string $class
+    ): void {
+
+        if ($cls->isSubclassOf($class)) {
+            return;
+        }
+
+        throw new TypeError("#[$stereoName] Attribute class "
+            . '"' . $cls->getName() . '"'
+            . ' must extend (be derived) from class ' . $class
+        );
+    }
 
     protected function mustHaveAttributeOneOf(
         RefKlass $ref,

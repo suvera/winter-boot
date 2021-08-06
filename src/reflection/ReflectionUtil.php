@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace dev\winterframework\reflection;
 
+use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\exception\AnnotationException;
 use dev\winterframework\exception\MissingExtensionException;
 use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ref\ReflectionAbstract;
+use dev\winterframework\reflection\ref\ReflectionRegistry;
 use dev\winterframework\reflection\support\ParameterType;
+use dev\winterframework\stereotype\Autowired;
 use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionFunction;
@@ -238,5 +241,35 @@ class ReflectionUtil {
         }
         throw new MissingExtensionException("Require one of [" . implode(', ', $extNames)
             . "] extension in PHP runtime");
+    }
+
+    public static function performAutoWired(
+        ApplicationContext $ctx,
+        Autowired $autoWired,
+        object $object
+    ): void {
+
+        if ($autoWired->name) {
+            $childBean = $ctx->beanByNameClass($autoWired->name, $autoWired->getTargetType());
+        } else {
+            $childBean = $ctx->beanByClass($autoWired->getTargetType());
+        }
+
+        $autoWired->getRefOwner()->setAccessible(true);
+        if ($autoWired->isTargetStatic()) {
+            $autoWired->getRefOwner()->setValue($childBean);
+        } else {
+            $autoWired->getRefOwner()->setValue($object, $childBean);
+        }
+    }
+
+    /**
+     * @throws
+     */
+    public static function setProperty(object $object, string $propName, mixed $value): void {
+        $ref = ReflectionRegistry::getClass($object::class);
+        $prop = $ref->getProperty($propName);
+        $prop->setAccessible(true);
+        $prop->setValue($object, $value);
     }
 }
