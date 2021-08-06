@@ -360,6 +360,7 @@ EOQ;
 
         foreach ($resources as $resource) {
             $ps = $resource->getClass()->newInstance($wServer, $this->applicationContext);
+            self::logInfo('Starting DaemonThread ' . $ps::class);
             $wServer->addProcess($ps);
         }
     }
