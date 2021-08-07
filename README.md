@@ -114,6 +114,7 @@ Go through this document **[Building Service](docs/build.md)**
 - [Json and XML](docs/json_xml.md)
 - [Async and Scheduling support](docs/async_scheduling.md)
 - [Shared In-Memory Stores](docs/local_store.md)
+- [Daemon Threads](docs/daemon_threads.md)
 - [Building & Deployment](docs/build.md)
 
 # 5. Module Extensions
