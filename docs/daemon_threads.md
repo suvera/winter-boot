@@ -9,7 +9,8 @@ Daemon Thread ( _is not OS thread or Java thread_ ) is a back-end process starte
 - Stream Processing
 - Any back-end processing
 
-> Daemon Threads cannot be killed explicitly, they'll be running for lifetime. Framework will restart these threads in-case of oom/crash. 
+> Daemon Threads cannot be killed explicitly, they'll be running for lifetime. Framework will restart these threads in-case of oom/crash.
+
 > This requires `swoole` php extension.
 
 ## #[DaemonThread]
@@ -29,7 +30,7 @@ class SomeBackendProcessing extends ServerWorkerProcess {
     }
 
     public function getProcessId(): string {
-        return 'my-backend-processor-' . mt_rand(0, PHP_INT_MAX);
+        return 'my-backend-processor';
     }
 
     protected function run(): void {
