@@ -56,7 +56,7 @@ Framework would start this class as a back-end process and monitor it.
 **#[DaemonThread]** has the following properties.
 
  Property  | Description 
-__________ | ________________
+---------- | ------------
  name       | (optional) Name of the Daemon, default to class name
  coreSize   | (optional) How many daemon processes to start, default is 1.  Setting it to 0 or negative values do not start any daemon process
  
