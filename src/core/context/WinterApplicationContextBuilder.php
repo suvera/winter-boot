@@ -115,6 +115,9 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         return $this->propertyContext->getAll();
     }
 
+    public function setProperty(string $name, mixed $value): mixed {
+        return $this->propertyContext->set($name, $value);
+    }
 
     /**
      * LOCAL Methods

@@ -359,9 +359,16 @@ EOQ;
         }
 
         foreach ($resources as $resource) {
-            $ps = $resource->getClass()->newInstance($wServer, $this->applicationContext);
-            self::logInfo('Starting DaemonThread ' . $ps::class);
-            $wServer->addProcess($ps);
+            /** @var DaemonThread $daemon */
+            $daemon = $resource->getAttribute(DaemonThread::class);
+            if ($daemon->coreSize <= 0) {
+                continue;
+            }
+            for ($i = 0; $i < $daemon->coreSize; $i++) {
+                $ps = $resource->getClass()->newInstance($wServer, $this->applicationContext, $i);
+                self::logInfo('Starting DaemonThread ' . $ps::class);
+                $wServer->addProcess($ps);
+            }
         }
     }
 }

@@ -35,6 +35,8 @@ interface ApplicationContext {
 
     public function getPropertyFloat(string $name, float $default = null): float;
 
+    public function setProperty(string $name, mixed $value): mixed;
+
     public function addClass(string $class): ClassResource;
 
     public function getProperties(): array;

@@ -22,10 +22,16 @@ abstract class ServerWorkerProcess extends Process implements AttachableProcess 
     protected WinterServer $wServer;
     protected ApplicationContext $appCtx;
     protected Process $process;
+    protected int $threadId;
 
-    public function __construct(WinterServer $wServer, ApplicationContext $ctx) {
+    public function __construct(
+        WinterServer $wServer,
+        ApplicationContext $ctx,
+        int $threadId = 0
+    ) {
         $this->wServer = $wServer;
         $this->appCtx = $ctx;
+        $this->threadId = $threadId;
         parent::__construct(
             $this,
         // $redirect_stdin_and_stdout = true/false,
@@ -43,6 +49,10 @@ abstract class ServerWorkerProcess extends Process implements AttachableProcess 
 
     public final function getProcess(): Process {
         return $this->process;
+    }
+
+    public function getThreadId(): int {
+        return $this->threadId;
     }
 
     private function doAutoWired(): void {

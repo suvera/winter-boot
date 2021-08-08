@@ -84,3 +84,56 @@ class DatabaseConfig {
 }
 
 ```
+
+# Additional Property Sources
+
+Along with application.yml, framework provides a way to add more property sources, such as
+
+- from Additional Files (.properties, .ini, .json, .xml etc ...)
+- from Vault
+- from Consul
+- From ENV
+
+Just implement [PropertySource](../src/io/PropertySource.php) interface.
+
+```phpt
+class EnvPropertySource implements PropertySource {
+    public function __construct(private array $source, private PropertyContext $defaultProps) {
+    }
+    
+    public function has(string $name): bool {
+        return isset($_ENV[$name]);
+    }
+
+    public function getAll(): array {
+        return $_ENV;
+    }
+    
+    public function get(string $name): mixed {
+        if (!isset($_ENV[$name])) {
+            throw new PropertyException('could not found property ' . $name . '');
+        }
+        
+        return $_ENV[$name];
+    }
+}
+```
+
+and in **application.yml** add these lines
+
+```yaml
+propertySources:
+    -   name: env
+        provider: dev\winterframework\io\EnvPropertySource
+
+    -   name: vault
+        provider: some\org\namespace\VaultPropertySource  # demo class name, This is not implemented in framework
+        url: https://127.0.0.1:443/
+        token: some-text
+        more: some-more
+
+some:
+    property1: $env.SOME_VALUE
+    property2: $vault.some_value2
+```
+
