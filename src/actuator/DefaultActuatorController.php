@@ -12,8 +12,10 @@ use dev\winterframework\core\context\WinterServer;
 use dev\winterframework\core\System;
 use dev\winterframework\core\web\DispatcherServlet;
 use dev\winterframework\core\web\route\RequestMappingRegistry;
+use dev\winterframework\io\kv\KvTemplate;
 use dev\winterframework\io\metrics\prometheus\PrometheusMetricRegistry;
 use dev\winterframework\io\process\ProcessUtil;
+use dev\winterframework\io\queue\QueueSharedTemplate;
 use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\reflection\support\ParameterType;
 use dev\winterframework\stereotype\RestController;
@@ -239,6 +241,18 @@ class DefaultActuatorController implements ActuatorController {
             }
 
             $arr[$bucket][] = $info;
+        }
+
+        if ($this->appCtx->getPropertyInt('winter.kv.port', 0) > 0) {
+            /** @var KvTemplate $tpl */
+            $tpl = $this->appCtx->beanByClass(KvTemplate::class);
+            $arr['kv-server-stats'] = $tpl->stats();
+        }
+
+        if ($this->appCtx->getPropertyInt('winter.queue.port', 0) > 0) {
+            /** @var QueueSharedTemplate $tpl */
+            $tpl = $this->appCtx->beanByClass(QueueSharedTemplate::class);
+            $arr['queue-server-stats'] = $tpl->stats();
         }
 
         $resp->setBody($arr ?: '{}');

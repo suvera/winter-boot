@@ -115,4 +115,14 @@ class QueueClient implements QueueSharedTemplate {
         $this->client->close();
     }
 
+    public function stats(): array {
+        $req = new QueueRequest();
+        $req->setCommand(QueueCommand::STATS);
+
+        $resp = $this->send($req);
+
+        return $resp->getData();
+    }
+
+
 }

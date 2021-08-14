@@ -10,6 +10,7 @@ use dev\winterframework\core\web\ResponseRenderer;
 use dev\winterframework\io\stream\HttpOutputStream;
 use dev\winterframework\util\log\Wlf4p;
 use dev\winterframework\web\http\HttpRequest;
+use dev\winterframework\web\http\HttpStatus;
 use dev\winterframework\web\http\ResponseEntity;
 use dev\winterframework\web\http\SwooleRequest;
 use dev\winterframework\web\MediaType;
@@ -70,18 +71,42 @@ class DefaultResponseRenderer extends AbstractResponseRenderer implements Respon
                 $stream->write($body);
             }
         } else if ($body instanceof JsonSerializable) {
+            $json = json_encode($body->jsonSerialize(), $prettyPrint);
+            $jsonError = 'JSON Encoding error: ' . json_last_error_msg();
             if ($checkOnly) {
                 $entity->withContentType(MediaType::APPLICATION_JSON);
+                if ($json === false) {
+                    $entity->withStatus(HttpStatus::$INTERNAL_SERVER_ERROR);
+                    $entity->setBody($jsonError);
+                    self::logError($jsonError);
+                } else {
+                    $entity->setBody($json);
+                }
             } else {
-                $stream->write(json_encode($body->jsonSerialize(), $prettyPrint));
+                if ($json === false) {
+                    $json = $jsonError;
+                }
+                $stream->write($json);
             }
         } else if (is_array($body)
             || $body instanceof ArrayObject
         ) {
+            $json = json_encode($body, $prettyPrint);
+            $jsonError = 'JSON Encoding error: ' . json_last_error_msg();
             if ($checkOnly) {
                 $entity->withContentType(MediaType::APPLICATION_JSON);
+                if ($json === false) {
+                    $entity->withStatus(HttpStatus::$INTERNAL_SERVER_ERROR);
+                    $entity->setBody($jsonError);
+                    self::logError($jsonError);
+                } else {
+                    $entity->setBody($json);
+                }
             } else {
-                $stream->write(json_encode($body, $prettyPrint));
+                if ($json === false) {
+                    $json = $jsonError;
+                }
+                $stream->write($json);
             }
         } else if ($body instanceof SplFileInfo) {
             if ($checkOnly) {
@@ -92,7 +117,6 @@ class DefaultResponseRenderer extends AbstractResponseRenderer implements Respon
                     'attachment; filename=' . $body->getFileName()
                 );
             } else {
-
                 $handle = fopen($body->getRealPath(), 'rb');
                 if (false === $handle) {
                     self::logError('Could not read file ' . $body->getRealPath());

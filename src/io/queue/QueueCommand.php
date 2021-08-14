@@ -9,5 +9,6 @@ class QueueCommand {
     const SIZE = 3;
     const DELETE = 4;
 
+    const STATS = 98;
     const PING = 99;
 }

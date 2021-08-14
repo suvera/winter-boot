@@ -78,6 +78,7 @@ class KvServer {
             && $req->getCommand() != KvCommand::DEL_ALL
             && $req->getCommand() != KvCommand::GET_ALL
             && $req->getCommand() != KvCommand::KEYS
+            && $req->getCommand() != KvCommand::STATS
             && $key == ''
         ) {
             $resp->setError('Empty KEY');
@@ -145,6 +146,10 @@ class KvServer {
 
             case KvCommand::GET_ALL:
                 $this->execGetAll($req, $resp);
+                break;
+
+            case KvCommand::STATS:
+                $this->execStats($req, $resp);
                 break;
 
             default:
@@ -399,5 +404,22 @@ class KvServer {
 
         $this->execPut($req, $resp);
         $resp->setData(null);
+    }
+
+    /** @noinspection PhpUnusedParameterInspection */
+    protected function execStats(KvRequest $req, KvResponse $resp): void {
+        $ret = [
+            'totalDomains' => count($this->store),
+            'memory' => memory_get_usage()
+        ];
+
+        $sum = 0;
+        foreach ($this->store as $items) {
+            $sum += count($items);
+        }
+
+        $ret['totalItems'] = $sum;
+
+        $resp->setData($ret);
     }
 }

@@ -10,12 +10,13 @@ class HttpUploadedFile implements File {
     use FileTrait;
 
     public function __construct(
-        protected string $name,
+        string $name,
         protected string $type,
         protected int $size,
         protected string $filePath,
         protected int $error
     ) {
+        $this->name = $name;
     }
 
     public function getName(): string {

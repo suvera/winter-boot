@@ -33,4 +33,6 @@ interface KvTemplate {
     public function keys(string $domain, string $key): array;
 
     public function getAll(string $domain): array;
+
+    public function stats(): array;
 }

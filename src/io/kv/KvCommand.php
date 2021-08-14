@@ -26,5 +26,6 @@ class KvCommand {
 
     const GETSET_IF_NOT = 16;
 
+    const STATS = 98;
     const PING = 99;
 }

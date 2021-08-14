@@ -73,6 +73,7 @@ class QueueServer {
         $queue = $req->getQueue();
 
         if ($req->getCommand() != QueueCommand::PING
+            && $req->getCommand() != QueueCommand::STATS
             && $queue == ''
         ) {
             $resp->setError('Empty Queue name');
@@ -123,6 +124,10 @@ class QueueServer {
                 }
                 break;
 
+            case QueueCommand::STATS:
+                $this->buildStats($resp);
+                break;
+
             default:
                 $resp->setError('Invalid Command');
                 break;
@@ -144,5 +149,21 @@ class QueueServer {
         });
 
         $this->server->start();
+    }
+
+    protected function buildStats(QueueResponse $resp): void {
+        $ret = [
+            'totalQueues' => count($this->store),
+            'memory' => memory_get_usage()
+        ];
+
+        $sum = 0;
+        foreach ($this->store as $q) {
+            $sum += $q->count();
+        }
+
+        $ret['totalItems'] = $sum;
+
+        $resp->setData($ret);
     }
 }

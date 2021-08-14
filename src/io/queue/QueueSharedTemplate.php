@@ -13,4 +13,6 @@ interface QueueSharedTemplate {
     public function size(string $queue): int;
 
     public function ping(): int;
+
+    public function stats(): array;
 }

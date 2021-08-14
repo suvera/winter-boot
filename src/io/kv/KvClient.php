@@ -238,5 +238,14 @@ class KvClient implements KvTemplate {
         return $resp->getData();
     }
 
+    public function stats(): array {
+        $req = new KvRequest();
+        $req->setCommand(KvCommand::STATS);
+
+        $resp = $this->send($req);
+
+        return $resp->getData();
+    }
+
 
 }
