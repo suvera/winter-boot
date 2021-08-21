@@ -6,12 +6,18 @@ namespace dev\winterframework\reflection;
 
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\exception\AnnotationException;
+use dev\winterframework\exception\BeansException;
 use dev\winterframework\exception\MissingExtensionException;
+use dev\winterframework\exception\WinterException;
 use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ref\ReflectionAbstract;
 use dev\winterframework\reflection\ref\ReflectionRegistry;
+use dev\winterframework\reflection\ref\RefProperty;
 use dev\winterframework\reflection\support\ParameterType;
 use dev\winterframework\stereotype\Autowired;
+use dev\winterframework\stereotype\Value;
+use dev\winterframework\type\TypeCast;
+use dev\winterframework\util\log\Wlf4p;
 use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionFunction;
@@ -24,6 +30,7 @@ use ReflectionUnionType;
 use Throwable;
 
 class ReflectionUtil {
+    use Wlf4p;
 
     /**
      * get Fully Qualified Method Name
@@ -243,11 +250,122 @@ class ReflectionUtil {
             . "] extension in PHP runtime");
     }
 
+    public static function createAutoWiredObject(
+        ApplicationContext $ctx,
+        RefKlass|ReflectionClass $cls,
+        mixed  ...$args
+    ): object {
+        try {
+            $object = $cls->newInstanceWithoutConstructor();
+            $cls->getConstructor()?->invoke($object, ...$args);
+        } catch (Throwable $e) {
+            throw new BeansException('Could not create object of class ' . $cls->getName()
+                . ' due to ' . $e->getMessage(), 0, $e);
+        }
+
+        self::performAutoWiredProperties($ctx, $cls, $object);
+        return $object;
+    }
+
+    public static function performAutoWiredProperties(
+        ApplicationContext $ctx,
+        RefKlass|ReflectionClass $cls,
+        object $object
+    ): void {
+        $properties = $cls->getProperties();
+        foreach ($properties as $property) {
+            $attributes = $property->getAttributes(Autowired::class);
+            if ($attributes) {
+                foreach ($attributes as $attribute) {
+                    /** @var Autowired $autoWired */
+                    $autoWired = $attribute->newInstance();
+                    $autoWired->init(RefProperty::getInstance($property));
+                    self::performAutoWired($ctx, $autoWired, $object);
+                }
+            }
+
+            $autoValues = $property->getAttributes(Value::class);
+            if ($autoValues) {
+                foreach ($autoValues as $attribute) {
+                    /** @var Value $autoValue */
+                    $autoValue = $attribute->newInstance();
+                    $autoValue->init(RefProperty::getInstance($property));
+                    self::performAutoValue($ctx, $autoValue, $object);
+                }
+            }
+        }
+    }
+
+    public static function performAutoValue(
+        ApplicationContext $ctx,
+        Value $autoValue,
+        object $bean
+    ): void {
+        $ref = $autoValue->getRefOwner();
+        $ref->setAccessible(true);
+
+        $ymlName = substr($autoValue->name, 2, -1);
+        $val = null;
+
+        try {
+            $val = $ctx->getProperty($ymlName);
+        } catch (Throwable $e) {
+            self::logDebug($e->getMessage());
+        }
+
+        if (is_null($val)) {
+            if (isset($autoValue->defaultValue)) {
+
+                try {
+                    $val = TypeCast::parseValue($autoValue->getTargetType(), $autoValue->defaultValue);
+                } catch (Throwable $e) {
+                    throw new WinterException('Invalid Type defined for config property #[Value] "'
+                        . $autoValue->name
+                        . '" (' . $autoValue->getTargetType() . ' - '
+                        . $e->getMessage() . '), so, Could not instantiate object for class '
+                        . get_class($bean), 0, $e
+                    );
+                }
+
+            } else if (!$autoValue->isNullable()) {
+
+                throw new WinterException('Could not find config property #[Value] "'
+                    . $autoValue->name
+                    . '", so, Could not instantiate object for class '
+                    . get_class($bean)
+                );
+
+            } else {
+                return;
+            }
+        }
+
+        if ($autoValue->isTargetStatic()) {
+            $ref->setValue($val);
+        } else {
+            $ref->setValue($bean, $val);
+        }
+    }
+
     public static function performAutoWired(
         ApplicationContext $ctx,
         Autowired $autoWired,
         object $object
     ): void {
+        $ref = $autoWired->getRefOwner();
+        $ref->setAccessible(true);
+
+        try {
+            $val = $ref->getValue($object);
+        } catch (Throwable $e) {
+            self::logDebug($e->getMessage());
+            $val = null;
+        }
+
+        if (isset($val)) {
+            // Variable already set
+            return;
+        }
 
         if ($autoWired->name) {
             $childBean = $ctx->beanByNameClass($autoWired->name, $autoWired->getTargetType());
@@ -255,11 +373,10 @@ class ReflectionUtil {
             $childBean = $ctx->beanByClass($autoWired->getTargetType());
         }
 
-        $autoWired->getRefOwner()->setAccessible(true);
         if ($autoWired->isTargetStatic()) {
-            $autoWired->getRefOwner()->setValue($childBean);
+            $ref->setValue($childBean);
         } else {
-            $autoWired->getRefOwner()->setValue($object, $childBean);
+            $ref->setValue($object, $childBean);
         }
     }
 

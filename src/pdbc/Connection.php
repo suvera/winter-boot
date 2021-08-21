@@ -83,6 +83,8 @@ interface Connection {
 
     public function reConnect(): void;
 
+    public function getDriverType(): mixed;
+
     public function checkIdleConnection(): void;
 
     public function touch(): void;

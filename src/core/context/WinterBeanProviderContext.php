@@ -31,7 +31,6 @@ use dev\winterframework\stereotype\test\WinterBootTest;
 use dev\winterframework\stereotype\Value;
 use dev\winterframework\stereotype\web\RequestMapping;
 use dev\winterframework\stereotype\WinterBootApplication;
-use dev\winterframework\type\TypeCast;
 use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionObject;
@@ -442,46 +441,7 @@ final class WinterBeanProviderContext implements BeanProviderContext {
     }
 
     private function injectAutoValue(Value $autoValue, object $bean): void {
-        $autoValue->getRefOwner()->setAccessible(true);
-
-        $ymlName = substr($autoValue->name, 2, -1);
-        $val = null;
-
-        if ($this->ctxData->getPropertyContext()->has($ymlName)) {
-            $val = $this->ctxData->getPropertyContext()->get($ymlName);
-        }
-
-        if (is_null($val)) {
-            if (isset($autoValue->defaultValue)) {
-
-                try {
-                    $val = TypeCast::parseValue($autoValue->getTargetType(), $autoValue->defaultValue);
-                } catch (Throwable $e) {
-                    throw new WinterException('Invalid Type defined for config property #[Value] "'
-                        . $autoValue->name
-                        . '" (' . $autoValue->getTargetType() . ' - ' . $e->getMessage() . '), so, Could not instantiate object for class '
-                        . get_class($bean), 0, $e
-                    );
-                }
-
-            } else if (!$autoValue->isNullable()) {
-
-                throw new WinterException('Could not find config property #[Value] "'
-                    . $autoValue->name
-                    . '", so, Could not instantiate object for class '
-                    . get_class($bean)
-                );
-
-            } else {
-                return;
-            }
-        }
-
-        if ($autoValue->isTargetStatic()) {
-            $autoValue->getRefOwner()->setValue($val);
-        } else {
-            $autoValue->getRefOwner()->setValue($bean, $val);
-        }
+        ReflectionUtil::performAutoValue($this->appCtx, $autoValue, $bean);
     }
 
     private function callConstructor(object $bean, ClassResource $class, BeanProvider $beanProvider): void {

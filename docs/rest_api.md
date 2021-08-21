@@ -1,7 +1,5 @@
 # REST API
 
-----
-
 REST API Development related attributes
 
 ## 1. RestController

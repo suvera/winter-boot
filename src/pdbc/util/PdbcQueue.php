@@ -6,7 +6,7 @@ namespace dev\winterframework\pdbc\util;
 use dev\winterframework\pdbc\PdbcTemplate;
 use dev\winterframework\pdbc\ResultSet;
 use dev\winterframework\ppa\PpaEntity;
-use dev\winterframework\ppa\PpaObjectMapper;
+use dev\winterframework\ppa\PpaObjectMapperFactory;
 use dev\winterframework\type\Queue;
 use dev\winterframework\type\TypeAssert;
 use dev\winterframework\util\log\Wlf4p;
@@ -75,7 +75,8 @@ class PdbcQueue implements Queue {
         }
 
         if ($record) {
-            $entity = PpaObjectMapper::createObject($this->table->getEntity(), $record);
+            $entity = PpaObjectMapperFactory::getMapper('generic')
+                ->createObject($this->table->getEntity(), $record);
 
             $this->pdbc->deleteObjects($entity);
 

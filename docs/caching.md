@@ -1,7 +1,5 @@
 # Caching
 
-----
-
 Winter managed bean dependencies are just handled by Annotations (Attributes).
 
 Here is Caching related attributes

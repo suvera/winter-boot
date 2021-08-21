@@ -97,6 +97,9 @@ class ProcessUtil {
         }
 
         $path = "/proc/$pid/task/$pid/children";
+        if (!file_exists($path)) {
+            return [];
+        }
 
         $lines = file($path);
         if ($lines === false) {

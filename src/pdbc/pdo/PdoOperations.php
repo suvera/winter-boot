@@ -17,7 +17,7 @@ use dev\winterframework\pdbc\ex\IncorrectResultSizeDataAccessException;
 use dev\winterframework\pdbc\PreparedStatement;
 use dev\winterframework\ppa\EntityRegistry;
 use dev\winterframework\ppa\PpaEntity;
-use dev\winterframework\ppa\PpaObjectMapper;
+use dev\winterframework\ppa\PpaObjectMapperFactory;
 use dev\winterframework\reflection\ObjectCreator;
 use Throwable;
 
@@ -231,7 +231,8 @@ abstract class PdoOperations {
                     $ret[] = $classOrMapper->mapRow($rs, $num);
                 } else if (is_a($classOrMapper, PpaEntity::class, true)) {
                     $ent = new $classOrMapper();
-                    PpaObjectMapper::mapObject($ent, $rs->getRow(), EntityRegistry::getEntity($classOrMapper));
+                    PpaObjectMapperFactory::getMapper($this->dataSource->getConnection()->getDriverType())
+                        ->mapObject($ent, $rs->getRow(), EntityRegistry::getEntity($classOrMapper));
                     $ret[] = $ent;
                 } else {
                     $ret[] = ObjectCreator::createObject($classOrMapper, $rs->getRow());
@@ -322,7 +323,8 @@ abstract class PdoOperations {
             while ($rs->next()) {
                 /** @var PpaEntity $ent */
                 $ent = new $ppaClass();
-                PpaObjectMapper::mapObject($ent, $rs->getRow(), EntityRegistry::getEntity($ppaClass));
+                PpaObjectMapperFactory::getMapper($this->dataSource->getConnection()->getDriverType())
+                    ->mapObject($ent, $rs->getRow(), EntityRegistry::getEntity($ppaClass));
                 $ent->setStored(true);
                 $ret[] = $ent;
             }
@@ -345,19 +347,16 @@ abstract class PdoOperations {
 
             /** @var PpaEntity $ppaObject */
             if ($ppaObject->isStored()) {
-                $sql = PpaObjectMapper::generateUpdateSql($ppaObject, $entity);
-                if (!isset($sql[0])) {
-                    continue;
-                }
-                $this->doUpdate($sql[0], $sql[1]);
+                $sql = PpaObjectMapperFactory::getMapper($this->dataSource->getConnection()->getDriverType())
+                    ->generateUpdateSql($ppaObject, $entity);
+                $this->doUpdate($sql->getSql(), $sql->getBindVars());
             } else {
-                $sql = PpaObjectMapper::generateInsertSql($ppaObject, $entity);
-                if (!isset($sql[0])) {
-                    continue;
-                }
-                $this->doUpdate($sql[0], $sql[1], $sql[2], $generatedKeys);
+                $sql = PpaObjectMapperFactory::getMapper($this->dataSource->getConnection()->getDriverType())
+                    ->generateInsertSql($ppaObject, $entity);
+                $this->doUpdate($sql->getSql(), $sql->getBindVars(), $sql->getOutBindVars(), $generatedKeys);
                 if ($generatedKeys) {
-                    PpaObjectMapper::mapObject($ppaObject, $generatedKeys, $entity);
+                    PpaObjectMapperFactory::getMapper($this->dataSource->getConnection()->getDriverType())
+                        ->mapObject($ppaObject, $generatedKeys, $entity);
                 }
                 $ppaObject->setStored(true);
             }
@@ -372,11 +371,9 @@ abstract class PdoOperations {
             $entity = EntityRegistry::getEntity($ppaObject::class);
             /** @var PpaEntity $ppaObject */
 
-            $sql = PpaObjectMapper::generateDeleteSql($ppaObject, $entity);
-            if (!isset($sql[0])) {
-                continue;
-            }
-            $this->doUpdate($sql[0], $sql[1]);
+            $sql = PpaObjectMapperFactory::getMapper($this->dataSource->getConnection()->getDriverType())
+                ->generateDeleteSql($ppaObject, $entity);
+            $this->doUpdate($sql->getSql(), $sql->getBindVars());
         }
     }
 

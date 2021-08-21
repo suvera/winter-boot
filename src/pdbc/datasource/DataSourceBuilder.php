@@ -11,6 +11,8 @@ use dev\winterframework\io\timer\IdleCheckRegistry;
 use dev\winterframework\pdbc\DataSource;
 use dev\winterframework\pdbc\pdo\PdoTransactionManager;
 use dev\winterframework\reflection\ObjectCreator;
+use dev\winterframework\reflection\ref\RefKlass;
+use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\txn\PlatformTransactionManager;
 use dev\winterframework\type\TypeAssert;
 use dev\winterframework\util\log\Wlf4p;
@@ -149,7 +151,12 @@ class DataSourceBuilder {
         $driver = $ds->getDriverClass();
 
         self::logInfo("creating DataSource of type $driver");
-        $obj = new $driver($ds);
+        /** @var DataSource $obj */
+        $obj = ReflectionUtil::createAutoWiredObject(
+            $this->ctx,
+            new RefKlass($driver),
+            $ds
+        );
 
         TypeAssert::typeOf($obj, DataSource::class);
         $this->dsObjectMap[$ds] = $obj;

@@ -1,7 +1,5 @@
 # Async & Scheduling Support
 
-----
-
 1. Asynchronous execution support by **#[Async]** attribute.
 2. Scheduling tasks just by using **#[Scheduled]** attribute
 

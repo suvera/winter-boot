@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace dev\winterframework\task\async;
 
 use dev\winterframework\core\context\ApplicationContext;
+use dev\winterframework\reflection\ref\RefKlass;
+use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\stereotype\Autowired;
 use dev\winterframework\stereotype\Component;
 use dev\winterframework\stereotype\Value;
@@ -35,7 +37,14 @@ class AsyncQueueStoreManager {
 
     public function addQueueStoreDefault(int $workerId): void {
         $cls = $this->queueStorageHandler;
-        $this->workerStores[$workerId] = new $cls($this->appCtx, $workerId, $this->queueCapacity, $this->argsSize);
+        $this->workerStores[$workerId] = ReflectionUtil::createAutoWiredObject(
+            $this->appCtx,
+            new RefKlass($cls),
+            $this->appCtx,
+            $workerId,
+            $this->queueCapacity,
+            $this->argsSize
+        );
     }
 
     public function addQueueStore(int $workerId, AsyncQueueStore $store): void {

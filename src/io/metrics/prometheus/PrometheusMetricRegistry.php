@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace dev\winterframework\io\metrics\prometheus;
 
 use dev\winterframework\core\context\ApplicationContext;
+use dev\winterframework\reflection\ref\RefKlass;
+use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\util\log\Wlf4p;
 use Prometheus\Collector;
 use Prometheus\CollectorRegistry;
@@ -50,14 +52,20 @@ class PrometheusMetricRegistry {
             || $this->adapterClass === NoAdapter::class
         ) {
             $cls = $this->adapterClass;
-            $adapter = new $cls();
+            $adapter = ReflectionUtil::createAutoWiredObject(
+                $this->ctx,
+                new RefKlass($cls)
+            );
         } else {
             $adapter = $this->ctx->beanByClass($this->adapterClass);
         }
         $this->registry = new CollectorRegistry($adapter, false);
         $providerClass = $this->providerClass;
         if (is_a($providerClass, PrometheusMetricProvider::class, true)) {
-            $provider = new $providerClass();
+            $provider = ReflectionUtil::createAutoWiredObject(
+                $this->ctx,
+                new RefKlass($providerClass)
+            );
             $provider->provide($this);
         }
     }
