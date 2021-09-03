@@ -35,7 +35,15 @@ ex:
 	eager = false
 )]
 class MyApplication {
+
+    public static function main() {
+        (new WinterWebSwooleApplication())->run(MyApplication::class);
+    }
 }
 
 
 ```
+
+## Live Example
+
+Checkout the example Application here is [ExampleServiceApplication.php](https://github.com/suvera/winter-example-service/blob/master/src/ExampleServiceApplication.php)

@@ -47,8 +47,6 @@ $obj = ObjectCreator::createObjectXml(
 
 # Attributes
 
-----
-
 ## JsonProperty
 
 Attribute **#[JsonProperty]** is used to indicate external property name, mapped to object variable.

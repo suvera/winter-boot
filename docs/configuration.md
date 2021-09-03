@@ -7,8 +7,6 @@ There are two types of configuration
 
 ## Application Properties
 
-----
-
 All properties can be defined in **application.yml** , and it must be there in **config**
 directory mentioned by **#[WinterBootApplication]** attribute.
 

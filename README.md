@@ -10,7 +10,7 @@ Inspired by Spring Boot, you can build **micro-services** in PHP 8 in that style
 class MyApplication {
 
     public static function main() {
-        (new WinterWebApplication())->run(MyApplication::class);
+        (new WinterWebSwooleApplication())->run(MyApplication::class);
     }
 
 }
@@ -125,7 +125,7 @@ This framework can be extended even further by using
 ### How to create new module
 
 Create a new module by extending [WinterModule](src/core/app/WinterModule.php). 
-Check below any existing module for reference
+Check out below modules for reference
 
 - [Redis Module](https://github.com/suvera/winter-modules/tree/master/winter-data-redis)
 - [Apache Kafka Module](https://github.com/suvera/winter-modules/tree/master/winter-kafka)
@@ -133,3 +133,48 @@ Check below any existing module for reference
 - [S3 Module](https://github.com/suvera/winter-modules/tree/master/winter-s3)
 - [Memdb Module](https://github.com/suvera/winter-memdb) - In-memory databases integrated, such as Apache Ignite, Redis, Memcached, Hazelcast, etc ... 
 - [Service Discovery](https://github.com/suvera/winter-eureka) - Consul, Netflix Eureka, etc...
+
+
+# 6. FAQ
+
+#### 1. How to use other framework components in my project?
+
+Yes, any component from any php framework can be used just by composer.
+Symfony, YII2, Laravel, Code Igniter etc ...
+
+Examples:
+```phpt
+# Symfony Security component
+composer require symfony/security
+
+
+# Laravel illuminate events component
+composer require illuminate/events
+
+
+# Yii Arrays Component
+composer require yiisoft/arrays --prefer-dist
+```
+
+Make sure that components are PHP8 compatible.
+
+#### 2. Can I use RoadRunner or Workerman in my project?
+
+Yes, You can extend framework and create core Application runner classes.
+
+##### Currently, Swoole is done like this.
+
+```phpt
+class WinterWebSwooleApplication extends WinterApplicationRunner implements WinterApplication {
+}
+```
+
+in the same way that you can also extend framework.
+
+```phpt
+class WinterWebWorkermanApplication extends WinterApplicationRunner implements WinterApplication {
+}
+
+class WinterRoadRunnerApplication extends WinterApplicationRunner implements WinterApplication {
+}
+```
