@@ -25,7 +25,7 @@
     },
     "bin": [
         "build/phing/phing"
-    ]
+    ],
     "autoload": {
         "psr-4": {
             "dev\\winterframework\\": "src/"
