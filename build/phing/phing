@@ -1,0 +1,47 @@
+#!/bin/sh
+
+PHING_PHAR_URL="https://www.phing.info/get/phing-3.0.0-RC2.phar"
+PHING_SHA512="f556b278e302bd3a506f3172f253d43967f39415b70bc5ab014099e868db874a82b32a15fde32867c8b92b07e5243fb37097e596ccb842075b47f2fddf8d4b44"
+
+PHP_EXEC=$(which php)
+echo "+------------------------+-------------------------------------------------------------+"
+echo "| PHP executable         +  $PHP_EXEC"
+echo "+------------------------+-------------------------------------------------------------+"
+
+if [ -x "$(realpath --version)" ]; then
+    BASEDIR=$(realpath "$0")
+    BASEDIR=$(dirname "$BASEDIR")
+    BASEDIR=$(dirname "$BASEDIR")
+    echo "| Project base directory |  $BASEDIR"
+else
+    BASEDIR="$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"
+    BASEDIR=$(dirname "$BASEDIR")
+    BASEDIR=$(dirname "$BASEDIR")
+    echo "| Project base directory |  $BASEDIR"
+    BASEDIR=$(echo $BASEDIR | sed 's:/*$::')
+fi
+echo "+------------------------+-------------------------------------------------------------+"
+
+PHING_DIR="$BASEDIR/.phing"
+PHING_EXEC="$PHING_DIR/phing.phar"
+mkdir -p $PHING_DIR
+
+echo "<?php echo hash_file('sha512', '$PHING_EXEC'); ?>" > "$PHING_DIR/sha512.php"
+
+if ! [ -f "$PHING_EXEC" ]; then
+
+    echo "Downloading Phing from $PHING_PHAR_URL ..."
+    sleep 1
+    curl "$PHING_PHAR_URL" --output "$PHING_EXEC"
+
+    CMD="$PHP_EXEC $PHING_DIR/sha512.php"
+    HASH=$($CMD)
+    if [ "$HASH" = "$PHING_SHA512" ]; then
+        echo "File Hash looks good"
+    else
+        echo "Downloaded file hash does not match. Wrong Phing file downloaded!";
+        exit 1
+    fi
+fi
+
+$PHING_EXEC "$@"

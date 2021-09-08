@@ -11,7 +11,8 @@
     "config": {
         "platform": {
             "php": "8.0"
-        }
+        },
+        "bin-dir": "bin"
     },
     "license": "MIT",
     "authors": [
@@ -22,6 +23,9 @@
     "support": {
         "issues": "https://github.com/suvera/winter-boot/issues"
     },
+    "bin": [
+        "build/phing/phing"
+    ]
     "autoload": {
         "psr-4": {
             "dev\\winterframework\\": "src/"

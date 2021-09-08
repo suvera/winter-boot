@@ -9,6 +9,8 @@
 .settings
 .springBeans
 .sts4-cache
+.phing
+phing/.phing
 /vendor/
 
 ### IntelliJ IDEA ###
