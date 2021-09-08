@@ -12,9 +12,11 @@ if [ -x "$(realpath --version)" ]; then
     BASEDIR=$(realpath "$0")
     BASEDIR=$(dirname "$BASEDIR")
     BASEDIR=$(dirname "$BASEDIR")
+    BASEDIR=$(dirname "$BASEDIR")
     echo "| Project base directory |  $BASEDIR"
 else
     BASEDIR="$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"
+    BASEDIR=$(dirname "$BASEDIR")
     BASEDIR=$(dirname "$BASEDIR")
     BASEDIR=$(dirname "$BASEDIR")
     echo "| Project base directory |  $BASEDIR"
