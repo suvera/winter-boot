@@ -15,7 +15,7 @@ Nested transactions are not allowed by the Pdo.
 If you want to extend and create your own transaction manager, then implement PlatformTransactionManager interface and create your manager.
 
 
-#### Examples
+#### Example (default transaction manager)
 
 ```phpt
 
@@ -24,16 +24,23 @@ public function executeInTransaction(): void {
     // do something here
 }
 
+```
 
+#### Example (custom transaction manager)
+```phpt
 
-// with a custom Transaction Manager
-// You need to define a bean that returns PlatformTransactionManager
-
+// You need to define a bean that returns PlatformTransactionManager, in your #[Configuration] annotated classes
 #[Bean("myTxnMgr")]
 public function getMyTransactionManager(DataSource $dataSource): PlatformTransactionManager {
     return new MyTransactionManager($dataSource);
 }
 
+
+
+
+// -------------------------------------------------------------------------------
+
+// and then,  in your business class
 
 
 #[Transactional(transactionManager: "myTxnMgr")]
