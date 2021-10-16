@@ -26,4 +26,8 @@ class NoAdapter implements Adapter {
         //Nothing
     }
 
+    public function updateSummary(array $data): void {
+        // TODO: Implement updateSummary() method.
+    }
+
 }

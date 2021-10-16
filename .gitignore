@@ -12,6 +12,7 @@
 .phing
 phing/.phing
 /vendor/
+bin/yaml-lint
 
 ### IntelliJ IDEA ###
 .idea

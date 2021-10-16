@@ -38,12 +38,12 @@
         "ext-posix": "*",
         "ext-pcntl": "*",
         "symfony/yaml": "5.4.x-dev",
-        "monolog/monolog": "2.x-dev",
-        "suvera/monolog-cascade": "0.5.x-dev",
+        "monolog/monolog": "2.3.*",
+        "suvera/monolog-cascade": "dev-master",
         "swoole/ide-helper": "@dev",
-        "lastguest/murmurhash": "dev-master",
-        "ramsey/uuid": "4.x-dev",
-        "promphp/prometheus_client_php": "^2.2",
-        "vanilla/garden-cli": "dev-master"
+        "lastguest/murmurhash": "2.1.*",
+        "ramsey/uuid": "4.2.*",
+        "promphp/prometheus_client_php": "v2.3.*",
+        "vanilla/garden-cli": "v3.1"
     }
 }

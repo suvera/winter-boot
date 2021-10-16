@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace dev\winterframework\io\metrics\prometheus;
 
 use dev\winterframework\io\kv\KvTemplate;
+use Prometheus\Math;
 use Prometheus\MetricFamilySamples;
 use Prometheus\Storage\Adapter;
 use RuntimeException;
@@ -14,8 +15,22 @@ class KvAdapter implements Adapter {
     private string $domainHistogram = 'winter-metrics-hist';
     private string $domainGauge = 'winter-metrics-gauge';
     private string $domainCounter = 'winter-metrics-count';
+    private string $domainSummary = 'winter-metrics-summary';
 
     public function __construct(protected KvTemplate $kvTemplate) {
+    }
+
+    public function updateSummary(array $data): void {
+        // store meta
+        $metaKey = $this->metaKey($data);
+        $this->kvTemplate->put($this->domainSummary, $metaKey, json_encode($this->metaData($data)));
+
+        // store value key
+        $valueKey = $this->valueKey($data);
+        $this->kvTemplate->put($this->domainSummary, $valueKey, $this->encodeLabelValues($data['labelValues']));
+
+        $sampleKey = $valueKey . ':' . uniqid('', true);
+        $this->kvTemplate->put($this->domainSummary, $sampleKey, json_encode($data['value']), $data['maxAgeSeconds']);
     }
 
     /**
@@ -33,7 +48,8 @@ class KvAdapter implements Adapter {
     public function collect(): array {
         $metrics = $this->collectHistograms();
         $metrics = array_merge($metrics, $this->collectGauges());
-        return array_merge($metrics, $this->collectCounters());
+        $metrics = array_merge($metrics, $this->collectCounters());
+        return array_merge($metrics, $this->collectSummaries());
     }
 
     private function histogramBucketValueKey(array $data, string|int|float $bucket): string {
@@ -309,6 +325,88 @@ class KvAdapter implements Adapter {
         }
 
         return $histograms;
+    }
+
+    /**
+     * @return MetricFamilySamples[]
+     */
+    private function collectSummaries(): array {
+        $math = new Math();
+        $summaries = [];
+        $allSummary = $this->kvTemplate->getAll($this->domainSummary);
+        foreach ($allSummary as $key => $summary) {
+            if (!preg_match('/^:summary:.*:meta/', $key)) {
+                continue;
+            }
+            $summary = json_decode($summary, true);
+            $metaData = $summary['value'];
+            $data = [
+                'name' => $metaData['name'],
+                'help' => $metaData['help'],
+                'type' => $metaData['type'],
+                'labelNames' => $metaData['labelNames'],
+                'maxAgeSeconds' => $metaData['maxAgeSeconds'],
+                'quantiles' => $metaData['quantiles'],
+                'samples' => [],
+            ];
+
+            foreach ($allSummary as $key2 => $value2) {
+                if (!preg_match('/^' . ':summary:' . $metaData['name'] . ':.*:value$/', $key2)) {
+                    continue;
+                }
+                $value = json_decode($value2, true);
+
+                $encodedLabelValues = $value['value'];
+                $decodedLabelValues = $this->decodeLabelValues($encodedLabelValues);
+                $samples = [];
+                foreach ($allSummary as $key3 => $value3) {
+                    if (!preg_match('/^' . ':summary:' . $metaData['name'] . ':' . str_replace('/', '\\/', preg_quote($encodedLabelValues)) . ':value:.*/', $key2)) {
+                        continue;
+                    }
+                    $sample = json_decode($value3, true);
+                    $samples[] = $sample['value'];
+                }
+
+                if (count($samples) === 0) {
+                    $this->kvTemplate->del($this->domainSummary, $value['key']);
+                    continue;
+                }
+
+                // Compute quantiles
+                sort($samples);
+                foreach ($data['quantiles'] as $quantile) {
+                    $data['samples'][] = [
+                        'name' => $metaData['name'],
+                        'labelNames' => ['quantile'],
+                        'labelValues' => array_merge($decodedLabelValues, [$quantile]),
+                        'value' => $math->quantile($samples, $quantile),
+                    ];
+                }
+
+                // Add the count
+                $data['samples'][] = [
+                    'name' => $metaData['name'] . '_count',
+                    'labelNames' => [],
+                    'labelValues' => $decodedLabelValues,
+                    'value' => count($samples),
+                ];
+
+                // Add the sum
+                $data['samples'][] = [
+                    'name' => $metaData['name'] . '_sum',
+                    'labelNames' => [],
+                    'labelValues' => $decodedLabelValues,
+                    'value' => array_sum($samples),
+                ];
+            }
+
+            if (count($data['samples']) > 0) {
+                $summaries[] = new MetricFamilySamples($data);
+            } else {
+                $this->kvTemplate->del($this->domainSummary, $summary['key']);
+            }
+        }
+        return $summaries;
     }
 
     private function sortSamples(array &$samples): void {
