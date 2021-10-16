@@ -22,6 +22,17 @@ class WinterServer {
 
     protected array $serverArgs = [];
 
+    protected static array $defaultServerArgs = [
+        'reload_async' => false,
+        'max_wait_time' => 3, // seconds
+        /**
+         * A worker process is restarted to avoid memory leak when receiving
+         *      max_request + rand(0, max_request_grace) requests.
+         * max_request is 0 which means there is no limit of the max requests.
+         */
+        'max_request' => 0,
+    ];
+
     /**
      * @var callable[][]
      */
@@ -142,6 +153,7 @@ class WinterServer {
 
         $this->registerEventCallbacks();
         $this->beginAdmin();
+        $this->serverArgs = array_merge(self::$defaultServerArgs, $this->serverArgs);
         $this->server->set($this->getServerArgs());
         $this->server->start();
     }
