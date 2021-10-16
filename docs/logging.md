@@ -4,8 +4,6 @@
 
 # Usage
 
-----
-
 
 A trait **Wlf4p** will do all magic for you.
 
@@ -33,8 +31,6 @@ Please check [Wlf4p.php](/src/util/log/Wlf4p.php) for more info
 
 
 # Configuration
-
-----
 
 Add a file named **logger.yml** in your **config** direction mentioned by WinterBootApplication
 

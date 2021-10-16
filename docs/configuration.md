@@ -51,8 +51,6 @@ datasource:
 
 # Bean Configuration
 
-----
-
 This is more like Logic configuration, it has to be done with **#[Configuration]** attribute.
 
 Define classes with **#[Configuration]** attribute that produces as many managed beans by **#[Bean]**
