@@ -99,6 +99,11 @@ Framework Support **[Phing](https://www.phing.info/)** build system
 
 Go through this document **[Building Service](docs/build.md)**
 
+- Build phar files
+- Build Docker Images - See [example-service](https://github.com/suvera/winter-example-service)
+  - [Dockerfile](https://github.com/suvera/winter-example-service/blob/master/Dockerfile)
+  - [build.xml](https://github.com/suvera/winter-example-service/blob/master/build.xml)
+
 # 4. Documentation
 
 - [StereoTypes & Dependency Injection](docs/dependency_stereo_types.md)

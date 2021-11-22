@@ -22,8 +22,9 @@ ln -s /usr/local/bin/phing-3.0.0-RC2.phar /usr/bin/phing
 #### Supported Features
 
 1. Phar binary support for your micro-service
-2. RPM binary support
-3. init.d script support
+2. Docker Image support
+3. RPM binary support
+4. init.d script support
 
 
 ## Phing
@@ -64,7 +65,7 @@ in **build.xml**, add following code
 ```
 
 
-### Phar binary
+### 1. Phar binary
 
 Create a new Phing target,  name it with ex: **phar**
 
@@ -118,7 +119,55 @@ phing phar
 ```
 
 
-### RPM binary
+### 2. Docker Image
+
+Create a new Phing target,  name it with ex: **rpm**
+
+```xml
+<target name="docker" description="Build Docker Image" depends="phar">
+    <echo>Building Docker Image ...</echo>
+    <exec dir="." executable="docker" level="verbose" checkreturn="true" passthru="true">
+        <arg line="build . -t ${company.id}/${app.id}:${app.version}-${app.release} -f ./Dockerfile"/>
+    </exec>
+    <echo>Docker Image Generated!</echo>
+</target>
+```
+
+
+To generate Docker Image, run below command
+
+```shell
+phing docker
+```
+
+**Dockerfile**
+```yaml
+#####################################################################################
+#  Build Application Image - Run below command
+#     docker build . -t yourname/example-service:1.0.0 -f ./Dockerfile
+######################################################################################
+FROM suvera/winter-boot:latest
+
+USER root
+LABEL maintainer="yourname@example.com"
+
+RUN useradd -ms /bin/bash app && mkdir -p /home/app/lib && mkdir -p /home/app/config
+
+COPY ./target/phar/example-service-*.phar /home/app/lib/example-service.phar
+COPY ./config/* /home/app/config/
+
+RUN chown -R app /home/app
+
+USER app
+WORKDIR /home/app
+
+ENTRYPOINT ["php", "/home/app/lib/example-service.phar", "-c", "/home/app/config"]
+
+EXPOSE 8080
+```
+
+
+### 3. RPM binary
 
 Create a new Phing target,  name it with ex: **rpm**
 
@@ -189,7 +238,6 @@ RPM file will be generated in the folders **target/rpm/RPMS/**
 /etc/init.d/example-service restart
 
 ```
-
 
 See example [build.xml](https://github.com/suvera/winter-example-service)
 
