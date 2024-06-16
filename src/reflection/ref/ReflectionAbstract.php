@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace dev\winterframework\reflection\ref;
@@ -15,6 +16,14 @@ abstract class ReflectionAbstract implements Serializable {
 
     public function unserialize($serialized): void {
         $this->_data = unserialize($serialized);
+    }
+
+    public function __serialize(): array {
+        return $this->_data;
+    }
+
+    public function __unserialize(array $data): void {
+        $this->_data = $data;
     }
 
     /**
