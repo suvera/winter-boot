@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace dev\winterframework\util\log;
@@ -48,11 +49,33 @@ final class LoggerManager {
         Cascade::fileConfig($data);
 
         self::$instance->logger = Cascade::getLogger($defaultName);
-        Wlf4p::setLogger(self::$instance->logger, $customLevels);
+        self::setLogger(self::$instance->logger, $customLevels);
     }
 
     public function addHandler(HandlerInterface $handler): void {
         $this->logger->pushHandler($handler);
     }
 
+    public static function setLogger(
+        MonoLogger $logger,
+        array $log_levels = []
+    ) {
+        LogWrapper::$LOGGER = $logger;
+        LogWrapper::$LOG_LEVELS = $log_levels;
+        LogWrapper::$LOG_LEVEL_NAMES = [];
+        LogWrapper::$LOG_CACHED_LEVELS = [];
+
+        if (!LogWrapper::$LOG_LEVEL_NAMES) {
+            LogWrapper::$LOG_LEVEL_NAMES = LoggerManager::getLogger()->getLevels();
+        }
+
+        foreach (LogWrapper::$LOG_LEVELS as $clsPath => $clsLevel) {
+            $clsLevel = strtoupper($clsLevel);
+            if ($clsLevel === 'NONE') {
+                LogWrapper::$LOG_CACHED_LEVELS[$clsPath] = PHP_INT_MAX;
+            } else {
+                LogWrapper::$LOG_CACHED_LEVELS[$clsPath] = LogWrapper::$LOG_LEVEL_NAMES[$clsLevel] ?? 0;
+            }
+        }
+    }
 }

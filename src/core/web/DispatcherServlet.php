@@ -116,7 +116,9 @@ class DispatcherServlet implements HttpRequestDispatcher {
         try {
             $this->afterCompletion(
                 $this->ctxData->getInterceptorRegistry(),
-                $request, $response, $t
+                $request,
+                $response,
+                $t
             );
         } catch (Throwable $e) {
             self::logException($e);
@@ -183,9 +185,10 @@ class DispatcherServlet implements HttpRequestDispatcher {
                     $request,
                     $response,
                     HttpStatus::$BAD_REQUEST,
-                    new WinterException('Bad Request: expected request types ['
-                        . implode(', ', $consumes)
-                        . ', but got "' . $contentType . '"'
+                    new WinterException(
+                        'Bad Request: expected request types ['
+                            . implode(', ', $consumes)
+                            . ', but got "' . $contentType . '"'
                     )
                 );
                 return;
@@ -213,9 +216,10 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 $this->handleError($request, $response, HttpStatus::$BAD_REQUEST, $e);
                 return;
             } catch (Throwable $e) {
-                self::logError('Invalid parameter in the request - with error '
-                    . $e::class . ': ' . $e->getMessage() . ', file: ' . $e->getFile()
-                    . ', line: ' . $e->getLine()
+                self::logError(
+                    'Invalid parameter in the request - with error '
+                        . $e::class . ': ' . $e->getMessage() . ', file: ' . $e->getFile()
+                        . ', line: ' . $e->getLine()
                 );
                 $this->handleError($request, $response, HttpStatus::$BAD_REQUEST);
                 return;
@@ -233,9 +237,10 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 $this->handleError($request, $response, HttpStatus::$BAD_REQUEST, $e);
                 return;
             } catch (Throwable $e) {
-                self::logError('Could not understand the request - with error '
-                    . $e::class . ': ' . $e->getMessage() . ', file: ' . $e->getFile()
-                    . ', line: ' . $e->getLine()
+                self::logError(
+                    'Could not understand the request - with error '
+                        . $e::class . ': ' . $e->getMessage() . ', file: ' . $e->getFile()
+                        . ', line: ' . $e->getLine()
                 );
                 $this->handleError($request, $response, HttpStatus::$BAD_REQUEST);
                 return;
@@ -262,11 +267,29 @@ class DispatcherServlet implements HttpRequestDispatcher {
             }
         }
 
+        foreach ($method->getParameters() as $param) {
+            if (isset($args[$param->getName()])) {
+                continue;
+            }
+            if (!$param->isOptional()) {
+                $this->handleError(
+                    $request,
+                    $response,
+                    HttpStatus::$BAD_REQUEST,
+                    new WinterException('Bad Request: Missing parameter ' . $param->getName())
+                );
+                return;
+            }
+        }
+
         /**
          * STEP - 6.1 : pre-intercept Controller
          */
         if ($controller instanceof ControllerInterceptor) {
-            $controller->preHandle($request, $response, $method->getDelegate());
+            if (!$controller->preHandle($request, $response, $method->getDelegate())) {
+                $renderer->render($response, $request);
+                return;
+            }
         }
 
         /**
@@ -322,8 +345,10 @@ class DispatcherServlet implements HttpRequestDispatcher {
             return $rawBody;
         }
 
-        if (str_contains($contentType, MediaType::APPLICATION_FORM_URLENCODED)
-            || str_contains($contentType, MediaType::MULTIPART_FORM_DATA)) {
+        if (
+            str_contains($contentType, MediaType::APPLICATION_FORM_URLENCODED)
+            || str_contains($contentType, MediaType::MULTIPART_FORM_DATA)
+        ) {
 
             try {
                 return ObjectCreator::createObject($varType, $_POST);
@@ -331,9 +356,10 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 self::logException($e);
                 throw new WinterException('Bad Request: Unexpected data passed');
             }
-
-        } else if (!$body->disableParsing
-            && (empty($contentType) || str_contains($contentType, MediaType::APPLICATION_JSON))) {
+        } else if (
+            !$body->disableParsing
+            && (empty($contentType) || str_contains($contentType, MediaType::APPLICATION_JSON))
+        ) {
 
             self::logInfo('JSON Body: ' . $rawBody);
 
@@ -350,9 +376,8 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 self::logException($e);
                 throw new WinterException('Bad Request: Wrong JSON data passed');
             }
-
         } else if (!$body->disableParsing && (str_contains($contentType, MediaType::APPLICATION_XML)
-                || str_contains($contentType, MediaType::TEXT_XML))) {
+            || str_contains($contentType, MediaType::TEXT_XML))) {
 
             self::logInfo('XML Body: ' . $rawBody);
 
@@ -475,6 +500,4 @@ class DispatcherServlet implements HttpRequestDispatcher {
             }
         }
     }
-
-
 }

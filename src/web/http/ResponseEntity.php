@@ -1,5 +1,7 @@
 <?php
+
 /** @noinspection PhpUnused */
+
 declare(strict_types=1);
 
 namespace dev\winterframework\web\http;
@@ -33,7 +35,8 @@ class ResponseEntity {
             $this->cookies = array_merge($this->cookies, $other->cookies);
         }
 
-        if (isset($other->body) && !empty($other->body)
+        if (
+            isset($other->body) && !empty($other->body)
             && (!isset($this->body) || empty($this->body))
         ) {
             $this->body = $other->body;
@@ -198,10 +201,15 @@ class ResponseEntity {
         return $obj;
     }
 
+    public static function movedAway(bool $isTemporary = true): self {
+        $obj = new self();
+        $obj->withStatus($isTemporary ? HttpStatus::$MOVED_TEMPORARILY : HttpStatus::$MOVED_PERMANENTLY);
+        return $obj;
+    }
+
     public static function status(HttpStatus $status): self {
         $obj = new self();
         $obj->withStatus($status);
         return $obj;
     }
-
 }

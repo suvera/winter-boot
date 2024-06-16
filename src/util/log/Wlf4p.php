@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace dev\winterframework\util\log;
@@ -8,29 +9,6 @@ use Monolog\Logger as MonoLogger;
 use Throwable;
 
 trait Wlf4p {
-
-    public static function setLogger(
-        MonoLogger $logger,
-        array $log_levels = []
-    ) {
-        LogWrapper::$LOGGER = $logger;
-        LogWrapper::$LOG_LEVELS = $log_levels;
-        LogWrapper::$LOG_LEVEL_NAMES = [];
-        LogWrapper::$LOG_CACHED_LEVELS = [];
-
-        if (!LogWrapper::$LOG_LEVEL_NAMES) {
-            LogWrapper::$LOG_LEVEL_NAMES = LoggerManager::getLogger()->getLevels();
-        }
-
-        foreach (LogWrapper::$LOG_LEVELS as $clsPath => $clsLevel) {
-            $clsLevel = strtoupper($clsLevel);
-            if ($clsLevel === 'NONE') {
-                LogWrapper::$LOG_CACHED_LEVELS[$clsPath] = PHP_INT_MAX;
-            } else {
-                LogWrapper::$LOG_CACHED_LEVELS[$clsPath] = LogWrapper::$LOG_LEVEL_NAMES[$clsLevel] ?? 0;
-            }
-        }
-    }
 
     public static function logEmergency(string $message, array $context = []) {
         self::logLog(MonoLogger::EMERGENCY, $message, $context);
@@ -104,5 +82,4 @@ trait Wlf4p {
 
         LoggerManager::getLogger()->addRecord($level, $cls . $message, $context);
     }
-
 }
