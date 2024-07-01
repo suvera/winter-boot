@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace dev\winterframework\pdbc\datasource;
@@ -6,38 +7,38 @@ namespace dev\winterframework\pdbc\datasource;
 use dev\winterframework\stereotype\JsonProperty;
 
 class DataSourceConfig {
-    private string $name;
+    protected string $name;
 
     #[JsonProperty("isPrimary")]
-    private bool $primary = false;
+    protected bool $primary = false;
 
-    private string $url;
-    private string $username = '';
-    private string $password = '';
+    protected string $url;
+    protected string $username = '';
+    protected string $password = '';
 
-    private string $validationQuery = '';
-    private string $driverClass;
+    protected string $validationQuery = '';
+    protected string $driverClass;
 
     #[JsonProperty("connection.persistent")]
-    private bool $persistent = false;
+    protected bool $persistent = false;
 
     #[JsonProperty("connection.errorMode")]
-    private string $errorMode = 'ERRMODE_EXCEPTION';
+    protected string $errorMode = 'ERRMODE_EXCEPTION';
 
     #[JsonProperty("connection.columnsCase")]
-    private string $columnsCase = 'ERRMODE_EXCEPTION';
+    protected string $columnsCase = 'ERRMODE_EXCEPTION';
 
     #[JsonProperty("connection.timeoutSecs")]
-    private int $timeoutSecs = 30;
+    protected int $timeoutSecs = 30;
 
     #[JsonProperty("connection.autoCommit")]
-    private bool $autoCommit = true;
+    protected bool $autoCommit = true;
 
     #[JsonProperty("connection.rowsPrefetch")]
-    private int $rowsPrefetch = 100;
+    protected int $rowsPrefetch = 100;
 
     #[JsonProperty("connection.idleTimeout")]
-    private int $idleTimeout = 600;
+    protected int $idleTimeout = 600;
 
     public function getName(): string {
         return $this->name;
@@ -150,5 +151,4 @@ class DataSourceConfig {
     public function setIdleTimeout(int $idleTimeout): void {
         $this->idleTimeout = $idleTimeout;
     }
-
 }

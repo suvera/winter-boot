@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace dev\winterframework\core\context;
@@ -140,52 +141,73 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
 
     private function registerInternals(): void {
         $this->beanProvider->registerInternalBean(
-            $this, ApplicationContext::class
+            $this,
+            ApplicationContext::class
         );
 
         $this->beanProvider->registerInternalBean(
-            $this->contextData->getAopRegistry(), AopInterceptorRegistry::class
+            $this->contextData->getAopRegistry(),
+            AopInterceptorRegistry::class
         );
 
         $this->beanProvider->registerInternalBean(
-            new ApplicationLogger(), ApplicationLogger::class
+            new ApplicationLogger(),
+            ApplicationLogger::class
         );
 
         $this->beanProvider->registerInternalBean(
-            new DefaultResponseRenderer(), ResponseRenderer::class, false
+            new DefaultResponseRenderer(),
+            ResponseRenderer::class,
+            false
         );
 
         $this->beanProvider->registerInternalBean(
-            new DefaultErrorController(), ErrorController::class, false
+            new DefaultErrorController(),
+            ErrorController::class,
+            false
         );
 
         $this->beanProvider->registerInternalBean(
-            new DefaultWebMvcConfigurer(), WebMvcConfigurer::class, false
+            new DefaultWebMvcConfigurer(),
+            WebMvcConfigurer::class,
+            false
         );
 
         $cacheManager = new DefaultCacheManager();
         $this->beanProvider->registerInternalBean(
-            $cacheManager, CacheManager::class, false
+            $cacheManager,
+            CacheManager::class,
+            false
         );
 
         $this->beanProvider->registerInternalBean(
-            new SimpleCacheResolver($cacheManager), CacheResolver::class, false
+            new SimpleCacheResolver($cacheManager),
+            CacheResolver::class,
+            false
         );
 
         $this->beanProvider->registerInternalBean(
-            new SimpleKeyGenerator(), KeyGenerator::class, false
+            new SimpleKeyGenerator(),
+            KeyGenerator::class,
+            false
         );
 
         $this->beanProvider->registerInternalBean(
-            new SimpleKeyGenerator(), KeyGenerator::class, false
+            new SimpleKeyGenerator(),
+            KeyGenerator::class,
+            false
         );
 
         $this->beanProvider->registerInternalBean(
-            new DefaultLockManager(), LockManager::class, false
+            new DefaultLockManager(),
+            LockManager::class,
+            false
         );
 
         $this->beanProvider->registerInternalBean(
-            new IdleCheckRegistry(), IdleCheckRegistry::class, false
+            new IdleCheckRegistry(),
+            IdleCheckRegistry::class,
+            false
         );
 
         $this->registerPrometheusBeans();
@@ -204,10 +226,11 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         $dsBuilder = new DataSourceBuilder($this, $this->contextData, $ds);
         foreach ($dsBuilder->getDataSourceConfig() as $beanName => $config) {
             if ($this->hasBeanByName($beanName)) {
-                throw new NoUniqueBeanDefinitionException('DataSource creation failed, '
-                    . 'due to no qualifying bean with name '
-                    . "'$beanName' available: expected single matching bean but found multiple "
-                    . DataSource::class
+                throw new NoUniqueBeanDefinitionException(
+                    'DataSource creation failed, '
+                        . 'due to no qualifying bean with name '
+                        . "'$beanName' available: expected single matching bean but found multiple "
+                        . DataSource::class
                 );
             }
 
@@ -221,8 +244,10 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
             );
         }
 
-        if (!$this->hasBeanByClass(PdbcTemplate::class)
-            && !$this->hasBeanByClass(PdoTemplateProvider::class)) {
+        if (
+            !$this->hasBeanByClass(PdbcTemplate::class)
+            && !$this->hasBeanByClass(PdoTemplateProvider::class)
+        ) {
             $this->addClass(PdoTemplateProvider::class);
         }
 
@@ -230,11 +255,28 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
             '',
             PlatformTransactionManager::class,
             $dsBuilder,
-            'getTransactionManager',
+            'getPrimaryTransactionManager',
             [],
             false
         );
 
+        $this->beanProvider->registerInternalBeanMethod(
+            $beanName . DataSourceBuilder::TXN_SUFFIX,
+            '',
+            $dsBuilder,
+            'getTransactionManager',
+            ['name' => $beanName . DataSourceBuilder::TXN_SUFFIX],
+            false
+        );
+
+        $this->beanProvider->registerInternalBeanMethod(
+            $beanName . DataSourceBuilder::TEMPLATE_SUFFIX,
+            '',
+            $dsBuilder,
+            'getPdbcTemplate',
+            ['name' => $beanName . DataSourceBuilder::TEMPLATE_SUFFIX],
+            false
+        );
     }
 
     private function eagerLoadBeans(): void {
@@ -260,7 +302,6 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         if ($table) {
             EntityRegistry::putEntity($resource);
         }
-
     }
 
     public function addClass(string $class): ClassResource {
@@ -328,5 +369,4 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
             false
         );
     }
-
 }

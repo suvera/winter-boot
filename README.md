@@ -113,7 +113,7 @@ Go through this document **[Building Service](docs/build.md)**
 - [REST API Development](docs/rest_api.md)
 - [Caching](docs/caching.md)
 - [Custom StereoTypes & Aspect Oriented Magic](docs/custom_aop.md)
-- [Transaction Management](docs/transactions.md)
+- [Databases & Transactions](docs/transactions.md)
 - [Actuator](docs/actuator.md)
 - [Locking](docs/locking.md)
 - [Json and XML](docs/json_xml.md)
@@ -132,6 +132,7 @@ This framework can be extended even further by using
 Create a new module by extending [WinterModule](src/core/app/WinterModule.php). 
 Check out below modules for reference
 
+- [Doctrine ORM/DBAL Module](https://github.com/suvera/winter-doctrine)
 - [Redis Module](https://github.com/suvera/winter-modules/tree/master/winter-data-redis)
 - [Apache Kafka Module](https://github.com/suvera/winter-modules/tree/master/winter-kafka)
 - [DTCE Module](https://github.com/suvera/winter-modules/tree/master/winter-dtce)

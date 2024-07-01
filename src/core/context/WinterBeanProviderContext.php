@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace dev\winterframework\core\context;
@@ -16,7 +17,6 @@ use dev\winterframework\reflection\proxy\ProxyGenerator;
 use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\reflection\ReflectionUtil;
-use dev\winterframework\reflection\VariableResource;
 use dev\winterframework\stereotype\Autowired;
 use dev\winterframework\stereotype\Bean;
 use dev\winterframework\stereotype\cli\Command;
@@ -131,7 +131,8 @@ final class WinterBeanProviderContext implements BeanProviderContext {
 
             case HealthInformer::class:
             case InfoInformer::class:
-                if ($this->ctxData->getAttributesToScan()->offsetExists($attrClass)
+                if (
+                    $this->ctxData->getAttributesToScan()->offsetExists($attrClass)
                     && !$this->hasBeanByClass($class->getClass()->getName())
                 ) {
                     /** @var HealthInformer|InfoInformer $attribute */
@@ -185,12 +186,15 @@ final class WinterBeanProviderContext implements BeanProviderContext {
 
     private function registerBeanProvider(BeanProvider $beanProvider, Bean $beanDef) {
         if ($beanDef->name) {
-            if (isset($this->beanNameFactory[$beanDef->name])
-                && !$this->beanNameFactory[$beanDef->name]->equals($beanProvider)) {
-                throw new WinterException('Duplicate Bean name found at class definition '
-                    . $beanProvider->toString()
-                    . ', as it was already defined for class '
-                    . $this->beanNameFactory[$beanDef->name]->toString()
+            if (
+                isset($this->beanNameFactory[$beanDef->name])
+                && !$this->beanNameFactory[$beanDef->name]->equals($beanProvider)
+            ) {
+                throw new WinterException(
+                    'Duplicate Bean name found at class definition '
+                        . $beanProvider->toString()
+                        . ', as it was already defined for class '
+                        . $this->beanNameFactory[$beanDef->name]->toString()
                 );
             }
             $this->beanNameFactory[$beanDef->name] = $beanProvider;
@@ -254,10 +258,11 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         if (isset($this->beanClassFactory[$class])) {
 
             if (count($this->beanClassFactory[$class]) > 1) {
-                throw new NoUniqueBeanDefinitionException('No qualifying bean of type '
-                    . "'$class' available: expected single matching bean but found "
-                    . count($this->beanClassFactory[$class]) . ': '
-                    . implode(', ', array_keys($this->beanClassFactory[$class]))
+                throw new NoUniqueBeanDefinitionException(
+                    'No qualifying bean of type '
+                        . "'$class' available: expected single matching bean but found "
+                        . count($this->beanClassFactory[$class]) . ': '
+                        . implode(', ', array_keys($this->beanClassFactory[$class]))
                 );
             }
 
@@ -358,8 +363,9 @@ final class WinterBeanProviderContext implements BeanProviderContext {
                 $msg .= '  -- ' . $beanProv->toString() . "\n";
             }
             $msg .= "|__________|\n";
-            throw new BeansDependencyException("The dependencies of some of the beans "
-                . "in the application context form a cycle: \n\n$msg\n"
+            throw new BeansDependencyException(
+                "The dependencies of some of the beans "
+                    . "in the application context form a cycle: \n\n$msg\n"
             );
         }
         $this->beanResolutionOrder[$beanId] = $beanProvider;
@@ -459,7 +465,7 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         BeanProvider $beanProvider
     ): mixed {
         if ($beanProvider->hasMethodArgs()) {
-            $args = $beanProvider->hasMethodArgs();
+            $args = $beanProvider->getMethodArgs();
         } else {
             $args = $this->buildMethodArguments($method);
         }
@@ -514,9 +520,10 @@ final class WinterBeanProviderContext implements BeanProviderContext {
 
         $bean = $this->callObjectMethod($providerBean, $m->getDelegate(), $beanProvider);
         if (!isset($bean)) {
-            throw new BeansException('' . $m->getReturnType()->getName()
-                . ', out of #[Bean] method '
-                . ReflectionUtil::getFqName($m)
+            throw new BeansException(
+                '' . $m->getReturnType()->getName()
+                    . ', out of #[Bean] method '
+                    . ReflectionUtil::getFqName($m)
             );
         }
 
@@ -549,18 +556,20 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         /** @var ReflectionNamedType $type */
         $type = $parameter->getType();
         if ($type === null) {
-            throw new TypeError("Arguments for Method "
-                . ReflectionUtil::getFqName($method)
-                . " must have Type Hinted"
+            throw new TypeError(
+                "Arguments for Method "
+                    . ReflectionUtil::getFqName($method)
+                    . " must have Type Hinted"
             );
         }
 
         if ($type->isBuiltin()) {
             if (!$parameter->isDefaultValueAvailable()) {
-                throw new TypeError("Method "
-                    . ReflectionUtil::getFqName($method)
-                    . " has parameter " . ReflectionUtil::getFqName($parameter)
-                    . " without default value, so cannot instantiate this class"
+                throw new TypeError(
+                    "Method "
+                        . ReflectionUtil::getFqName($method)
+                        . " has parameter " . ReflectionUtil::getFqName($parameter)
+                        . " without default value, so cannot instantiate this class"
                 );
             }
         }
@@ -603,8 +612,10 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         try {
             $ref = new RefKlass($beanClass);
         } catch (Throwable $e) {
-            throw new ClassNotFoundException('Could not load class "' . $beanClass,
-                0, $e
+            throw new ClassNotFoundException(
+                'Could not load class "' . $beanClass,
+                0,
+                $e
             );
         }
         $class = new ClassResource();

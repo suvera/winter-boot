@@ -1,8 +1,88 @@
+# Databases
+
+Configure datasources in your application.yml
+
+## application.yml
+
+In below example, there are two datasources configured here with names.
+
+1. defaultdb  (**isPrimary: true**)
+2. admindb
+
+```yaml
+
+datasource:
+    -   name: defaultdb
+        isPrimary: true
+        url: "sqlite::memory:"
+        username: xxxxx
+        password: xxzzz
+        doctrine:
+            entityPaths:
+                - /path/to/defaultdb/entities
+            isDevMode: false
+
+    -   name: admindb
+        url: "mysql:host=localhost;port=3307;dbname=testdb"
+        username: xxxxx
+        password: xxzzz
+        doctrine:
+            entityPaths:
+                - /path/to/admindb/entities
+                - /path/other/admindb/entities2
+            isDevMode: false
+            driver:
+            driverOptions:
+            wrapperClass:
+            driverClass: 
+        connection:
+            persistent: true
+            errorMode: ERRMODE_EXCEPTION
+            columnsCase: CASE_NATURAL
+            idleTimeout: 300
+            autoCommit: true
+            defaultrowprefetch: 100
+
+```
+
+## PdbcTemplate
+
+This is a template of database operations created automatically by the framework.
+
+Below PdbcTemplate created for the Primary datasource (defaultdb)
+```phpt
+
+#[Autowired]
+private PdbcTemplate $pdbc;
+
+```
+
+Below PdbcTemplate created for the any datasource (ex: admindb)
+```phpt
+
+#[Autowired("admindb-template")]
+private PdbcTemplate $adminPdbc;
+
+```
+
+Check the PdbcTemplate interface for the available methods.
+
+
 # Transaction Management
 
 Framework comes-up with a annotation to manage transactions.
 
+To enable transactions , you need enable it on your application using **#[EnableTransactionManagement]** annotation.
 
+```phpt
+#[EnableTransactionManagement]
+class MyApplication {
+    public static function main() {
+        (new WinterWebApplication())->run(MyApplication::class);
+    }
+}
+
+```
 
 ## Transactional
 
@@ -17,11 +97,24 @@ If you want to extend and create your own transaction manager, then implement Pl
 
 #### Example (default transaction manager)
 
+Below transaction is handled by the Default transaction manager (defaultdb)
 ```phpt
 
 #[Transactional]
 public function executeInTransaction(): void {
     // do something here
+    
+}
+
+```
+
+Below transaction is handled by the other transaction manager (admindb)
+```phpt
+
+#[Transactional("admindb-txn")]
+public function executeInTransaction(): void {
+    // do something here
+    
 }
 
 ```

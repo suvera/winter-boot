@@ -38,7 +38,11 @@ abstract class ReflectionAbstract implements Serializable {
 
     public function __call(string $name, mixed $arguments): mixed {
         $this->getDelegate();
-        return $this->delegate->$name(...$arguments);
+        if ($this->delegate instanceof \ReflectionProperty && $name === 'setValue' && count($arguments) == 1) {
+            return $this->delegate->getDeclaringClass()->setStaticPropertyValue($this->delegate->getName(), $arguments[0]);
+        } else {
+            return $this->delegate->$name(...$arguments);
+        }
     }
 
     protected abstract function loadDelegate(): mixed;

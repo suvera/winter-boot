@@ -34,7 +34,7 @@ myApp:
 
 datasource:
     -   name: default
-        url: "pdbc:sqlite:/opt/databases/mydb.sq3"
+        url: "sqlite:/opt/databases/mydb.sq3"
         username:
         password:
         validationQuery: SELECT 'Databse Connected'

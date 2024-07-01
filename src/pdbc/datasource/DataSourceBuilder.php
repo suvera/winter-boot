@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace dev\winterframework\pdbc\datasource;
@@ -9,6 +10,8 @@ use dev\winterframework\exception\ClassNotFoundException;
 use dev\winterframework\exception\WinterException;
 use dev\winterframework\io\timer\IdleCheckRegistry;
 use dev\winterframework\pdbc\DataSource;
+use dev\winterframework\pdbc\PdbcTemplate;
+use dev\winterframework\pdbc\pdo\PdoTemplate;
 use dev\winterframework\pdbc\pdo\PdoTransactionManager;
 use dev\winterframework\reflection\ObjectCreator;
 use dev\winterframework\reflection\ref\RefKlass;
@@ -22,6 +25,9 @@ use WeakMap;
 
 class DataSourceBuilder {
     use Wlf4p;
+
+    const TXN_SUFFIX = '-txn';
+    const TEMPLATE_SUFFIX = '-template';
 
     /**
      * @var DataSource[]
@@ -53,11 +59,17 @@ class DataSourceBuilder {
 
         foreach ($dataSources as $dataSource) {
 
-            TypeAssert::notEmpty('name', $dataSource['name'],
-                'DataSource configured without "name" parameter');
+            TypeAssert::notEmpty(
+                'name',
+                $dataSource['name'],
+                'DataSource configured without "name" parameter'
+            );
 
-            TypeAssert::notEmpty('url', $dataSource['url'],
-                'DataSource configured without "url" parameter');
+            TypeAssert::notEmpty(
+                'url',
+                $dataSource['url'],
+                'DataSource configured without "url" parameter'
+            );
 
             if (isset($dataSource['driverClass'])) {
                 if (!class_exists($dataSource['driverClass'], true)) {
@@ -111,8 +123,24 @@ class DataSourceBuilder {
         return $this->dataSources;
     }
 
-    public function getTransactionManager(): PlatformTransactionManager {
+    public function getPrimaryTransactionManager(): PlatformTransactionManager {
         return new PdoTransactionManager($this->ctx->beanByClass(DataSource::class));
+    }
+
+    public function getTransactionManager(string $name): PlatformTransactionManager {
+        $parts = explode('-', $name);
+        if ('-' . $parts[count($parts) - 1] == self::TXN_SUFFIX) {
+            $name = implode('-', explode('-', $name, -1));
+        }
+        return new PdoTransactionManager($this->getDataSource($name));
+    }
+
+    public function getPdbcTemplate(string $name): PdbcTemplate {
+        $parts = explode('-', $name);
+        if ('-' . $parts[count($parts) - 1] == self::TEMPLATE_SUFFIX) {
+            $name = implode('-', explode('-', $name, -1));
+        }
+        return new PdoTemplate($this->getDataSource($name));
     }
 
     public function getPrimaryDataSource(): DataSource {
@@ -167,5 +195,4 @@ class DataSourceBuilder {
 
         return $obj;
     }
-
 }
