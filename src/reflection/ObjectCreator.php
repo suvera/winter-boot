@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace dev\winterframework\reflection;
@@ -21,7 +22,7 @@ class ObjectCreator {
         return ReflectionRegistry::getClass($class);
     }
 
-    public static function createObject(string $class, string|array $props): object {
+    public static function createObject(string $class, string|array $props, string $parentName = ''): object {
         $ref = self::getClass($class);
 
         try {
@@ -33,10 +34,10 @@ class ObjectCreator {
         } catch (ReflectionException $e) {
             throw new WinterException('Could not create object of class ' . $class, 0, $e);
         }
-        return self::mapObject($obj, $props, $ref);
+        return self::mapObject($obj, $props, $ref, $parentName);
     }
 
-    public static function mapObject(object $obj, string|array $props, ReflectionClass $ref = null): object {
+    public static function mapObject(object $obj, string|array $props, ReflectionClass $ref = null, string $parentName = ''): object {
         if (!$ref) {
             $ref = self::getClass($obj);
         }
@@ -48,6 +49,7 @@ class ObjectCreator {
             if (count($attrs) > 0) {
                 $gotValue = false;
                 /** @var JsonProperty $attr */
+                $attr = null;
                 try {
                     $attr = $attrs[0]->newInstance();
                     $attr->init(RefProperty::getInstance($refProp));
@@ -65,9 +67,14 @@ class ObjectCreator {
                         $extName = $attr->name;
                     }
 
+                    $fqdn = $extName;
+                    if (!empty($fqdn) && !empty($parentName)) {
+                        $fqdn = $parentName . '.' . $extName;
+                    }
+
                     if (!$gotValue && $attr->isRequired() && !isset($props[$extName])) {
-                        throw new InvalidSyntaxException('Property "' . $refProp->getName()
-                            . '" is Required, at class ' . $ref->getName()
+                        throw new InvalidSyntaxException(
+                            'Property "' . $fqdn . '" is Required, for the object ' . $ref->getName()
                         );
                     }
 
@@ -75,8 +82,8 @@ class ObjectCreator {
 
                         if ($attr->isList()) {
                             if (!is_array($props[$extName])) {
-                                throw new InvalidSyntaxException('Property "' . $refProp->getName()
-                                    . '" is defined as Array, but non-array value seen, at class ' . $ref->getName()
+                                throw new InvalidSyntaxException(
+                                    'Property "' . $fqdn . '" accepts list of values only, for the object ' . $ref->getName()
                                 );
                             }
                             $list = [];
@@ -85,20 +92,27 @@ class ObjectCreator {
                             }
                             $props[$extName] = $list;
                         } else if ($attr->isObject()) {
-                            $props[$extName] = ObjectCreator::createObject($attr->getObjectClass(), $props[$extName]);
+                            $props[$extName] = ObjectCreator::createObject($attr->getObjectClass(), $props[$extName], $fqdn);
                         }
                     }
-
                 } catch (InvalidSyntaxException $ex) {
                     throw $ex;
                 } catch (Throwable $e) {
-                    throw new InvalidSyntaxException('Invalid JsonProperty on property '
-                        . $refProp->getName() . ', for class ' . $ref->getName(), 0, $e
+                    throw new InvalidSyntaxException(
+                        'Invalid JsonProperty on property ' . $extName . ', for the object' . $ref->getName(),
+                        0,
+                        $e
                     );
                 }
             }
 
             if (isset($props[$extName])) {
+                if (isset($attr)) {
+                    $err = $attr->validate($fqdn, $props[$extName]);
+                    if ($err) {
+                        throw new InvalidSyntaxException($err);
+                    }
+                }
                 self::doSetObjectProperty($refProp, $obj, $props[$extName]);
             }
         }

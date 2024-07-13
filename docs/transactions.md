@@ -26,15 +26,6 @@ datasource:
         url: "mysql:host=localhost;port=3307;dbname=testdb"
         username: xxxxx
         password: xxzzz
-        doctrine:
-            entityPaths:
-                - /path/to/admindb/entities
-                - /path/other/admindb/entities2
-            isDevMode: false
-            driver:
-            driverOptions:
-            wrapperClass:
-            driverClass: 
         connection:
             persistent: true
             errorMode: ERRMODE_EXCEPTION

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace dev\winterframework\reflection\support;
@@ -93,6 +94,26 @@ class ParameterType {
         return strtolower($this->name) == 'void';
     }
 
+    public function isStringType(): bool {
+        return strtolower($this->name) == 'string';
+    }
+
+    public function isIntegerType(): bool {
+        return strtolower($this->name) == 'int';
+    }
+
+    public function isFloatType(): bool {
+        return strtolower($this->name) == 'float';
+    }
+
+    public function isBooleanType(): bool {
+        return strtolower($this->name) == 'bool' || strtolower($this->name) == 'false' || strtolower($this->name) == 'true';
+    }
+
+    public function isArrayType(): bool {
+        return strtolower($this->name) == 'array' || (is_a($this->name, \ArrayAccess::class, true) && is_a($this->name, \IteratorAggregate::class, true));
+    }
+
     public function allowsNull(): bool {
         return $this->allowsNull;
     }
@@ -107,6 +128,11 @@ class ParameterType {
 
     public function getNames(): array {
         return $this->names;
+    }
+
+    /** @return ParameterType[] */
+    public function getUnionTypes(): array {
+        return $this->unionTypes;
     }
 
     public function hasType(string $type): bool {
@@ -172,8 +198,9 @@ class ParameterType {
     ): mixed {
         if (is_null($value)) {
             if (!$this->allowsNull() && is_null($defaultValue)) {
-                throw new NullPointerException('Property "'
-                    . $this->name . '" cannot be nullable '
+                throw new NullPointerException(
+                    'Property "'
+                        . $this->name . '" cannot be nullable '
                 );
             }
             return $defaultValue;
@@ -222,23 +249,20 @@ class ParameterType {
 
             if ($this->hasType("string")) {
                 return $value;
-
             } else if ($this->hasType("bool") && ($valLower === 'true' || $valLower === 'false')) {
                 return ($valLower === 'true');
-
             } else if (is_numeric($value)) {
                 $value = $value + 0;
                 if (is_float($value) && $this->hasType("float")) {
                     return $value;
-
                 } else if ($this->hasType("int")) {
                     return $value;
-
                 }
             } else if ($this->isDateTimeType()) {
                 try {
                     return new DateTime($value);
-                } /** @noinspection PhpUnusedLocalVariableInspection */
+                }
+                /** @noinspection PhpUnusedLocalVariableInspection */
                 catch (Throwable $e) {
                     // do nothing
                 }
@@ -252,7 +276,6 @@ class ParameterType {
         if (is_array($value)) {
             if ($this->hasType("array")) {
                 return $value;
-
             }
 
             $classTypes = $this->getClassTypes();
@@ -302,8 +325,9 @@ class ParameterType {
     private function throwTypeError(
         string $type = ''
     ): void {
-        throw new TypeError('Parameter "' . $this->name
-            . '" cannot be assigned to "' . $type . '"'
+        throw new TypeError(
+            'Parameter "' . $this->name
+                . '" cannot be assigned to "' . $type . '"'
         );
     }
 }
