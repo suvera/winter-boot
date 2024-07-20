@@ -15,6 +15,7 @@ class ResponseEntity {
     protected HttpHeaders $headers;
     protected mixed $body = null;
     protected HttpStatus $status;
+    protected bool $statusSet;
     protected HttpOutputStream $outputStream;
     /**
      * @var HttpCookie[]
@@ -73,8 +74,13 @@ class ResponseEntity {
     }
 
     public function withStatus(HttpStatus $status): self {
+        $this->statusSet = true;
         $this->status = $status;
         return $this;
+    }
+
+    public function isStatusSet(): bool {
+        return $this->statusSet;
     }
 
     public function withStatusCode(int $code): self {
@@ -199,6 +205,24 @@ class ResponseEntity {
         $obj = new self();
         $obj->withStatus(HttpStatus::$UNAUTHORIZED);
         return $obj;
+    }
+
+    public static function getUnauthorizedBody(string $err = 'Unauthorized'): array {
+        return [
+            'timestamp' => gmdate('Y-m-d\TH:i:s\Z'),
+            'status' => HttpStatus::$UNAUTHORIZED->getValue(),
+            'message' => HttpStatus::$UNAUTHORIZED->getReasonPhrase(),
+            'error' => $err
+        ];
+    }
+
+    public static function defaultBody(array $data = []): array {
+        return array_merge([
+            'timestamp' => gmdate('Y-m-d\TH:i:s\Z'),
+            'status' => HttpStatus::$OK->getValue(),
+            'message' => 'Success',
+            'error' => null
+        ], $data);
     }
 
     public static function movedAway(bool $isTemporary = true): self {

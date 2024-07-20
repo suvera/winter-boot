@@ -88,7 +88,7 @@ class ObjectCreator {
                             }
                             $list = [];
                             foreach ($props[$extName] as $value) {
-                                $list[] = ObjectCreator::createObject($attr->getListClass(), $value);
+                                $list[] = ObjectCreator::createObject($attr->getListClass(), $value, $fqdn);
                             }
                             $props[$extName] = $list;
                         } else if ($attr->isObject()) {

@@ -1,4 +1,5 @@
 <?php
+
 /** @noinspection PhpUnused */
 
 declare(strict_types=1);
@@ -26,7 +27,8 @@ trait Data {
 
             try {
                 $property = $this->reflection->getProperty($field);
-            } /** @noinspection PhpUnusedLocalVariableInspection */
+            }
+            /** @noinspection PhpUnusedLocalVariableInspection */
             catch (ReflectionException $e) {
                 $property = null;
             }
@@ -49,6 +51,8 @@ trait Data {
 
                     if ($actual === 'object') {
                         $actual = get_class($arguments[0]);
+                    } else if ($actual === 'integer') {
+                        $actual = 'int';
                     }
 
                     if ($actual !== $expected) {

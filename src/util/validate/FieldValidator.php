@@ -260,6 +260,7 @@ class FieldValidator {
             }
             return null;
         }
+        return $msg;
     }
 
     protected function validateOneOf(string $paramName, ParameterType $paramType, mixed $value, array $xtraArgs): ?string {
@@ -268,7 +269,7 @@ class FieldValidator {
         }
         $msg = 'Property ' . $paramName . ' must be one of ' . implode(',', $xtraArgs['values']);
         if ($paramType->isStringType()) {
-            if (!in_array($value, $xtraArgs)) {
+            if (!in_array($value, $xtraArgs['values'])) {
                 return $msg;
             }
             return null;
@@ -277,12 +278,14 @@ class FieldValidator {
                 return $msg;
             }
             foreach ($value as $val) {
-                if (!in_array($val, $xtraArgs)) {
+                if (!in_array($val, $xtraArgs['values'])) {
                     return $msg;
                 }
             }
             return null;
         }
+
+        return $msg;
     }
 
     protected function validateRegex(string $paramName, ParameterType $paramType, mixed $value, array $xtraArgs): ?string {
@@ -365,6 +368,7 @@ class FieldValidator {
             }
             return null;
         }
+        return $msg;
     }
 
     protected function validateHttpUrl(string $paramName, ParameterType $paramType, mixed $value, array $xtraArgs): ?string {
@@ -402,7 +406,7 @@ class FieldValidator {
         }
 
         if ($paramType->isStringType()) {
-            if (mb_strlen($value) < $xtraArgs['min'] || mb_strlen($value) > $xtraArgs['max']) {
+            if (strlen($value) < $xtraArgs['min'] || strlen($value) > $xtraArgs['max']) {
                 return $msg;
             }
             return null;
@@ -411,7 +415,7 @@ class FieldValidator {
                 return $msg;
             }
             foreach ($value as $val) {
-                if (mb_strlen($val) < $xtraArgs['min'] || mb_strlen($val) > $xtraArgs['max']) {
+                if (strlen($val) < $xtraArgs['min'] || strlen($val) > $xtraArgs['max']) {
                     return $msg;
                 }
             }
@@ -432,10 +436,9 @@ class FieldValidator {
         return $msg;
     }
 
-    // validate Username
     protected function validateUsername(string $paramName, ParameterType $paramType, mixed $value, array $xtraArgs): ?string {
         if (!isset($xtraArgs['regex']) || empty($xtraArgs['regex'])) {
-            $xtraArgs['regex'] = '/^[a-zA-Z0-9_\-]*$/';
+            $xtraArgs['regex'] = '/^\w+([\-\.]\w+)*$/';
         }
         $msg = $this->validateRegex($paramName, $paramType, $value, $xtraArgs);
         if ($msg !== null) {

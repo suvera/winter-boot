@@ -102,7 +102,8 @@ abstract class WinterApplicationRunner {
 
         if ($resource == null) {
             throw new NotWinterApplicationException(
-                "Could not find WinterBootApplication for class '$appClass'");
+                "Could not find WinterBootApplication for class '$appClass'"
+            );
         }
         return $resource;
     }
@@ -146,8 +147,10 @@ abstract class WinterApplicationRunner {
             throw new WinterException('configDirectory is empty for application '
                 . ReflectionUtil::getFqName($this->bootApp));
         }
-        TypeAssert::stringArray($bootConfig->configDirectory,
-            ' configDirectory is not configured well, please follow documentation');
+        TypeAssert::stringArray(
+            $bootConfig->configDirectory,
+            ' configDirectory is not configured well, please follow documentation'
+        );
 
         if (empty($bootConfig->scanNamespaces)) {
             throw new WinterException('scanNamespaces is empty for application '
@@ -156,18 +159,26 @@ abstract class WinterApplicationRunner {
 
         $this->scanNamespaces = Psr4Namespaces::ofValues();
         foreach ($bootConfig->scanNamespaces as $nsRow) {
-            TypeAssert::array($nsRow,
-                ' scanNamespaces is not configured well, please follow documentation');
-            TypeAssert::string($nsRow[0],
-                ' scanNamespaces is not configured well, please follow documentation');
-            TypeAssert::string($nsRow[1],
-                ' scanNamespaces is not configured well, please follow documentation');
+            TypeAssert::array(
+                $nsRow,
+                ' scanNamespaces is not configured well, please follow documentation'
+            );
+            TypeAssert::string(
+                $nsRow[0],
+                ' scanNamespaces is not configured well, please follow documentation'
+            );
+            TypeAssert::string(
+                $nsRow[1],
+                ' scanNamespaces is not configured well, please follow documentation'
+            );
 
             $this->scanNamespaces[] = new Psr4Namespace($nsRow[0], $nsRow[1]);
         }
 
-        TypeAssert::stringArray($bootConfig->scanExcludeNamespaces,
-            ' scanExcludeNamespaces is not configured well, please follow documentation');
+        TypeAssert::stringArray(
+            $bootConfig->scanExcludeNamespaces,
+            ' scanExcludeNamespaces is not configured well, please follow documentation'
+        );
 
         $this->bootConfig = $bootConfig;
     }
@@ -300,7 +311,7 @@ abstract class WinterApplicationRunner {
     }
 
     private function buildApplicationLogger(array $configDirs, ?string $profile = null): void {
-        $suffix = (isset($this->profile) && strlen($profile) ? '-' . $profile : '');
+        $suffix = (isset($profile) && strlen($profile) ? '-' . $profile : '');
         $logFiles = [
             'logger' . $suffix . '.yml',
             'logger' . '.yml',

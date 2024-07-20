@@ -80,7 +80,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
         $matchedRoute = $this->mappingRegistry->find($uri, $request->getMethod());
 
         if ($matchedRoute === null) {
-            self::logError('Could not find Requested URI [' . $request->getMethod() . ']' . $uri);
+            self::logError('Could not find Requested URI [' . $request->getMethod() . '] ' . $uri);
             $this->handleError(
                 $request,
                 $response,
@@ -374,7 +374,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 return ObjectCreator::createObject($varType, $row);
             } catch (Throwable $e) {
                 self::logException($e);
-                throw new WinterException('Bad Request: Wrong JSON data passed');
+                throw new WinterException('Bad Request: Wrong JSON data passed, ' . $e->getMessage());
             }
         } else if (!$body->disableParsing && (str_contains($contentType, MediaType::APPLICATION_XML)
             || str_contains($contentType, MediaType::TEXT_XML))) {

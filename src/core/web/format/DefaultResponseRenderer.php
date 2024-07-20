@@ -1,5 +1,7 @@
 <?php
+
 /** @noinspection PhpUnusedParameterInspection */
+
 declare(strict_types=1);
 
 namespace dev\winterframework\core\web\format;
@@ -88,7 +90,8 @@ class DefaultResponseRenderer extends AbstractResponseRenderer implements Respon
                 }
                 $stream->write($json);
             }
-        } else if (is_array($body)
+        } else if (
+            is_array($body)
             || $body instanceof ArrayObject
         ) {
             $json = json_encode($body, $prettyPrint);
@@ -140,5 +143,4 @@ class DefaultResponseRenderer extends AbstractResponseRenderer implements Respon
         $this->processResponse($entity, false, $stream);
         $stream->flush();
     }
-
 }
