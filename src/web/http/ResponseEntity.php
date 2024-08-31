@@ -36,6 +36,10 @@ class ResponseEntity {
             $this->cookies = array_merge($this->cookies, $other->cookies);
         }
 
+        if (!empty($other->status)) {
+            $this->status = $other->status;
+        }
+
         if (
             isset($other->body) && !empty($other->body)
             && (!isset($this->body) || empty($this->body))

@@ -287,7 +287,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
          */
         if ($controller instanceof ControllerInterceptor) {
             if (!$controller->preHandle($request, $response, $method->getDelegate())) {
-                $renderer->render($response, $request);
+                $renderer->renderAndExit($response, $request);
                 return;
             }
         }
@@ -345,13 +345,21 @@ class DispatcherServlet implements HttpRequestDispatcher {
             return $rawBody;
         }
 
-        if (
-            str_contains($contentType, MediaType::APPLICATION_FORM_URLENCODED)
-            || str_contains($contentType, MediaType::MULTIPART_FORM_DATA)
-        ) {
+        if (str_contains($contentType, MediaType::APPLICATION_FORM_URLENCODED)) {
 
             try {
                 return ObjectCreator::createObject($varType, $_POST);
+            } catch (Throwable $e) {
+                self::logException($e);
+                throw new WinterException('Bad Request: Unexpected data passed');
+            }
+        } else if (str_contains($contentType, MediaType::MULTIPART_FORM_DATA)) {
+            $data = $_POST;
+            if (isset($_FILES)) {
+                $data = array_merge($data, $_FILES);
+            }
+            try {
+                return ObjectCreator::createObject($varType, $data);
             } catch (Throwable $e) {
                 self::logException($e);
                 throw new WinterException('Bad Request: Unexpected data passed');

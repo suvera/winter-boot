@@ -7,14 +7,17 @@ namespace dev\winterframework\util\validate;
 use dev\winterframework\reflection\support\ParameterType;
 use dev\winterframework\util\DateUtil;
 use dev\winterframework\util\log\Wlf4p;
+use dev\winterframework\web\http\HttpUploadedFile;
 
 class FieldValidator {
     use Wlf4p;
-    private static ?FieldValidator $instance = null;
+    protected static ?FieldValidator $instance = null;
+    protected \finfo $mimeFinder;
 
     public static function getInstance(): FieldValidator {
         if (self::$instance === null) {
             self::$instance = new FieldValidator();
+            self::$instance->mimeFinder = new \finfo(FILEINFO_MIME_TYPE);
         }
 
         return self::$instance;
@@ -445,5 +448,56 @@ class FieldValidator {
             return 'Property ' . $paramName . ' must satisfy Username requirements';
         }
         return null;
+    }
+
+    protected function validateUploadedFile(string $paramName, ParameterType $paramType, mixed $value, array $xtraArgs): ?string {
+        $msg = 'Property ' . $paramName . ' must be of type ' . HttpUploadedFile::class;
+
+        $maxFiles = $xtraArgs['max_files'] ?? 1;
+        $allowedTypes = $xtraArgs['types'] ?? [];
+        $maxSize = $xtraArgs['size'] ?? PHP_INT_MAX;
+
+        if (!is_array($allowedTypes)) {
+            $allowedTypes = [$allowedTypes];
+        }
+
+        $files = [];
+        if ($paramType->getName() === HttpUploadedFile::class) {
+            if (!($value instanceof HttpUploadedFile)) {
+                return $msg;
+            }
+            $files[] = $value;
+        } else if ($paramType->isArrayType()) {
+            if (!is_array($value)) {
+                return $msg;
+            }
+            foreach ($value as $val) {
+                if (!($val instanceof HttpUploadedFile)) {
+                    return $msg;
+                }
+            }
+            if (count($value) > $maxFiles) {
+                return 'File upload for ' . $paramName . ' must have at most ' . $maxFiles . ' files';
+            }
+            $files = $value;
+        }
+
+        foreach ($files as $val) {
+            $msg = $val->getError();
+            if ($msg) {
+                return 'File upload for ' . $paramName . ' has error: ' . $msg;
+            }
+            if ($val->getSize() > $maxSize) {
+                return 'File upload for ' . $paramName . ' must be at most ' . $maxSize . ' bytes';
+            }
+            if (!empty($allowedTypes)) {
+                $val->typeDerived = self::$instance->mimeFinder->file($val->getFilePath());
+                if ($val->typeDerived && !in_array($val->typeDerived, $allowedTypes)) {
+                    return 'File upload for ' . $paramName . ' must be of type ' . implode(',', $allowedTypes) . ', but got ' . $val->typeDerived;
+                }
+            }
+        }
+
+        return $msg;
     }
 }

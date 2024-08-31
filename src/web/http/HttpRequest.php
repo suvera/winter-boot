@@ -1,5 +1,7 @@
 <?php
+
 /** @noinspection PhpUnused */
+
 declare(strict_types=1);
 
 namespace dev\winterframework\web\http;
@@ -37,7 +39,7 @@ class HttpRequest {
         $this->files = $this->loadUploadedFiles($files);
     }
 
-    protected function loadUploadedFiles($files): array {
+    protected function loadUploadedFiles(array $files): array {
         $uploaded = [];
         foreach ($files as $name => $data) {
             $uploaded[$name] = [];
@@ -48,13 +50,7 @@ class HttpRequest {
             }
 
             foreach ($fileList as $value) {
-                $uploaded[$name][] = new HttpUploadedFile(
-                    $value['name'] ?? '',
-                    $value['type'] ?? '',
-                    $value['size'] ?? 0,
-                    $value['tpm_name'] ?? '',
-                    $value['error'] ?? UPLOAD_ERR_NO_FILE
-                );
+                $uploaded[$name][] = HttpUploadedFile::fromArray($value);
             }
         }
         return $uploaded;
@@ -142,5 +138,4 @@ class HttpRequest {
     public function getFile(string $name): ?array {
         return $this->files[$name] ?? null;
     }
-
 }

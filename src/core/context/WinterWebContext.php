@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace dev\winterframework\core\context;
@@ -13,8 +14,6 @@ use dev\winterframework\core\web\route\RequestMappingRegistry;
 use dev\winterframework\core\web\route\WinterRequestMappingRegistry;
 use dev\winterframework\enums\RequestMethod;
 use dev\winterframework\exception\DuplicatePathException;
-use dev\winterframework\io\kv\KvTemplate;
-use dev\winterframework\io\metrics\prometheus\PrometheusMetricRegistry;
 use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\reflection\ReflectionUtil;
@@ -89,9 +88,10 @@ class WinterWebContext implements WebContext {
 
             $mapping = $this->requestMapping->find($path, RequestMethod::GET);
             if ($mapping != null) {
-                throw new DuplicatePathException("Actuator Duplicate Path '$path' "
-                    . 'detected at '
-                    . ReflectionUtil::getFqName($mapping->getMapping()->getRefOwner())
+                throw new DuplicatePathException(
+                    "Actuator Duplicate Path '$path' "
+                        . 'detected at '
+                        . ReflectionUtil::getFqName($mapping->getMapping()->getRefOwner())
                 );
             }
 
@@ -116,5 +116,4 @@ class WinterWebContext implements WebContext {
         );
         $webConfig->addInterceptors($this->ctxData->getInterceptorRegistry());
     }
-
 }
