@@ -1,21 +1,25 @@
-# Async & Scheduling Support
+# Unleash Concurrency: Async & Scheduling Support in Winter Boot!
 
-1. Asynchronous execution support by **#[Async]** attribute.
-2. Scheduling tasks just by using **#[Scheduled]** attribute
+Supercharge your Winter Boot applications with powerful asynchronous execution and intelligent task scheduling!
+
+1.  **Asynchronous Execution:** Effortlessly run methods in the background using the magical `#[Async]` attribute, ensuring your main application thread remains responsive.
+2.  **Smart Scheduling:** Automate repetitive tasks with precision using the intuitive `#[Scheduled]` attribute, making cron jobs a thing of the past!
 
 
-## Pre-requisites
+## Essential Pre-requisites: Get Ready for Speed!
 
-**swoole** extension is required
+To unlock the full potential of Async and Scheduling, the blazing-fast **`swoole`** extension is a must-have!
 
 ```shell
 pecl install swoole
 ```
 
-Add **extension=swoole.so** to your **php.ini**
+Don't forget to enable it! Add `extension=swoole.so` to your `php.ini` file.
 
 
-## Your Application Starter
+## Empower Your Application Starter
+
+To activate these incredible features, simply add `#[EnableAsync]` and `#[EnableScheduling]` to your main application starter class.
 
 ```phpt
 
@@ -33,12 +37,11 @@ class MyApplication {
 ```
 
 
-## 1. Async Support
+## 1. Asynchronous Magic with `#[Async]`
 
-`#[EnableAsync] is required on your main application`
+**`#[EnableAsync]` is crucial for your main application to enable this feature!**
 
-Annotating a method of a *service/component* bean with **#[Async]** will make it execute in a separate worker process. In other words, the caller will not wait for the completion of the called method.
-
+Transform any method of a *service* or *component* bean into an asynchronous powerhouse by annotating it with `#[Async]`. This means the calling code will *not* wait for the method's completion, allowing your application to perform non-blocking operations and dramatically improve responsiveness!
 
 ```phpt
 #[Service]
@@ -46,12 +49,14 @@ class FooService {
     
     #[Async]
     public function someAsyncMethodName(): void {
-        echo "method Executed asynchronously by " . getmypid();
+        echo "Method executed asynchronously by " . getmypid();
     }
 }
 ```
 
-### Configuration
+### Fine-Tune Your Async Operations: Configuration
+
+Customize the behavior of your asynchronous tasks in your `application.yml` under the `winter.task.async` section:
 
 ```yaml
 
@@ -62,35 +67,31 @@ winter:
             queueCapacity: 50
             argsSize: 2048
 ```
-- **poolSize** Total number of backend workers needed
-
-- **argsSize** Maximum allowed size of total arguments that are passed to a Async method (in bytes)
-
-- **queueCapacity** how many concurrent async requests can be queued.
+-   **`poolSize`**: Define the total number of backend worker processes dedicated to executing your async tasks.
+-   **`argsSize`**: Set the maximum allowed size (in bytes) for all arguments passed to an asynchronous method.
+-   **`queueCapacity`**: Control how many concurrent asynchronous requests can be queued and processed.
 
 
-by default, async uses shared memory as internal queue to execute Async calls. 
-Redis also can be used as async queue as a persistence layer, and application restart execute any old pending async calls.
+By default, Winter Boot utilizes shared memory for its internal async queue. For enhanced persistence and the ability to execute pending async calls even after an application restart, consider integrating the Redis module as your async queue storage!
 
-More info on [Redis module](https://github.com/suvera/winter-modules/tree/master/winter-data-redis)
+Discover more about this powerful integration in the [Redis module documentation](https://github.com/suvera/winter-modules/tree/master/winter-data-redis).
+
 ```yaml
 winter:
     task:
         async:
-            ...
-            ...
+            # ... other async configurations ...
             queueStorage:
                 handler: dev\winterframework\data\redis\async\AsyncRedisQueueStore
 
 ```
 
 
-## 2. Scheduled Support
+## 2. Precision Scheduling with `#[Scheduled]`
 
-`#[EnableScheduling] is required on your main application`
+**Remember: `#[EnableScheduling]` is essential on your main application to activate scheduling!**
 
-Annotating a method of a *service/component* bean with **#[Scheduled]** will make it scheduled and executed on interval(s) by a separate worker process.
-
+Automate your recurring tasks with incredible precision! By annotating a method of a *service* or *component* bean with `#[Scheduled]`, you can define intervals for its execution, offloading the burden of manual triggering. These tasks run in a dedicated worker process, ensuring your main application remains focused.
 
 ```phpt
 #[Component]
@@ -98,15 +99,15 @@ class SomeScheduler {
 
     #[Scheduled(fixedDelay: 20, initialDelay: 10)]
     public function someScheduledMethodName(): void {
-        echo 'I generate a unique Id on every 20 seconds ' . uniqid();
+        echo 'I generate a unique ID every 20 seconds: ' . uniqid();
     }
 }
 ```
 
 
-### Configuration
+### Configure Your Scheduled Tasks
 
-in your **application.yml**
+Manage your scheduled tasks efficiently within your `application.yml` under the `winter.task.scheduling` section:
 
 ```yaml
 
@@ -117,12 +118,14 @@ winter:
             queueCapacity: 50
 ```
 
-- **poolSize** Total number of backend workers needed
+-   **`poolSize`**: Specify the total number of backend worker processes allocated for executing your scheduled tasks.
+-   **`queueCapacity`**: Determine the maximum number of concurrent scheduled requests that can be queued.
 
-- **queueCapacity** how many concurrent schedule requests can be queued.
 
+## Dive Deeper: Explore the Example!
 
-## Example
+Ready to see Async and Scheduling in action?
+Check out the comprehensive example application: [Example Service](https://github.com/suvera/winter-example-service)
 
-Check out the example application [Example Service](https://github.com/suvera/winter-example-service)
+```
 
