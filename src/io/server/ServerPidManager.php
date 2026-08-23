@@ -38,26 +38,30 @@ class ServerPidManager {
 
         $masterPid = 0;
         if (isset($this->pidTable['master'])) {
-            $masterPid = $this->pidTable['master']['pid'];
-            exec('kill -2 -' . $masterPid);
+            $masterPid = intval($this->pidTable['master']['pid']);
+            if ($masterPid > 0) {
+                Process::kill($masterPid, SIGTERM);
+            }
         }
 
         if (isset($this->pidTable['manager'])) {
-            $pid = $this->pidTable['manager']['pid'];
-            self::logInfo("Stopping Manager ($pid)");
-            Process::kill($pid, SIGKILL);
+            $pid = intval($this->pidTable['manager']['pid']);
+            if ($pid > 0 && $pid != $myPid) {
+                self::logInfo("Stopping Manager ($pid)");
+                Process::kill($pid, SIGKILL);
+            }
         }
         foreach ($this->pidTable as $id => $data) {
             $pid = intval($data['pid']);
-            if ($myPid != $pid && $id != 'master') {
+            if ($myPid != $pid && $id != 'master' && $pid > 0) {
                 self::logInfo("Stopping worker ($id, $pid)");
                 Process::kill($pid, SIGTERM);
             }
         }
-        sleep(1);
+        usleep(500000);
         foreach ($this->pidTable as $id => $data) {
             $pid = intval($data['pid']);
-            if ($myPid != $pid && $id != 'master') {
+            if ($myPid != $pid && $id != 'master' && $pid > 0) {
                 self::logInfo("Stopping worker ($id, $pid)");
                 Process::kill($pid, SIGKILL);
             }
@@ -67,12 +71,17 @@ class ServerPidManager {
         if ($masterPid > 0) {
             self::logInfo("Stopping MASTER ($masterPid)");
             Process::kill($masterPid, SIGKILL);
+            if (function_exists('posix_kill')) {
+                @posix_kill(-$masterPid, SIGKILL);
+            }
         }
 
         if ($killSelf) {
             self::logInfo("Stopping self ($myPid)");
-            Process::kill($myPid, SIGTERM);
-            exit;
+            if (function_exists('posix_kill')) {
+                @posix_kill($myPid, SIGKILL);
+            }
+            exit(1);
         }
     }
 }

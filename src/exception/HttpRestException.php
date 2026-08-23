@@ -11,7 +11,7 @@ class HttpRestException extends WinterException {
     public function __construct(
         protected HttpStatus $status,
         string $message,
-        \Throwable $previous = null
+        ?\Throwable $previous = null
     ) {
         parent::__construct($message, $status->getValue(), $previous);
     }

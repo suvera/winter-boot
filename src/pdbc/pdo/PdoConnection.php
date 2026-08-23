@@ -164,14 +164,14 @@ class PdoConnection extends AbstractConnection {
         }
     }
 
-    public function rollback(Savepoint $savepoint = null): void {
+    public function rollback(?Savepoint $savepoint = null): void {
         $this->assertConnectionOpen();
         if ($this->pdo->inTransaction()) {
             $this->pdo->rollBack();
         }
     }
 
-    public function setSavepoint(string $name = null): Savepoint {
+    public function setSavepoint(?string $name = null): Savepoint {
         throw new SQLException('Driver does not support this function ' . __METHOD__);
     }
 

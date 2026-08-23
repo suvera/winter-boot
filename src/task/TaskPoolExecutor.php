@@ -5,7 +5,7 @@ namespace dev\winterframework\task;
 
 interface TaskPoolExecutor {
 
-    public function enqueue(string $className, string $methodName, array $args = null);
+    public function enqueue(string $className, string $methodName, ?array $args = null);
 
     public function getPoolSize(): int;
 

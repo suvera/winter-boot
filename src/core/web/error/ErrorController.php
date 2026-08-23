@@ -14,6 +14,6 @@ interface ErrorController {
         HttpRequest $request,
         ResponseEntity $response,
         HttpStatus $status,
-        Throwable $t = null
+        ?Throwable $t = null
     ): void;
 }

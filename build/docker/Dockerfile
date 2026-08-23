@@ -4,15 +4,13 @@
 #     docker build . -t suvera/winter-boot:latest -f ./build/docker/Dockerfile
 #
 ######################################################################################
-FROM php:latest
+FROM php:8.5-cli
 
-RUN apt update \
-    && apt install -y librdkafka-dev libzip-dev procps \
+RUN apt-get update \
+    && apt-get install -y librdkafka-dev libzip-dev procps libssl-dev libcurl4-openssl-dev \
     && pecl install redis \
-    && pecl install ev \
     && pecl install rdkafka \
-    && pecl install swoole \
+    && pecl install swoole-6.2.2 \
     && pecl install zip \
-    && pecl install xhprof \
-    && docker-php-ext-enable redis ev rdkafka swoole zip xhprof
+    && docker-php-ext-enable redis rdkafka swoole zip
 

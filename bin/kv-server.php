@@ -3,12 +3,21 @@
 declare(strict_types=1);
 
 use dev\winterframework\io\kv\KvServer;
+
+// Determine the project root for autoloading. Prefer explicit WINTER_VENDOR_HOME if set,
+// otherwise fall back to the directory containing this script's parent (the project root).
 if (isset($_SERVER['WINTER_VENDOR_HOME']) && $_SERVER['WINTER_VENDOR_HOME']) {
     $dir = $_SERVER['WINTER_VENDOR_HOME'];
 } else {
-    $dir = dirname(dirname(dirname(__DIR__)));
+    // __DIR__ points to the 'bin' directory; its parent is the project root.
+    $dir = dirname(__DIR__);
 }
-require_once($dir . '/autoload.php');
+// Load Composer autoloader if present; otherwise try a legacy autoload.php in the project root.
+if (file_exists($dir . '/vendor/autoload.php')) {
+    require_once($dir . '/vendor/autoload.php');
+} else {
+    require_once($dir . '/autoload.php');
+}
 
 $stdin = fopen("php://stdin", 'r');
 $lines = [];

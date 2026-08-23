@@ -34,7 +34,7 @@ class AsyncTaskPoolExecutor implements TaskPoolExecutor {
     #[Autowired]
     private ApplicationContext $appCtx;
 
-    public function enqueue(string $className, string $methodName, array $args = null) {
+    public function enqueue(string $className, string $methodName, ?array $args = null) {
         $argValue = '{}';
         if ($args) {
             $argValue = json_encode($args);

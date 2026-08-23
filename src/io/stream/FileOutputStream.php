@@ -34,7 +34,7 @@ class FileOutputStream implements OutputStream {
         fclose($this->fileResource);
     }
 
-    public function write(string|int|float $data, int $length = null): int {
+    public function write(string|int|float $data, ?int $length = null): int {
         if ($length !== null && is_numeric($length)) {
             return fwrite($this->fileResource, $data, $length);
         }

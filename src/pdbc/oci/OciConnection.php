@@ -200,7 +200,7 @@ class OciConnection extends AbstractConnection {
         }
     }
 
-    public function rollback(Savepoint $savepoint = null): void {
+    public function rollback(?Savepoint $savepoint = null): void {
         $this->assertConnectionOpen();
         if (is_null($savepoint)) {
             $this->txnCounter--;
@@ -213,7 +213,7 @@ class OciConnection extends AbstractConnection {
         }
     }
 
-    public function setSavepoint(string $name = null): Savepoint {
+    public function setSavepoint(?string $name = null): Savepoint {
         $this->assertConnectionOpen();
         if (is_null($name) || empty($name)) {
             $name = uniqid('ocisp_', true);

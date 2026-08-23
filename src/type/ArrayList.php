@@ -31,17 +31,17 @@ abstract class ArrayList implements Countable, ArrayAccess, IteratorAggregate {
         return $this->values;
     }
 
-    public function offsetExists($offset): bool {
+    public function offsetExists(mixed $offset): bool {
         return array_key_exists($offset, $this->values);
     }
 
-    public function offsetUnset($offset): void {
+    public function offsetUnset(mixed $offset): void {
         if (isset($this->values[$offset])) {
             unset($this->values[$offset]);
         }
     }
 
-    public function offsetGet($offset): mixed {
+    public function offsetGet(mixed $offset): mixed {
         if (isset($this->values[$offset])) {
             return $this->values[$offset];
         }
@@ -58,7 +58,7 @@ abstract class ArrayList implements Countable, ArrayAccess, IteratorAggregate {
         }
     }
 
-    public function offsetSet($offset, $value): void {
+    public function offsetSet(mixed $offset, mixed $value): void {
         if ($this->emptyList) {
             throw new OutOfBoundsException('Could not add item to "EmptyList" object');
         }

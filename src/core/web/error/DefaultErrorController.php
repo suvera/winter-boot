@@ -24,7 +24,7 @@ class DefaultErrorController implements ErrorController {
         HttpRequest $request,
         ResponseEntity $response,
         HttpStatus $status,
-        Throwable $t = null
+        ?Throwable $t = null
     ): void {
         if ($t instanceof HttpRestException) {
             $response->withStatus($t->getStatus());

@@ -57,7 +57,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
         return new HttpRequest();
     }
 
-    public function dispatch(HttpRequest $request = null, ResponseEntity $response = null): void {
+    public function dispatch(?HttpRequest $request = null, ?ResponseEntity $response = null): void {
         $this->initialize();
         $serverPath = $this->ctxData->getPropertyContext()->get('server.context-path', '/');
         $serverPath = isset($serverPath) ? trim($serverPath, '/') : '';
@@ -109,7 +109,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
         HttpRequest $request,
         ResponseEntity $response,
         HttpStatus $status,
-        Throwable $t = null
+        ?Throwable $t = null
     ): void {
         $this->errorController->handleError($request, $response, $status, $t);
 
@@ -495,7 +495,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
         InterceptorRegistry $registry,
         HttpRequest $request,
         ResponseEntity $entity,
-        Throwable $ex = null
+        ?Throwable $ex = null
     ): void {
         $uri = $request->getUri();
         foreach ($registry->getInterceptors() as $regexPath => $interceptors) {

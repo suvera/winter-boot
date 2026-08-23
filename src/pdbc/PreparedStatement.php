@@ -41,7 +41,7 @@ interface PreparedStatement {
 
     public function setFloat(string|int $bind, float $value): void;
 
-    public function setNull(string|int $bind, int $sqlType = null): void;
+    public function setNull(string|int $bind, ?int $sqlType = null): void;
 
     public function setString(string|int $bind, string $value): void;
 

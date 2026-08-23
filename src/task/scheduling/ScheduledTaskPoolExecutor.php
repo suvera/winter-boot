@@ -31,7 +31,7 @@ class ScheduledTaskPoolExecutor implements TaskPoolExecutor {
     #[Autowired]
     private ApplicationContext $appCtx;
 
-    public function enqueue(string $className, string $methodName, array $args = null) {
+    public function enqueue(string $className, string $methodName, ?array $args = null) {
         $tables = $this->server->getScheduledTables();
         $workerId = $this->findAvailableWorker($tables);
 

@@ -180,7 +180,7 @@ class WinterServer {
     public static function registerProcessSignals(): void {
     }
 
-    public function shutdown(string $message = null, Throwable $ex = null): void {
+    public function shutdown(?string $message = null, ?Throwable $ex = null): void {
         $msg = 'Shutting down the server ';
         if ($message) {
             $msg .= "$message\n";

@@ -112,7 +112,9 @@ class QueueClient implements QueueSharedTemplate {
     }
 
     public function __destruct() {
-        $this->client->close();
+        if (isset($this->_client)) {
+            $this->_client->close();
+        }
     }
 
     public function stats(): array {

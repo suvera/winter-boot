@@ -14,7 +14,7 @@ interface InputStream {
      * @param int|null $length
      * @return mixed
      */
-    public function read(int $length = null): mixed;
+    public function read(?int $length = null): mixed;
 
     /**
      * Reached end of the stream

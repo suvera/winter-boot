@@ -9,7 +9,7 @@ class PrintOutputStream implements OutputStream {
         // nothing
     }
 
-    public function write(string|int|float $data, int $length = null): int {
+    public function write(string|int|float $data, ?int $length = null): int {
         $data = (string)$data;
 
         if ($length !== null && is_numeric($length)) {
