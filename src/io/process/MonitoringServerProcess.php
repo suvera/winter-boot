@@ -13,7 +13,7 @@ abstract class MonitoringServerProcess extends ServerWorkerProcess {
     /**
      * @var resource
      */
-    protected mixed $proc;
+    protected mixed $proc = null;
 
     public function __destruct() {
         if ($this->proc) {

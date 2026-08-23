@@ -12,6 +12,9 @@ class ServerPidManager {
     use Wlf4p;
 
     private ShmTable $pidTable;
+    // Singleton instance for static callbacks
+    protected static ?self $instance = null;
+    protected static bool $processSignalsRegistered = false;
 
     public function __construct(
         protected ApplicationContext $ctx
@@ -23,6 +26,7 @@ class ServerPidManager {
                 ['type', ShmTable::TYPE_INT]
             ]
         );
+        self::$instance = $this;
     }
 
     public function getPidTable(): ShmTable {
@@ -33,9 +37,9 @@ class ServerPidManager {
         $this->pidTable[$id] = ['pid' => $pid, 'type' => $psType];
     }
 
+    /** Gracefully kill all managed processes */
     public function killAll(bool $killSelf = true): void {
         $myPid = getmypid();
-
         $masterPid = 0;
         if (isset($this->pidTable['master'])) {
             $masterPid = intval($this->pidTable['master']['pid']);
@@ -43,7 +47,6 @@ class ServerPidManager {
                 Process::kill($masterPid, SIGTERM);
             }
         }
-
         if (isset($this->pidTable['manager'])) {
             $pid = intval($this->pidTable['manager']['pid']);
             if ($pid > 0 && $pid != $myPid) {
@@ -67,7 +70,6 @@ class ServerPidManager {
             }
             unset($this->pidTable[$id]);
         }
-
         if ($masterPid > 0) {
             self::logInfo("Stopping MASTER ($masterPid)");
             Process::kill($masterPid, SIGKILL);
@@ -75,7 +77,6 @@ class ServerPidManager {
                 @posix_kill(-$masterPid, SIGKILL);
             }
         }
-
         if ($killSelf) {
             self::logInfo("Stopping self ($myPid)");
             if (function_exists('posix_kill')) {
@@ -83,5 +84,25 @@ class ServerPidManager {
             }
             exit(1);
         }
+    }
+
+    // Static signal handling
+    public static function onProcessSignal(int $signal): void {
+        self::logInfo("Got Signal: $signal");
+        if (self::$instance !== null) {
+            self::$instance->killAll();
+        }
+        exit(0);
+    }
+
+    public static function registerProcessSignals(): void {
+        if (self::$processSignalsRegistered) {
+            return;
+        }
+        if (class_exists('Swoole\\Process')) {
+            Process::signal(SIGINT, fn(int $s) => self::onProcessSignal($s));
+            Process::signal(SIGTERM, fn(int $s) => self::onProcessSignal($s));
+        }
+        self::$processSignalsRegistered = true;
     }
 }
