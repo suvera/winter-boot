@@ -66,13 +66,13 @@ class ServerPidManager {
             $pid = intval($data['pid']);
             if ($myPid != $pid && $id != 'master' && $pid > 0) {
                 self::logInfo("Stopping worker ($id, $pid)");
-                Process::kill($pid, SIGKILL);
+                @Process::kill($pid, SIGKILL);
             }
             unset($this->pidTable[$id]);
         }
         if ($masterPid > 0) {
             self::logInfo("Stopping MASTER ($masterPid)");
-            Process::kill($masterPid, SIGKILL);
+            @Process::kill($masterPid, SIGKILL);
             if (function_exists('posix_kill')) {
                 @posix_kill(-$masterPid, SIGKILL);
             }
@@ -88,7 +88,6 @@ class ServerPidManager {
 
     // Static signal handling
     public static function onProcessSignal(int $signal): void {
-        self::logInfo("Got Signal: $signal");
         if (self::$instance !== null) {
             self::$instance->killAll();
         }
@@ -99,9 +98,9 @@ class ServerPidManager {
         if (self::$processSignalsRegistered) {
             return;
         }
+        // Only register SIGINT (Ctrl+C). SIGTERM is already owned by Swoole internally.
         if (class_exists('Swoole\\Process')) {
             Process::signal(SIGINT, fn(int $s) => self::onProcessSignal($s));
-            Process::signal(SIGTERM, fn(int $s) => self::onProcessSignal($s));
         }
         self::$processSignalsRegistered = true;
     }

@@ -63,6 +63,7 @@ class WinterServer {
         $this->server = new Server($this->address, $this->port);
         $this->pidManager = new ServerPidManager($this->appCtx);
         $this->adminHandler = new WinterServerAdmin($this->appCtx, $this->pidManager);
+        self::$instance = $this;
     }
 
     public function addPid(string $id, int $pid, int $psType): void {
@@ -134,7 +135,7 @@ class WinterServer {
 
     protected function registerEventCallbacks(): void {
         foreach ($this->eventCallbacks as $eventName => $callbacks) {
-            $this->server->on($eventName, function (...$args) use ($callbacks) {
+            $this->server->on($eventName, function (...$args) use ($callbacks, $eventName) {
                 foreach ($callbacks as $callback) {
                     $callback(...$args);
                 }
@@ -160,26 +161,29 @@ class WinterServer {
         self::$started = true;
         self::logInfo("Starting Http server on $this->address:$this->port" . ', pid:' . getmypid());
         
-        // In Swoole 6.x, Process::signal() creates the event-loop immediately
-        // We need to register signals after the server starts
-        // self::registerProcessSignals();
-        // ServerPidManager::registerProcessSignals();
-        
         $this->serverArgs = array_merge(self::$defaultServerArgs, $this->serverArgs);
         $this->server->set($this->getServerArgs());
         
-        // In Swoole 6.x, the event-loop is created when callbacks are registered
-        // We need to add the admin listener and register signals in the onStart callback
-        $this->server->on('Start', function (Server $server) {
-            $this->beginAdmin();
-            // Register process signals after server starts
+        // Prepend signal registration to 'start' event callbacks so it runs
+        // BEFORE posix_setpgid() in other callbacks. posix_setpgid() changes
+        // the process group, which disconnects the master from terminal signals.
+        // Only the master process registers signal handlers — the manager and
+        // workers should NOT, otherwise they race with the master on Ctrl+C.
+        $signalCb = function (Server $server) {
             self::registerProcessSignals();
             ServerPidManager::registerProcessSignals();
-        });
-        
+        };
+        if (!isset($this->eventCallbacks['start'])) {
+            $this->eventCallbacks['start'] = [];
+        }
+        array_unshift($this->eventCallbacks['start'], $signalCb);
+
         // Register event callbacks before start
         $this->registerEventCallbacks();
-        
+
+        // Set up admin listener
+        $this->beginAdmin();
+
         // Start the server
         $this->server->start();
     }
@@ -198,7 +202,6 @@ class WinterServer {
     }
 
     public static function onProcessSignal(int $signal): void {
-        self::logInfo("Got Signal: $signal");
         // If we have a server instance, perform graceful shutdown
         if (self::$instance !== null) {
             self::$instance->shutdown("Received signal $signal", null);
@@ -211,12 +214,9 @@ class WinterServer {
         if (self::$processSignalsRegistered) {
             return;
         }
-        // Register SIGINT (Ctrl+C) and SIGTERM for graceful shutdown
+        // Only register SIGINT (Ctrl+C). SIGTERM is already owned by Swoole internally.
         if (class_exists('Swoole\Process')) {
             Process::signal(SIGINT, function (int $signal) {
-                self::onProcessSignal($signal);
-            });
-            Process::signal(SIGTERM, function (int $signal) {
                 self::onProcessSignal($signal);
             });
         }
@@ -234,6 +234,10 @@ class WinterServer {
         }
 
         self::logError($msg);
+        // Call Swoole's graceful shutdown first — this tells the manager and
+        // workers to stop cleanly. Only fall back to forceful killAll() if
+        // graceful shutdown doesn't complete in time.
+        $this->server->shutdown();
         $this->pidManager->killAll();
     }
 
