@@ -179,6 +179,94 @@ rollbackFor |  | default all exceptions | List of exception classes when occurre
 noRollbackFor |  | None | List of exception classes when occurred RollBack Does not happen.
 
 
+## Programmatic Transaction Management
+
+In addition to the declarative `#[Transactional]` annotation, you can manage transactions programmatically using [`PlatformTransactionManager`](src/txn/PlatformTransactionManager.php). This is useful when you need fine-grained control or when working with dynamically-resolved transaction managers (e.g., from [`MultiTenantManager`](src/pdbc/multitenant/MultiTenantManager.php)).
+
+### PlatformTransactionManager Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `getTransaction(TransactionDefinition $definition)` | [`TransactionStatus`](src/txn/TransactionStatus.php) | Begin a new transaction (or join an existing one, depending on propagation). Returns a status object representing the current transaction |
+| `commit(TransactionStatus $status)` | `void` | Commit the transaction represented by the given status |
+| `rollback(TransactionStatus $status)` | `void` | Roll back the transaction represented by the given status |
+
+### TransactionDefinition
+
+[`TransactionDefinition`](src/txn/TransactionDefinition.php) controls transaction properties like propagation, isolation, timeout, and read-only mode. Use [`DefaultTransactionDefinition`](src/txn/support/DefaultTransactionDefinition.php) for standard cases:
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `propagationBehavior` | `PROPAGATION_REQUIRED` (0) | How the transaction relates to existing transactions |
+| `isolationLevel` | `ISOLATION_DEFAULT` | Database isolation level |
+| `timeout` | `TIMEOUT_DEFAULT` | Transaction timeout in seconds |
+| `readOnly` | `false` | Whether the transaction is read-only |
+
+**Propagation constants** (defined in [`Transaction`](src/txn/Transaction.php)):
+
+| Constant | Value | Behavior |
+|----------|-------|----------|
+| `PROPAGATION_REQUIRED` | 0 | Support current tx; create new if none exists *(default)* |
+| `PROPAGATION_SUPPORTS` | 1 | Support current tx; execute non-transactionally if none |
+| `PROPAGATION_MANDATORY` | 2 | Support current tx; throw exception if none exists |
+| `PROPAGATION_REQUIRES_NEW` | 3 | Create new tx, suspending current if one exists |
+| `PROPAGATION_NOT_SUPPORTED` | 4 | Execute non-transactionally; suspend current tx |
+| `PROPAGATION_NEVER` | 5 | Execute non-transactionally; throw exception if tx exists |
+| `PROPAGATION_NESTED` | 6 | Execute within nested tx if current tx exists *(not supported by PDO)* |
+
+### Example: Programmatic Transaction
+
+```phpt
+use dev\winterframework\txn\PlatformTransactionManager;
+use dev\winterframework\txn\support\DefaultTransactionDefinition;
+
+class BankService {
+
+    #[Autowired]
+    private PlatformTransactionManager $txnMgr;
+
+    #[Autowired]
+    private PdbcTemplate $pdbc;
+
+    public function transferMoney(int $fromAccount, int $toAccount, float $amount): void {
+        $txnDef = new DefaultTransactionDefinition();
+        // Optional: customize the definition
+        // $txnDef->setReadOnly(false);
+        // $txnDef->setTimeout(30);
+
+        $status = $this->txnMgr->getTransaction($txnDef);
+        try {
+            $this->pdbc->update(
+                "UPDATE accounts SET balance = balance - :amount WHERE id = :id",
+                ['amount' => $amount, 'id' => $fromAccount]
+            );
+            $this->pdbc->update(
+                "UPDATE accounts SET balance = balance + :amount WHERE id = :id",
+                ['amount' => $amount, 'id' => $toAccount]
+            );
+            $this->txnMgr->commit($status);
+        } catch (\Throwable $e) {
+            $this->txnMgr->rollback($status);
+            throw $e;
+        }
+    }
+}
+```
+
+### TransactionStatus
+
+[`TransactionStatus`](src/txn/TransactionStatus.php) represents the state of an active transaction:
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `isNewTransaction()` | `bool` | Whether this is a newly created transaction |
+| `isCompleted()` | `bool` | Whether the transaction has been committed or rolled back |
+| `isRollbackOnly()` | `bool` | Whether the transaction is marked for rollback only |
+| `hasTransaction()` | `bool` | Whether an actual transaction is active |
+| `hasSavepoint()` | `bool` | Whether a savepoint has been created |
+| `getTransaction()` | `?TransactionObject` | The underlying transaction object |
+
+
 # Multi-Tenant Support
 
 Framework provides a `MultiTenantManager` class that can provide per-tenant `PdbcTemplate` and `PlatformTransactionManager` instances. This is useful when your application serves multiple tenants, each with their own database.

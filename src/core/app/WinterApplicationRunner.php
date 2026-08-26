@@ -56,6 +56,9 @@ abstract class WinterApplicationRunner {
 
     public function __construct() {
         $this->scanner = ClassResourceScanner::getDefaultScanner();
+        // Initialize with a basic logger in case buildApplicationLogger doesn't run
+        $this->console = new Logger('winter_console_logger');
+        $this->console->pushHandler(new StreamHandler('php://stdout', Logger::INFO));
     }
 
     public function getBootVersion(): string {
@@ -328,6 +331,38 @@ abstract class WinterApplicationRunner {
         }
 
         if (empty($data)) {
+            // Initialize with default console logger when no config is found
+            $defaultData = [
+                'loggers' => [
+                    'winter_console_logger' => [
+                        'handlers' => ['winter_consoled'],
+                        'processors' => ['winter_pid_processor']
+                    ]
+                ],
+                'formatters' => [
+                    'winter_console_formatter' => [
+                        'class' => WinterConsoleLogFormatter::class,
+                        'format' => "%datetime% [%extra.process_id%] [%level_name%] - %message%\n"
+                    ]
+                ],
+                'handlers' => [
+                    'winter_consoled' => [
+                        'class' => StreamHandler::class,
+                        'level' => 'INFO',
+                        'formatter' => 'winter_console_formatter',
+                        'processors' => ['winter_pid_processor'],
+                        'stream' => 'php://stdout'
+                    ]
+                ],
+                'processors' => [
+                    'winter_pid_processor' => [
+                        'class' => ProcessIdProcessor::class
+                    ]
+                ]
+            ];
+
+            LoggerManager::buildInstance($defaultData);
+            $this->console = Cascade::getLogger('winter_console_logger');
             return;
         }
 

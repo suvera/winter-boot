@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 namespace dev\winterframework\pdbc\pdo;
 
+use dev\winterframework\pdbc\core\BindType;
 use dev\winterframework\pdbc\core\BindVars;
 use dev\winterframework\pdbc\core\OutBindVar;
 use dev\winterframework\pdbc\core\OutBindVars;
@@ -13,6 +14,7 @@ use dev\winterframework\pdbc\core\ResultSetExtractor;
 use dev\winterframework\pdbc\core\RowCallbackHandler;
 use dev\winterframework\pdbc\core\RowMapper;
 use dev\winterframework\pdbc\DataSource;
+use dev\winterframework\pdbc\ex\EmptyResultDataAccessException;
 use dev\winterframework\pdbc\ex\IncorrectResultSizeDataAccessException;
 use dev\winterframework\pdbc\PreparedStatement;
 use dev\winterframework\ppa\EntityRegistry;
@@ -78,11 +80,14 @@ abstract class PdoOperations {
         } else {
             foreach ($bindVars as $bindKey => $bindVal) {
                 $maxLen = $bindVal;
-                $type = SQLT_CHR;
-                if (is_array($bindVal) && isset($bindVal[0])) {
-                    $maxLen = intval($bindVal[0]);
-                } else if (is_array($bindVal) && isset($bindVal[1])) {
-                    $type = intval($bindVal[1]);
+                $type = BindType::STRING;
+                if (is_array($bindVal)) {
+                    if (isset($bindVal[0])) {
+                        $maxLen = intval($bindVal[0]);
+                    }
+                    if (isset($bindVal[1])) {
+                        $type = intval($bindVal[1]);
+                    }
                 }
                 $stmt->outBindVar(new OutBindVar($bindKey, $maxLen, $type));
             }
@@ -183,9 +188,13 @@ abstract class PdoOperations {
             $stmt->close();
             unset($stmt);
         }
-        if ($num != 1) {
+        if ($num == 0) {
+            throw new EmptyResultDataAccessException('Incorrect result size: expected: 1 '
+                . ', actual  empty record');
+        }
+        if ($num > 1) {
             throw new IncorrectResultSizeDataAccessException('Incorrect result size: expected: 1 '
-                . ', actual  ' . ($num > 1 ? 'more than one record' : ' empty record'));
+                . ', actual  more than one record');
         }
         return $ret[0];
     }
@@ -248,9 +257,13 @@ abstract class PdoOperations {
             $stmt->close();
             unset($stmt);
         }
-        if ($num != 1) {
+        if ($num == 0) {
+            throw new EmptyResultDataAccessException('Incorrect result size: expected: 1 '
+                . ', actual  empty record');
+        }
+        if ($num > 1) {
             throw new IncorrectResultSizeDataAccessException('Incorrect result size: expected: 1 '
-                . ', actual  ' . ($num > 1 ? 'more than one record' : ' empty record'));
+                . ', actual  more than one record');
         }
         return $ret[0];
     }
