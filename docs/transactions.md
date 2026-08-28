@@ -216,38 +216,105 @@ In addition to the declarative `#[Transactional]` annotation, you can manage tra
 
 ### Example: Programmatic Transaction
 
+Below is a real-world example from the PDBC sample application (`UserService`). It demonstrates programmatic transaction management using `PlatformTransactionManager` with `PdbcTemplate`:
+
 ```phpt
+use dev\winterframework\pdbc\ex\EmptyResultDataAccessException;
+use dev\winterframework\pdbc\PdbcTemplate;
+use dev\winterframework\stereotype\Autowired;
+use dev\winterframework\stereotype\Service;
 use dev\winterframework\txn\PlatformTransactionManager;
 use dev\winterframework\txn\support\DefaultTransactionDefinition;
+use dev\winterframework\util\log\Wlf4p;
 
-class BankService {
-
-    #[Autowired]
-    private PlatformTransactionManager $txnMgr;
+#[Service]
+class UserService {
+    use Wlf4p;
 
     #[Autowired]
     private PdbcTemplate $pdbc;
 
-    public function transferMoney(int $fromAccount, int $toAccount, float $amount): void {
-        $txnDef = new DefaultTransactionDefinition();
-        // Optional: customize the definition
-        // $txnDef->setReadOnly(false);
-        // $txnDef->setTimeout(30);
+    #[Autowired]
+    private PlatformTransactionManager $txnMgr;
 
-        $status = $this->txnMgr->getTransaction($txnDef);
+    public function createUser(User $user): User
+    {
+        $status = $this->txnMgr->getTransaction(new DefaultTransactionDefinition());
         try {
-            $this->pdbc->update(
-                "UPDATE accounts SET balance = balance - :amount WHERE id = :id",
-                ['amount' => $amount, 'id' => $fromAccount]
-            );
-            $this->pdbc->update(
-                "UPDATE accounts SET balance = balance + :amount WHERE id = :id",
-                ['amount' => $amount, 'id' => $toAccount]
-            );
+            $sql = "INSERT INTO users (name, email, age) VALUES (:name, :email, :age) RETURNING id";
+            $ret = [];
+            $result = $this->pdbc->update($sql, [
+                'name' => $user->getName(),
+                'email' => $user->getEmail(),
+                'age' => $user->getAge()
+            ], [], $ret);
+
+            if ($result) {
+                $user->setId(intval($ret['id']));
+            }
+
             $this->txnMgr->commit($status);
+            return $user;
         } catch (\Throwable $e) {
             $this->txnMgr->rollback($status);
             throw $e;
+        }
+    }
+
+    public function updateUser(User $user): User
+    {
+        $status = $this->txnMgr->getTransaction(new DefaultTransactionDefinition());
+        try {
+            $this->pdbc->updateObjects($user);
+            $this->txnMgr->commit($status);
+            return $user;
+        } catch (\Throwable $e) {
+            $this->txnMgr->rollback($status);
+            throw $e;
+        }
+    }
+
+    public function deleteUser(int $id): bool
+    {
+        $status = $this->txnMgr->getTransaction(new DefaultTransactionDefinition());
+        try {
+            $user = $this->findById($id);
+            if ($user) {
+                $this->pdbc->deleteObjects($user);
+                $this->txnMgr->commit($status);
+                return true;
+            }
+            $this->txnMgr->commit($status);
+            return false;
+        } catch (\Throwable $e) {
+            $this->txnMgr->rollback($status);
+            throw $e;
+        }
+    }
+
+    public function findById(int $id): ?User
+    {
+        $sql = "SELECT * FROM users WHERE id = :id";
+        try {
+            return $this->pdbc->queryForObject($sql, ['id' => $id], User::class);
+        } catch (EmptyResultDataAccessException $e) {
+            return null;
+        }
+    }
+
+    public function findAll(): array
+    {
+        $sql = "SELECT * FROM users ORDER BY id";
+        return $this->pdbc->queryForObjects($sql, [], User::class);
+    }
+
+    public function findByEmail(string $email): ?User
+    {
+        $sql = "SELECT * FROM users WHERE email = :email";
+        try {
+            return $this->pdbc->queryForObject($sql, ['email' => $email], User::class);
+        } catch (EmptyResultDataAccessException $e) {
+            return null;
         }
     }
 }

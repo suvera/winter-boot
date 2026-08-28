@@ -9,7 +9,7 @@ use dev\winterframework\txn\TransactionDefinition;
 class DefaultTransactionDefinition implements TransactionDefinition {
     private int $timeout = Transaction::TIMEOUT_DEFAULT;
     private bool $readOnly = false;
-    private string $name;
+    private string $name = 'default';
 
     public function __construct(
         private int $propagationBehavior = Transaction::PROPAGATION_REQUIRED,

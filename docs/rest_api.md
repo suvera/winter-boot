@@ -14,6 +14,21 @@ class UserController {
 
 ```
 
+### Dependency Injection
+
+Inject services and other dependencies into your controller using the `#[Autowired]` attribute. Winter Boot automatically resolves and injects the required beans.
+
+```phpt
+#[RestController]
+class UserController {
+
+    #[Autowired]
+    protected UserService $userService;
+
+    // ...
+}
+```
+
 ## 2. RequestMapping
 
 This attribute is used both at class and method level. The **#[RequestMapping]** attribute is used to map web requests onto specific handler classes and handler methods.
@@ -155,6 +170,211 @@ public function sayHello2(
 
 ```
 
+## 6. Return Types
+
+Controllers can return various types. The most common are:
+
+- **`array`** — Automatically serialized to JSON response.
+- **`ResponseEntity`** — Provides full control over HTTP status, headers, and body.
+- **`string`** — Returned as plain text.
+
+### Example with `ResponseEntity`:
+
+```phpt
+use dev\winterframework\web\http\ResponseEntity;
+
+#[GetMapping(path: "/users/{id}")]
+public function getUserById(#[PathVariable] int $id): ResponseEntity
+{
+    $user = $this->userService->findById($id);
+
+    if ($user) {
+        return ResponseEntity::ok()->withJson($user);
+    } else {
+        return ResponseEntity::notFound()->build();
+    }
+}
+```
+
+## 7. Complete Controller Example
+
+Below is a full `UserController` demonstrating all CRUD operations, request data binding, and error handling in a real-world scenario:
+
+```phpt
+<?php
+
+namespace dev\winterboot\samples\doctrine\controller;
+
+use dev\winterboot\samples\doctrine\model\User;
+use dev\winterboot\samples\doctrine\service\UserService;
+use dev\winterframework\stereotype\Autowired;
+use dev\winterframework\stereotype\RestController;
+use dev\winterframework\stereotype\web\DeleteMapping;
+use dev\winterframework\stereotype\web\GetMapping;
+use dev\winterframework\stereotype\web\PostMapping;
+use dev\winterframework\stereotype\web\PutMapping;
+use dev\winterframework\stereotype\web\PathVariable;
+use dev\winterframework\stereotype\web\RequestBody;
+use dev\winterframework\stereotype\web\RequestParam;
+
+#[RestController]
+class UserController
+{
+    #[Autowired]
+    protected UserService $userService;
+
+    #[GetMapping(path: "/users")]
+    public function getAllUsers(): array
+    {
+        return [
+            'success' => true,
+            'data' => $this->userService->findAll()
+        ];
+    }
+
+    #[GetMapping(path: "/users/{id}")]
+    public function getUserById(#[PathVariable] int $id): array
+    {
+        $user = $this->userService->findById($id);
+
+        if ($user) {
+            return [
+                'success' => true,
+                'data' => $user
+            ];
+        } else {
+            return [
+                'success' => false,
+                'message' => 'User not found'
+            ];
+        }
+    }
+
+    #[PostMapping(path: "/users")]
+    public function createUser(#[RequestBody] User $user): array
+    {
+        try {
+            $existingUser = $this->userService->findByEmail($user->getEmail());
+            if ($existingUser) {
+                return [
+                    'success' => false,
+                    'message' => 'User with email ' . $user->getEmail() . ' already exists'
+                ];
+            }
+
+            $createdUser = $this->userService->createUser($user);
+            return [
+                'success' => true,
+                'data' => $createdUser,
+                'message' => 'User created successfully'
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Failed to create user: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    #[PutMapping(path: "/users/{id}")]
+    public function updateUser(#[PathVariable] int $id, #[RequestBody] User $user): array
+    {
+        try {
+            $existingUser = $this->userService->findById($id);
+            if (!$existingUser) {
+                return [
+                    'success' => false,
+                    'message' => 'User not found'
+                ];
+            }
+
+            $user->setId($id);
+            $updatedUser = $this->userService->updateUser($user);
+
+            return [
+                'success' => true,
+                'data' => $updatedUser,
+                'message' => 'User updated successfully'
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Failed to update user: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    #[DeleteMapping(path: "/users/{id}")]
+    public function deleteUser(#[PathVariable] int $id): array
+    {
+        try {
+            $deleted = $this->userService->deleteUser($id);
+            if ($deleted) {
+                return [
+                    'success' => true,
+                    'message' => 'User deleted successfully'
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'message' => 'User not found'
+                ];
+            }
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Failed to delete user: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    #[GetMapping(path: "/users/search")]
+    public function searchByEmail(#[RequestParam] string $email): array
+    {
+        $user = $this->userService->findByEmail($email);
+
+        if ($user) {
+            return [
+                'success' => true,
+                'data' => $user
+            ];
+        } else {
+            return [
+                'success' => false,
+                'message' => 'User not found'
+            ];
+        }
+    }
+}
+```
+
+## 8. Testing Your Endpoints
+
+Test your controller endpoints with `curl`:
+
+```shell
+# Get all users
+curl http://localhost/users
+
+# Get user by ID
+curl http://localhost/users/1
+
+# Create a new user
+curl -X POST http://localhost/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"John Doe","email":"john@example.com"}'
+
+# Update a user
+curl -X PUT http://localhost/users/1 \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Jane Doe","email":"jane@example.com"}'
+
+# Delete a user
+curl -X DELETE http://localhost/users/1
+
+# Search user by email
+curl "http://localhost/users/search?email=john@example.com"
+```
 
 # Error Handling
 
