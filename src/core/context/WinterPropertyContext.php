@@ -79,7 +79,7 @@ final class WinterPropertyContext implements PropertyContext {
         throw new PropertyException("No such property exists with name " . json_encode($name));
     }
 
-    public function getStr(string $name, string $default = null): string {
+    public function getStr(string $name, ?string $default = null): string {
         $val = self::get($name, $default);
         return match (gettype($val)) {
             'string' => $val,
@@ -88,7 +88,7 @@ final class WinterPropertyContext implements PropertyContext {
         };
     }
 
-    public function getBool(string $name, bool $default = null): bool {
+    public function getBool(string $name, ?bool $default = null): bool {
         $value = self::get($name, $default);
         if (is_bool($value)) {
             return $value;
@@ -109,7 +109,7 @@ final class WinterPropertyContext implements PropertyContext {
             . var_export($value, true) . '"');
     }
 
-    public function getInt(string $name, int $default = null): int {
+    public function getInt(string $name, ?int $default = null): int {
         $val = self::get($name, $default);
         if (!is_numeric($val)) {
             throw new PropertyException("property " . json_encode($name) . ' is not of type "integer"');
@@ -117,7 +117,7 @@ final class WinterPropertyContext implements PropertyContext {
         return intval($val);
     }
 
-    public function getFloat(string $name, float $default = null): float {
+    public function getFloat(string $name, ?float $default = null): float {
         $val = self::get($name, $default);
         if (!is_numeric($val)) {
             throw new PropertyException("property " . json_encode($name) . ' is not of type "float"');

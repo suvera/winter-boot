@@ -27,13 +27,13 @@ interface ApplicationContext {
 
     public function getProperty(string $name, mixed $default = null): string|int|float|bool|null;
 
-    public function getPropertyStr(string $name, string $default = null): string;
+    public function getPropertyStr(string $name, ?string $default = null): string;
 
-    public function getPropertyBool(string $name, bool $default = null): bool;
+    public function getPropertyBool(string $name, ?bool $default = null): bool;
 
-    public function getPropertyInt(string $name, int $default = null): int;
+    public function getPropertyInt(string $name, ?int $default = null): int;
 
-    public function getPropertyFloat(string $name, float $default = null): float;
+    public function getPropertyFloat(string $name, ?float $default = null): float;
 
     public function setProperty(string $name, mixed $value): mixed;
 

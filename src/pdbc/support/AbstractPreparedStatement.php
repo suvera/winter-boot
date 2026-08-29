@@ -128,7 +128,7 @@ abstract class AbstractPreparedStatement implements PreparedStatement {
         $this->parameters[$bind] = BindVar::of($bind, $value, BindType::FLOAT);
     }
 
-    public function setNull(int|string $bind, int $sqlType = null): void {
+    public function setNull(int|string $bind, ?int $sqlType = null): void {
         $this->parameters[$bind] = BindVar::of($bind, null, BindType::NULL);
     }
 

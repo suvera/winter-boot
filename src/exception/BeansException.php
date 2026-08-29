@@ -8,7 +8,7 @@ use Throwable;
 
 class BeansException extends RuntimeException {
 
-    public function __construct(string $beanName, $code = 0, Throwable $previous = null) {
+    public function __construct(string $beanName, int $code = 0, ?Throwable $previous = null) {
         parent::__construct("Could not find/create Bean of type/name $beanName ", $code, $previous);
     }
 

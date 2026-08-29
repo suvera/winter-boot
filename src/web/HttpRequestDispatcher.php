@@ -8,6 +8,6 @@ use dev\winterframework\web\http\ResponseEntity;
 
 interface HttpRequestDispatcher {
 
-    public function dispatch(HttpRequest $request = null, ResponseEntity $response = null): void;
+    public function dispatch(?HttpRequest $request = null, ?ResponseEntity $response = null): void;
 
 }

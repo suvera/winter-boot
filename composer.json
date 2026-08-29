@@ -10,7 +10,7 @@
     "homepage": "https://suvera.github.io/",
     "config": {
         "platform": {
-            "php": "8.0"
+            "php": "8.5"
         },
         "bin-dir": "bin"
     },
@@ -35,15 +35,16 @@
     "repositories": [
     ],
     "require": {
+        "php": ">=8.4",
         "ext-posix": "*",
         "ext-pcntl": "*",
-        "symfony/yaml": "5.4.x-dev",
-        "monolog/monolog": "2.3.*",
+        "symfony/yaml": "5.4.x-dev || ^5.4 || ^6.0 || ^7.0",
+        "monolog/monolog": "^2.3.5 || ^3.0",
         "suvera/monolog-cascade": "dev-master",
         "swoole/ide-helper": "@dev",
-        "lastguest/murmurhash": "2.1.*",
-        "ramsey/uuid": "4.2.*",
-        "promphp/prometheus_client_php": "v2.3.*",
-        "vanilla/garden-cli": "v3.1"
+        "lastguest/murmurhash": "^2.1",
+        "ramsey/uuid": "^4.7",
+        "promphp/prometheus_client_php": "^2.10",
+        "vanilla/garden-cli": "^3.1"
     }
 }

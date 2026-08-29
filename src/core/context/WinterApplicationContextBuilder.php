@@ -96,19 +96,19 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         return $this->propertyContext->get($name, $default);
     }
 
-    public function getPropertyStr(string $name, string $default = null): string {
+    public function getPropertyStr(string $name, ?string $default = null): string {
         return $this->propertyContext->getStr($name, $default);
     }
 
-    public function getPropertyBool(string $name, bool $default = null): bool {
+    public function getPropertyBool(string $name, ?bool $default = null): bool {
         return $this->propertyContext->getBool($name, $default);
     }
 
-    public function getPropertyInt(string $name, int $default = null): int {
+    public function getPropertyInt(string $name, ?int $default = null): int {
         return $this->propertyContext->getInt($name, $default);
     }
 
-    public function getPropertyFloat(string $name, float $default = null): float {
+    public function getPropertyFloat(string $name, ?float $default = null): float {
         return $this->propertyContext->getFloat($name, $default);
     }
 

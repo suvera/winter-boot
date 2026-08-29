@@ -84,13 +84,18 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         $wServer->addEventCallback('request', [$this, 'serveRequest']);
 
         $wServer->addEventCallback('start', function (Server $server) use ($wServer) {
-            posix_setpgid(getmypid(), $server->master_pid);
+            // NOTE: Do NOT call posix_setpgid() on the master process.
+            // The master must stay in the terminal's foreground process group
+            // so it can receive SIGINT (Ctrl+C) and initiate graceful shutdown.
+            // Workers and manager are still moved to the master's process group
+            // in their respective callbacks, so posix_kill(-$master_pid, SIGKILL)
+            // can still kill the entire tree.
             $wServer->addPid('master', $server->master_pid, ProcessType::MASTER);
             self::logInfo("Http server started on $server->host:" . $server->port . ', pid:' . getmypid()
                 . ', master_pid:' . $server->master_pid);
         });
 
-        $wServer->addEventCallback('WorkerStart', function (Server $server, int $workerId) use ($wServer) {
+        $wServer->addEventCallback('workerStart', function (Server $server, int $workerId) use ($wServer) {
             posix_setpgid(getmypid(), $server->master_pid);
 
             /** @var IdleCheckRegistry $idleCheck */
@@ -110,7 +115,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
             $wServer->addPid('worker-' . $workerId, getmypid(), $psType);
         });
 
-        $wServer->addEventCallback('ManagerStart', function (Server $server) use ($wServer) {
+        $wServer->addEventCallback('managerStart', function (Server $server) use ($wServer) {
             posix_setpgid(getmypid(), $server->master_pid);
             $wServer->addPid('manager', getmypid(), ProcessType::MANAGER);
 
@@ -121,7 +126,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
                 . ', master_pid:' . $server->master_pid);
         });
 
-        $wServer->addEventCallback('PipeMessage', function (Server $server, $srcWorkerId, $data) {
+        $wServer->addEventCallback('pipeMessage', function (Server $server, $srcWorkerId, $data) {
             if (str_starts_with($data, 'json:')) {
                 $json = json_decode(substr($data, 5), true);
                 switch ($json['cmd']) {

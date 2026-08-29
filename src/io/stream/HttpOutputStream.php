@@ -7,12 +7,12 @@ use dev\winterframework\web\http\HttpCookie;
 
 interface HttpOutputStream extends OutputStream {
 
-    public function writeHeader(string $name, string $value);
+    public function writeHeader(string $name, ?string $value): void;
 
-    public function setStatus(int $status, string $phrase = null, string $version = null);
+    public function setStatus(int $status, ?string $phrase = null, ?string $version = null): void;
 
     /**
      * @param HttpCookie[] $cookies
      */
-    public function setCookies(array $cookies);
+    public function setCookies(array $cookies): void;
 }

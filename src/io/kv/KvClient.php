@@ -155,10 +155,12 @@ class KvClient implements KvTemplate {
     }
 
     public function __destruct() {
-        $this->client->close();
+        if (isset($this->_client)) {
+            $this->_client->close();
+        }
     }
 
-    public function incr(string $domain, string $key, int|float $incVal = null): int|float {
+    public function incr(string $domain, string $key, int|float|null $incVal = null): int|float {
         $req = new KvRequest();
         $req->setCommand(KvCommand::INCR);
         $req->setKey($key);
@@ -170,7 +172,7 @@ class KvClient implements KvTemplate {
         return $resp->getData();
     }
 
-    public function decr(string $domain, string $key, int|float $decVal = null): int|float {
+    public function decr(string $domain, string $key, int|float|null $decVal = null): int|float {
         $req = new KvRequest();
         $req->setCommand(KvCommand::DECR);
         $req->setKey($key);

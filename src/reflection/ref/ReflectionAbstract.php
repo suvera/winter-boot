@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace dev\winterframework\reflection\ref;
 
-use Serializable;
-
-abstract class ReflectionAbstract implements Serializable {
+abstract class ReflectionAbstract {
     protected array $_data = [];
     protected mixed $delegate;
 

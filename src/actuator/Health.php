@@ -43,7 +43,7 @@ class Health implements Stringable, JsonSerializable {
         return new self(Status::UP);
     }
 
-    public static function down(Throwable $ex = null): self {
+    public static function down(?Throwable $ex = null): self {
         $h = new self(Status::DOWN);
         if ($ex) {
             $h->withDetail("error", get_class($ex) . ": " . $ex->getMessage());

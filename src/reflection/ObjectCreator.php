@@ -37,7 +37,7 @@ class ObjectCreator {
         return self::mapObject($obj, $props, $ref, $parentName);
     }
 
-    public static function mapObject(object $obj, string|array $props, ReflectionClass $ref = null, string $parentName = ''): object {
+    public static function mapObject(object $obj, string|array $props, ?ReflectionClass $ref = null, string $parentName = ''): object {
         if (!$ref) {
             $ref = self::getClass($obj);
         }

@@ -14,6 +14,7 @@ use Swoole\HTTP\Server;
 use Swoole\Process;
 use Swoole\Server\Port;
 use Throwable;
+use Error;
 
 class WinterServer {
     use Wlf4p;
@@ -45,6 +46,8 @@ class WinterServer {
     private mixed $address;
     private mixed $port;
     protected static bool $processSignalsRegistered = false;
+    protected static ?self $instance = null;
+    protected static bool $started = false;
     protected WinterServerAdmin $adminHandler;
     protected ServerPidManager $pidManager;
 
@@ -60,6 +63,7 @@ class WinterServer {
         $this->server = new Server($this->address, $this->port);
         $this->pidManager = new ServerPidManager($this->appCtx);
         $this->adminHandler = new WinterServerAdmin($this->appCtx, $this->pidManager);
+        self::$instance = $this;
     }
 
     public function addPid(string $id, int $pid, int $psType): void {
@@ -131,7 +135,7 @@ class WinterServer {
 
     protected function registerEventCallbacks(): void {
         foreach ($this->eventCallbacks as $eventName => $callbacks) {
-            $this->server->on($eventName, function (...$args) use ($callbacks) {
+            $this->server->on($eventName, function (...$args) use ($callbacks, $eventName) {
                 foreach ($callbacks as $callback) {
                     $callback(...$args);
                 }
@@ -140,7 +144,7 @@ class WinterServer {
     }
 
     public function addListener(string $host, int|string $port, string|int $socket_type): bool|Port {
-        return $this->server->addlistener($host, $port, $socket_type);
+        return $this->server->listen($host, $port, $socket_type);
     }
 
     public function addProcess(Process $process): bool {
@@ -149,12 +153,38 @@ class WinterServer {
     }
 
     public function start(): void {
+        // Prevent multiple starts which cause Swoole event-loop recreation errors
+        if (self::$started) {
+            self::logInfo('WinterServer already started, skipping');
+            return;
+        }
+        self::$started = true;
         self::logInfo("Starting Http server on $this->address:$this->port" . ', pid:' . getmypid());
-
-        $this->registerEventCallbacks();
-        $this->beginAdmin();
+        
         $this->serverArgs = array_merge(self::$defaultServerArgs, $this->serverArgs);
         $this->server->set($this->getServerArgs());
+        
+        // Prepend signal registration to 'start' event callbacks so it runs
+        // BEFORE posix_setpgid() in other callbacks. posix_setpgid() changes
+        // the process group, which disconnects the master from terminal signals.
+        // Only the master process registers signal handlers — the manager and
+        // workers should NOT, otherwise they race with the master on Ctrl+C.
+        $signalCb = function (Server $server) {
+            self::registerProcessSignals();
+            ServerPidManager::registerProcessSignals();
+        };
+        if (!isset($this->eventCallbacks['start'])) {
+            $this->eventCallbacks['start'] = [];
+        }
+        array_unshift($this->eventCallbacks['start'], $signalCb);
+
+        // Register event callbacks before start
+        $this->registerEventCallbacks();
+
+        // Set up admin listener
+        $this->beginAdmin();
+
+        // Start the server
         $this->server->start();
     }
 
@@ -164,7 +194,7 @@ class WinterServer {
             return;
         }
         /** @var Port $servPort */
-        $servPort = $this->server->addlistener('127.0.0.1', $port, SWOOLE_SOCK_TCP);
+        $servPort = @$this->server->listen('127.0.0.1', $port, SWOOLE_SOCK_TCP);
 
         $servPort->on('Request', function (Request $request, Response $response) {
             $this->adminHandler->serveRequest($request, $response);
@@ -172,15 +202,28 @@ class WinterServer {
     }
 
     public static function onProcessSignal(int $signal): void {
-        echo "Got Signal: $signal\n";
-        self::logInfo("Got Signal: $signal");
-        die;
+        // If we have a server instance, perform graceful shutdown
+        if (self::$instance !== null) {
+            self::$instance->shutdown("Received signal $signal", null);
+        }
+        // Ensure the process exits
+        exit(0);
     }
 
     public static function registerProcessSignals(): void {
+        if (self::$processSignalsRegistered) {
+            return;
+        }
+        // Only register SIGINT (Ctrl+C). SIGTERM is already owned by Swoole internally.
+        if (class_exists('Swoole\Process')) {
+            Process::signal(SIGINT, function (int $signal) {
+                self::onProcessSignal($signal);
+            });
+        }
+        self::$processSignalsRegistered = true;
     }
 
-    public function shutdown(string $message = null, Throwable $ex = null): void {
+    public function shutdown(?string $message = null, ?Throwable $ex = null): void {
         $msg = 'Shutting down the server ';
         if ($message) {
             $msg .= "$message\n";
@@ -191,6 +234,10 @@ class WinterServer {
         }
 
         self::logError($msg);
+        // Call Swoole's graceful shutdown first — this tells the manager and
+        // workers to stop cleanly. Only fall back to forceful killAll() if
+        // graceful shutdown doesn't complete in time.
+        $this->server->shutdown();
         $this->pidManager->killAll();
     }
 

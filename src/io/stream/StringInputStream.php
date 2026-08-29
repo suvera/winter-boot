@@ -16,7 +16,7 @@ class StringInputStream implements InputStream {
         unset($this->value);
     }
 
-    public function read(int $length = null): string {
+    public function read(?int $length = null): string {
         if ($length !== null) {
             TypeAssert::positiveInteger($length);
             $data = substr($this->value, $this->pos, $length);

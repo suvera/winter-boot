@@ -70,19 +70,19 @@ class ShmTable implements ArrayAccess, Iterator, Countable {
         $this->intern->destroy();
     }
 
-    public function offsetExists($offset): bool {
+    public function offsetExists(mixed $offset): bool {
         return $this->exists($offset);
     }
 
-    public function offsetGet($offset): ?array {
+    public function offsetGet(mixed $offset): ?array {
         return $this->get($offset);
     }
 
-    public function offsetSet($offset, $value): void {
+    public function offsetSet(mixed $offset, mixed $value): void {
         $this->put($offset, $value);
     }
 
-    public function offsetUnset($offset) {
+    public function offsetUnset(mixed $offset): void {
         $this->delete($offset);
     }
 
@@ -90,19 +90,19 @@ class ShmTable implements ArrayAccess, Iterator, Countable {
         return $this->intern->current();
     }
 
-    public function next() {
+    public function next(): void {
         $this->intern->next();
     }
 
-    public function key(): string {
+    public function key(): mixed {
         return '' . $this->intern->key();
     }
 
-    public function valid() {
+    public function valid(): bool {
         return $this->intern->valid();
     }
 
-    public function rewind() {
+    public function rewind(): void {
         $this->intern->rewind();
     }
 

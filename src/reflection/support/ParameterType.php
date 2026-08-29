@@ -10,6 +10,7 @@ use dev\winterframework\exception\NullPointerException;
 use dev\winterframework\io\ObjectMapper;
 use dev\winterframework\reflection\ObjectCreator;
 use dev\winterframework\reflection\ref\RefKlass;
+use ReflectionIntersectionType;
 use ReflectionNamedType;
 use ReflectionType;
 use ReflectionUnionType;
@@ -20,6 +21,7 @@ class ParameterType {
     public static ParameterType $noType;
 
     private bool $unionType = false;
+    private bool $intersectionType = false;
     /**
      * @var ParameterType[]
      */
@@ -41,15 +43,17 @@ class ParameterType {
         return self::$noType;
     }
 
-    public static function fromType(
-        ReflectionNamedType|ReflectionUnionType|ReflectionType|null $type
-    ): ParameterType {
+    public static function fromType(?ReflectionType $type): ParameterType {
         if ($type == null) {
             return self::getNoType();
         } else if ($type instanceof ReflectionUnionType) {
             return self::fromUnionType($type);
-        } else {
+        } else if ($type instanceof ReflectionIntersectionType) {
+            return self::fromIntersectionType($type);
+        } else if ($type instanceof ReflectionNamedType) {
             return self::fromNamedType($type);
+        } else {
+            return self::getNoType();
         }
     }
 
@@ -59,23 +63,37 @@ class ParameterType {
         return $obj;
     }
 
+    public static function fromIntersectionType(ReflectionIntersectionType $type): ParameterType {
+        $primary = null;
+        foreach ($type->getTypes() as $subType) {
+            $typeObj = self::fromType($subType);
+            if (is_null($primary)) {
+                $primary = new ParameterType($typeObj->getName(), $type->allowsNull(), false);
+                $primary->intersectionType = true;
+            }
+            $primary->names = array_merge($primary->names, $typeObj->getNames());
+        }
+
+        return $primary ?? self::getNoType();
+    }
+
     public static function fromUnionType(ReflectionUnionType $type): ParameterType {
         $primary = null;
         foreach ($type->getTypes() as $subType) {
-            $typeObj = new ParameterType($subType->getName(), $subType->allowsNull(), $subType->isBuiltin());
+            $typeObj = self::fromType($subType);
             if (is_null($primary)) {
-                $typeObj->unionType = true;
-                $primary = $typeObj;
+                $primary = new ParameterType($typeObj->getName(), $type->allowsNull(), $typeObj->isBuiltin());
+                $primary->unionType = true;
             }
             $primary->unionTypes[] = $typeObj;
-            $primary->names[] = $typeObj->getName();
+            $primary->names = array_merge($primary->names, $typeObj->getNames());
 
             if ($subType->allowsNull()) {
                 $primary->allowsNull = true;
             }
         }
 
-        return $primary;
+        return $primary ?? self::getNoType();
     }
 
     public function isUnionType(): bool {

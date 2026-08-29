@@ -168,7 +168,7 @@ class KvServer {
         $this->server->on('connect', [$this, 'onConnect']);
         $this->server->on('receive', [$this, 'onReceive']);
 
-        $this->server->on('ManagerStart', function (Server $server) {
+        $this->server->on('managerStart', function (Server $server) {
             echo "Manager started\n";
         });
 

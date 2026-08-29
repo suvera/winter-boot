@@ -80,10 +80,13 @@ abstract class OciOperations {
             foreach ($bindVars as $bindKey => $bindVal) {
                 $maxLen = $bindVal;
                 $type = SQLT_CHR;
-                if (is_array($bindVal) && isset($bindVal[0])) {
-                    $maxLen = intval($bindVal[0]);
-                } else if (is_array($bindVal) && isset($bindVal[1])) {
-                    $type = intval($bindVal[1]);
+                if (is_array($bindVal)) {
+                    if (isset($bindVal[0])) {
+                        $maxLen = intval($bindVal[0]);
+                    }
+                    if (isset($bindVal[1])) {
+                        $type = intval($bindVal[1]);
+                    }
                 }
                 $stmt->outBindVar(new OutBindVar($bindKey, $maxLen, $type));
             }

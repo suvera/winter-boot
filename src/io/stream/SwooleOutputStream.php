@@ -13,18 +13,18 @@ class SwooleOutputStream implements HttpOutputStream {
     ) {
     }
 
-    public function writeHeader(string $name, ?string $value) {
+    public function writeHeader(string $name, ?string $value): void {
         $this->response->header($name, $value);
     }
 
-    public function setStatus(int $status, string $phrase = null, string $version = null) {
+    public function setStatus(int $status, ?string $phrase = null, ?string $version = null): void {
         $this->response->status($status, $phrase);
     }
 
     /**
      * @param HttpCookie[] $cookies
      */
-    public function setCookies(array $cookies) {
+    public function setCookies(array $cookies): void {
         foreach ($cookies as $cookie) {
             $this->response->cookie(
                 $cookie->name,
@@ -43,7 +43,7 @@ class SwooleOutputStream implements HttpOutputStream {
         //$this->response->close();
     }
 
-    public function write(string|int|float $data, int $length = null): int {
+    public function write(string|int|float $data, ?int $length = null): int {
         $data = (string)$data;
 
         if ($length !== null && is_numeric($length)) {

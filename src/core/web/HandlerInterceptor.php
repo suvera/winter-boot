@@ -13,6 +13,6 @@ interface HandlerInterceptor {
 
     public function postHandle(HttpRequest $request, ResponseEntity $response): void;
 
-    public function afterCompletion(HttpRequest $request, ResponseEntity $response, Throwable $ex = null): void;
+    public function afterCompletion(HttpRequest $request, ResponseEntity $response, ?Throwable $ex = null): void;
 
 }

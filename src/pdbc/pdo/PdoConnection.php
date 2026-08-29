@@ -99,6 +99,32 @@ class PdoConnection extends AbstractConnection {
         return $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
     }
 
+    /**
+     * Whether the underlying PDO driver natively supports PDO::lastInsertId()
+     * as the mechanism for retrieving auto-generated keys.
+     *
+     * Drivers that support it:
+     *  - mysql   : LAST_INSERT_ID()
+     *  - sqlite  : last_insert_rowid()
+     *  - sqlsrv  : SCOPE_IDENTITY()
+     *  - dblib   : @@IDENTITY / SCOPE_IDENTITY() (SQL Server / Sybase via FreeTDS)
+     *
+     * Drivers intentionally excluded:
+     *  - pgsql   : lastInsertId() relies on lastval()/currval(), which requires a prior
+     *              sequence increment in the session and is not portable; PostgreSQL
+     *              should use INSERT ... RETURNING through the result-set path instead.
+     *  - oci     : generated values use RETURNING ... INTO ... with bound output
+     *              variables, not lastInsertId().
+     *  - others  : not reliably supported.
+     */
+    public function supportsLastInsertId(): bool {
+        return in_array(
+            $this->getDriverType(),
+            ['mysql', 'sqlite', 'sqlsrv', 'dblib'],
+            true
+        );
+    }
+
     public function getSchema(): string {
         $this->assertConnectionOpen();
 
@@ -164,14 +190,14 @@ class PdoConnection extends AbstractConnection {
         }
     }
 
-    public function rollback(Savepoint $savepoint = null): void {
+    public function rollback(?Savepoint $savepoint = null): void {
         $this->assertConnectionOpen();
         if ($this->pdo->inTransaction()) {
             $this->pdo->rollBack();
         }
     }
 
-    public function setSavepoint(string $name = null): Savepoint {
+    public function setSavepoint(?string $name = null): Savepoint {
         throw new SQLException('Driver does not support this function ' . __METHOD__);
     }
 

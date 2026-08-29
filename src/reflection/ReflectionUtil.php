@@ -21,11 +21,13 @@ use dev\winterframework\util\log\Wlf4p;
 use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionFunction;
+use ReflectionIntersectionType;
 use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionObject;
 use ReflectionParameter;
 use ReflectionProperty;
+use ReflectionType;
 use ReflectionUnionType;
 use Throwable;
 
@@ -93,7 +95,6 @@ class ReflectionUtil {
             return '';
         }
 
-        /** @var ReflectionNamedType|ReflectionUnionType $type */
         $type = $param->getType();
         return self::getTypeString($type);
     }
@@ -103,12 +104,11 @@ class ReflectionUtil {
             return '';
         }
 
-        /** @var ReflectionNamedType|ReflectionUnionType $type */
         $type = $method->getReturnType();
         return self::getTypeString($type);
     }
 
-    public static function getTypeString(ReflectionNamedType|ReflectionUnionType $type): string {
+    public static function getTypeString(?ReflectionType $type): string {
         if ($type == null) {
             return '';
         }
@@ -119,13 +119,29 @@ class ReflectionUtil {
                 if (!empty($mixType)) {
                     $mixType .= '|';
                 }
-                $mixType .= $subType->getName();
+                $mixType .= self::getTypeString($subType);
             }
 
             return $mixType;
         }
 
-        return $type->getName();
+        if ($type instanceof ReflectionIntersectionType) {
+            $mixType = '';
+            foreach ($type->getTypes() as $subType) {
+                if (!empty($mixType)) {
+                    $mixType .= '&';
+                }
+                $mixType .= self::getTypeString($subType);
+            }
+
+            return $mixType;
+        }
+
+        if ($type instanceof ReflectionNamedType) {
+            return $type->getName();
+        }
+
+        return (string)$type;
     }
 
     /**
@@ -143,36 +159,11 @@ class ReflectionUtil {
             }
             $m = '@method ';
 
-            if (!$method->hasReturnType()) {
-                $retType = 'mixed';
-            } else {
-                /** @var ReflectionNamedType $type */
-                $type = $method->getReturnType();
-                $retType = $type->getName();
-            }
-
+            $retType = $method->hasReturnType() ? self::getTypeString($method->getReturnType()) : 'mixed';
             $m .= $retType . ' ' . $method->getShortName() . '(';
 
-            $typeName = '';
             foreach ($method->getParameters() as $i => $p) {
-                if (!$p->hasType()) {
-                    $typeName = 'mixed';
-                } else {
-                    /** @var ReflectionNamedType|ReflectionUnionType $type */
-                    $type = $p->getType();
-                    if ($type instanceof ReflectionUnionType) {
-                        foreach ($type->getTypes() as $uType) {
-                            /** @var ReflectionNamedType $uType */
-                            if (!empty($typeName)) {
-                                $typeName .= '|';
-                            }
-                            $typeName .= $uType->getName();
-                        }
-                    } else {
-                        $type = $p->getType();
-                        $typeName = $type->getName();
-                    }
-                }
+                $typeName = $p->hasType() ? self::getTypeString($p->getType()) : 'mixed';
                 if ($i > 0) {
                     $m .= ', ';
                 }

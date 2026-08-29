@@ -9,13 +9,13 @@ interface PropertyContext {
 
     public function set(string $name, mixed $value): mixed;
 
-    public function getStr(string $name, string $default = null): string;
+    public function getStr(string $name, ?string $default = null): string;
 
-    public function getBool(string $name, bool $default = null): bool;
+    public function getBool(string $name, ?bool $default = null): bool;
 
-    public function getInt(string $name, int $default = null): int;
+    public function getInt(string $name, ?int $default = null): int;
 
-    public function getFloat(string $name, float $default = null): float;
+    public function getFloat(string $name, ?float $default = null): float;
 
     public function getAll(): array;
 

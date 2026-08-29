@@ -39,7 +39,13 @@ class KvServerProcess extends MonitoringServerProcess {
         return ProcessType::KV_SERVER;
     }
 
+    private int $restartAttempts = 0;
+    private bool $firstStart = true;
+
     protected function onProcessStart(): void {
+        // Reset attempts on successful start
+        $this->restartAttempts = 0;
+        $this->firstStart = false;
         self::logInfo('KV Server started on port ' . $this->config->getAddress()
             . ':' . $this->config->getPort());
     }
@@ -49,7 +55,25 @@ class KvServerProcess extends MonitoringServerProcess {
     }
 
     protected function onProcessDead(): void {
-        throw new KvException('KV Server down');
+        if ($this->firstStart) {
+            // First failure during startup – shut down entire app immediately
+            $this->wServer->shutdown('KV Server failed on startup', new KvException('KV Server down'));
+            return;
+        }
+        // Subsequent failure – retry with exponential backoff
+        $this->restartAttempts++;
+        $delay = min(pow(2, $this->restartAttempts), 60); // cap at 60 seconds
+        self::logError("KV Server died, retrying in {$delay}s (attempt {$this->restartAttempts})");
+        // Schedule a restart after the delay
+        if (class_exists('Swoole\Timer')) {
+            Swoole\Timer::after($delay * 1000, function () {
+                // Reset firstStart flag so that the next attempt is considered a restart
+                $this->firstStart = false;
+                $this->run();
+            });
+        }
+        // Do not exit; monitoring loop will continue and the timer will trigger a restart
+        return;
     }
 
     protected function run(): void {

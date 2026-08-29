@@ -13,14 +13,14 @@ class PrintHttpOutputStream implements HttpOutputStream {
         $this->cliMode = (php_sapi_name() === 'cli');
     }
 
-    public function writeHeader(string $name, string $value) {
+    public function writeHeader(string $name, ?string $value): void {
         if ($this->cliMode) {
             return;
         }
         header($name . ': ' . $value);
     }
 
-    public function setStatus(int $status, string $phrase = null, string $version = null) {
+    public function setStatus(int $status, ?string $phrase = null, ?string $version = null): void {
         if ($this->cliMode) {
             return;
         }
@@ -33,7 +33,7 @@ class PrintHttpOutputStream implements HttpOutputStream {
     /**
      * @param HttpCookie[] $cookies
      */
-    public function setCookies(array $cookies) {
+    public function setCookies(array $cookies): void {
         if ($this->cliMode) {
             return;
         }
@@ -55,7 +55,7 @@ class PrintHttpOutputStream implements HttpOutputStream {
         // nothing
     }
 
-    public function write(string|int|float $data, int $length = null): int {
+    public function write(string|int|float $data, ?int $length = null): int {
         $data = (string)$data;
 
         if ($length !== null && is_numeric($length)) {

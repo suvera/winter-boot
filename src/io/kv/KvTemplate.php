@@ -18,9 +18,9 @@ interface KvTemplate {
 
     public function delAll(string $domain): bool;
 
-    public function incr(string $domain, string $key, int|float $incVal = null): int|float;
+    public function incr(string $domain, string $key, int|float|null $incVal = null): int|float;
 
-    public function decr(string $domain, string $key, int|float $decVal = null): int|float;
+    public function decr(string $domain, string $key, int|float|null $decVal = null): int|float;
 
     public function append(string $domain, string $key, string $append): int;
 

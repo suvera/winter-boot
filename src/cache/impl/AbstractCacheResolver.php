@@ -14,7 +14,7 @@ use InvalidArgumentException;
 abstract class AbstractCacheResolver implements CacheResolver {
     private CacheManager $cacheManager;
 
-    protected function __construct(CacheManager $cacheManager = null) {
+    protected function __construct(?CacheManager $cacheManager = null) {
         if (!is_null($cacheManager)) {
             $this->cacheManager = $cacheManager;
         }

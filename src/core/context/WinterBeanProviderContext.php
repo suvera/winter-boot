@@ -68,7 +68,7 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         $this->_addProviderClass($class, $attributes);
     }
 
-    private function _addProviderClass(ClassResource $class, array $moreAttributes = null): void {
+    private function _addProviderClass(ClassResource $class, ?array $moreAttributes = null): void {
         $this->validateBeanClass($class->getClass());
         $attributes = $class->getAttributes();
         if ($moreAttributes) {
