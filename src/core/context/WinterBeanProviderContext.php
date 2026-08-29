@@ -384,7 +384,16 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         $className = ProxyGenerator::getProxyClassName($beanProvider->getClass()->getClass()->getName());
 
         if (!class_exists($className)) {
-            eval(ProxyGenerator::getDefault()->generateClass($beanProvider->getClass()));
+            $proxyCode = ProxyGenerator::getDefault()->generateClass($beanProvider->getClass());
+            try {
+                eval($proxyCode);
+            } catch (Throwable $e) {
+                throw new BeansException(
+                    sprintf("Failed to evaluate generated proxy class [%s] for target [%s]: %s", $className, $beanProvider->getClass()->getClass()->getName(), $e->getMessage()),
+                    $e->getCode(),
+                    $e
+                );
+            }
         }
 
         $clsRes = $this->appCtx->addClass($className);

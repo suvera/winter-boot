@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace dev\winterframework\stereotype\aop;
 
 use dev\winterframework\stereotype\util\ComponentName;
+use dev\winterframework\core\aop\ex\AopException;
+use Throwable;
 
 trait AopContextExecute {
     /** @noinspection PhpUnusedParameterInspection */
@@ -20,7 +22,15 @@ trait AopContextExecute {
             $$name = $value;
         }
 
-        return eval($__c_o_d_e);
+        try {
+            return eval($__c_o_d_e);
+        } catch (Throwable $e) {
+            throw new AopException(
+                sprintf("Error executing AOP inline code in target [%s]: %s, [CODE]: %s", $target::class, $e->getMessage(), $__c_o_d_e),
+                $e->getCode(),
+                $e
+            );
+        }
     }
 
     protected static function buildNameByContext(
