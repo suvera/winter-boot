@@ -1,6 +1,6 @@
-# Winter Boot - Unleash the Power of PHP 8.0+ Microservices!
+# Winter Boot - Unleash the Power of PHP 8.5+ Microservices!
 
-Inspired by the elegance of Spring Boot, Winter Boot empowers you to build robust and scalable **microservices** in PHP 8 with unparalleled ease and familiarity. If you're a Spring Boot enthusiast looking to dive into the world of PHP, Winter Boot is your perfect gateway!
+Inspired by the elegance of Spring Boot, Winter Boot empowers you to build robust and scalable **microservices** in PHP 8.5 with unparalleled ease and familiarity. If you're a Spring Boot enthusiast looking to dive into the world of PHP, Winter Boot is your perfect gateway!
 
 **Effortless Application Setup:**
 
