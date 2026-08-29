@@ -12,7 +12,11 @@
         "platform": {
             "php": "8.5"
         },
-        "bin-dir": "bin"
+        "bin-dir": "bin",
+        "allow-plugins": {
+            "php-http/discovery": true,
+            "tbachert/spi": true
+        }
     },
     "license": "MIT",
     "authors": [
@@ -45,6 +49,11 @@
         "lastguest/murmurhash": "^2.1",
         "ramsey/uuid": "^4.7",
         "promphp/prometheus_client_php": "^2.10",
-        "vanilla/garden-cli": "^3.1"
+        "vanilla/garden-cli": "^3.1",
+        "open-telemetry/opentelemetry": "^1.0",
+        "open-telemetry/api": "^1.0",
+        "open-telemetry/exporter-otlp": "^1.0",
+        "guzzlehttp/promises": "3.0.x-dev",
+        "php-http/httplug": "2.x-dev"
     }
 }

@@ -1,0 +1,25 @@
+# OpenTelemetry Configuration for Winter Boot
+
+winter:
+    telemetry:
+        # The name of the service that will be reported in traces
+        serviceName: 'my-winter-application'
+        
+        # OTel Exporter Configuration
+        exporter:
+            # Supported: 'otlp', 'zipkin', 'jaeger'
+            type: 'otlp'
+            endpoint: 'http://localhost:4317'
+        
+        # Sampling configuration
+        sampler:
+            # Supported: 'always_on', 'always_off', 'parent_based_always_on', 'trace_id_ratio'
+            type: 'parent_based_always_on'
+            # Only used if type is 'trace_id_ratio'
+            ratio: 1.0
+
+        # Enable/Disable specific instrumentation
+        instrumentation:
+            web: true
+            database: true
+            async: true

@@ -140,6 +140,7 @@ Unlock the full potential of Winter Boot with our detailed documentation. Each g
 -   [**Locking**](docs/locking.md): Implement concurrency control for critical sections.
 -   [**Json and XML**](docs/json_xml.md): Seamlessly handle data serialization and deserialization.
 -   [**Async and Scheduling support**](docs/async_scheduling.md): Harness the power of asynchronous operations and scheduled tasks.
+-   [**OpenTelemetry**](docs/telemetry.md): Observe your microservices with distributed tracing.
 -   [**Shared In-Memory Stores**](docs/local_store.md): Utilize high-performance in-memory data stores.
 -   [**Daemon Threads**](docs/daemon_threads.md): Run background processes efficiently.
 -   [**Building & Deployment**](docs/build.md): Comprehensive guide to packaging and deploying your applications.
@@ -158,6 +159,8 @@ Check out these existing modules for inspiration and reference:
 -   [**Apache Kafka Module**](https://github.com/suvera/winter-modules/tree/master/winter-kafka): Stream processing with Kafka.
 -   [**DTCE Module**](https://github.com/suvera/winter-modules/tree/master/winter-dtce): Distributed Transaction Coordination.
 -   [**S3 Module**](https://github.com/suvera/winter-modules/tree/master/winter-s3): Seamless integration with Amazon S3.
+-   [**SQS Module**](https://github.com/suvera/winter-modules/tree/master/winter-sqs): Seamless integration with Amazon SQS.
+-   [**OpenSearch Module**](https://github.com/suvera/winter-modules/tree/master/winter-opensearch): Seamless integration with OpenSearch.
 -   [**Memdb Module**](https://github.com/suvera/winter-memdb): Integrate with popular in-memory databases like Apache Ignite, Redis, Memcached, Hazelcast, and more!
 -   [**Service Discovery**](https://github.com/suvera/winter-eureka): Connect with Consul, Netflix Eureka, and other service discovery solutions.
 
