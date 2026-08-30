@@ -26,6 +26,8 @@ use dev\winterframework\io\metrics\prometheus\PrometheusMetricRegistry;
 use dev\winterframework\io\timer\IdleCheckRegistry;
 use dev\winterframework\pdbc\DataSource;
 use dev\winterframework\pdbc\datasource\DataSourceBuilder;
+use dev\winterframework\pdbc\multitenant\MultiTenantManager;
+use dev\winterframework\pdbc\multitenant\TenantDataSourceProvider;
 use dev\winterframework\pdbc\PdbcTemplate;
 use dev\winterframework\pdbc\pdo\PdoTemplateProvider;
 use dev\winterframework\ppa\EntityRegistry;
@@ -38,6 +40,10 @@ use dev\winterframework\stereotype\WinterBootApplication;
 use dev\winterframework\txn\PlatformTransactionManager;
 use dev\winterframework\util\concurrent\DefaultLockManager;
 use dev\winterframework\util\concurrent\LockManager;
+use dev\winterframework\exception\WinterException;
+use dev\winterframework\exception\ClassNotFoundException;
+use dev\winterframework\type\TypeAssert;
+use Throwable;
 
 abstract class WinterApplicationContextBuilder implements ApplicationContext {
     protected BeanProviderContext $beanProvider;
@@ -211,6 +217,58 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         );
 
         $this->registerPrometheusBeans();
+        $this->registerMultiTenantDataSources();
+    }
+
+    private function registerMultiTenantDataSources(): void {
+        if (!$this->propertyContext->has('multitenant-datasource')) {
+            return;
+        }
+
+        $mts = $this->propertyContext->get('multitenant-datasource');
+        if (!is_array($mts) || empty($mts)) {
+            return;
+        }
+
+        foreach ($mts as $mtDs) {
+            if (!isset($mtDs['name'])) {
+                throw new WinterException('multitenant-datasource DataSource configured without "name" parameter');
+            }
+            if (!isset($mtDs['url'])) {
+                throw new WinterException('multitenant-datasource DataSource configured without "url" parameter');
+            }
+            if (!isset($mtDs['providerClass'])) {
+                throw new WinterException('multitenant-datasource DataSource configured without "providerClass" parameter');
+            }
+
+            if (!class_exists($mtDs['providerClass'], true)) {
+                throw new ClassNotFoundException('multitenant-datasource providerClass does not exist "'
+                    . $mtDs['providerClass'] . '"');
+            }
+
+            TypeAssert::objectOfIsA(
+                $mtDs['providerClass'],
+                TenantDataSourceProvider::class,
+                'multitenant-datasource "providerClass" must be derived from ' . TenantDataSourceProvider::class
+            );
+
+            $providerClass = $mtDs['providerClass'];
+
+            try {
+                /* @var TenantDataSourceProvider $provider */
+                $provider = new $providerClass();
+            } catch (Throwable $e) {
+                throw new WinterException('Could not initialize the provider in multitenant-datasource DataSource configuration', 0, $e);
+            }
+
+            $mtManager = new MultiTenantManager($provider);
+            $this->beanProvider->registerInternalBean(
+                $mtManager,
+                MultiTenantManager::class, 
+                true,
+                $mtDs['name'] . '-manager'
+            );
+        }
     }
 
     private function registerDataSources(): void {

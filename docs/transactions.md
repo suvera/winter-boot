@@ -17,6 +17,8 @@ datasource:
         url: "sqlite::memory:"
         username: xxxxx
         password: xxzzz
+        migrations:
+            enabled: false
         doctrine:
             entityPaths:
                 - /path/to/defaultdb/entities
@@ -26,6 +28,8 @@ datasource:
         url: "mysql:host=localhost;port=3307;dbname=testdb"
         username: xxxxx
         password: xxzzz
+        migrations:
+            enabled: true
         connection:
             persistent: true
             errorMode: ERRMODE_EXCEPTION
@@ -56,11 +60,14 @@ private PdbcTemplate $adminPdbc;
 
 ```
 
+> **Note:** The `-template` suffix is part of the framework's automatic bean naming convention for each configured datasource (`<datasource-name>-template`). It is only required when injecting a specific non-primary `PdbcTemplate` to disambiguate between multiple datasource templates in the container. For a single or primary datasource, `#[Autowired]` without a name or suffix is sufficient.
+
 ### PPA (PHP Persistence API)
 
 PPA is Winter Framework's lightweight ORM layer (analogous to JPA in Java). Entity classes annotated with [`#[Table]`](src/stereotype/ppa/Table.php) implement [`PpaEntity`](src/ppa/PpaEntity.php) (or use [`PpaEntityTrait`](src/ppa/PpaEntityTrait.php)) and are automatically mapped to database rows. The framework generates INSERT/UPDATE/DELETE SQL and maps query results to PHP objects.
 
 ```phpt
+```
 #[Table("users")]
 class User implements PpaEntity {
     use PpaEntityTrait;
@@ -72,21 +79,282 @@ class User implements PpaEntity {
 }
 ```
 
-### PdbcTemplate Methods
+### Using `BindVars`
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `execute(string $sql, array\|BindVars $bindVars = [], PreparedStatementCallback $action = null)` | `mixed` | Execute a SQL statement with optional bind variables and an optional callback that receives the `PreparedStatement` |
-| `query(string $sql, array\|BindVars $bindVars, callable\|ResultSetExtractor\|RowCallbackHandler\|RowMapper $processor)` | `mixed` | Execute a query and process results via a callback, `ResultSetExtractor`, `RowCallbackHandler`, or `RowMapper` |
-| `queryForList(string $sql, array\|BindVars $bindVars = [])` | `array` | Returns all rows as an array of associative arrays: `[ ['col' => 'val', ...], ... ]` |
-| `queryForMap(string $sql, array\|BindVars $bindVars = [])` | `array` | Returns a single row as an associative array. Throws exception if result is not exactly one row |
-| `queryForScalar(string $sql, array\|BindVars $bindVars = [])` | `int\|string\|float\|bool\|null` | Returns a single scalar value from the first column of the first row |
-| `queryForObject(string $sql, array\|BindVars $bindVars, string\|RowMapper $classOrMapper = null)` | `object` | Returns a single row mapped to an object via `RowMapper` or class name |
-| `queryForObjects(string $sql, array\|BindVars $bindVars, string $ppaClass)` | `array` | Returns an array of PPA entity objects populated from the query result. `$ppaClass` is the fully-qualified class name of a PPA entity (e.g., `User::class`) |
-| `update(string $sql, array\|BindVars $bindVars, array\|OutBindVars $outBindVars = [], array &$generatedKeys = [])` | `int` | Execute an INSERT/UPDATE/DELETE statement. Returns number of affected rows. Supports OUT bind variables and generated keys |
-| `batchUpdate(string $sql, array $arrayBindVars)` | `array` | Execute a batch of updates. `$arrayBindVars` is an array of bind-variable arrays, one per batch entry |
-| `updateObjects(object ...$ppaObjects)` | `void` | Create or update PPA entity objects in the database. Each argument must implement [`PpaEntity`](src/ppa/PpaEntity.php) |
-| `deleteObjects(object ...$ppaObjects)` | `void` | Delete PPA entity objects from the database. Each argument must implement [`PpaEntity`](src/ppa/PpaEntity.php) |
+In addition to standard arrays (both positional `?` and named `:name`), you can use the `BindVars` collection class to build typed query parameters explicitly:
+
+```phpt
+use dev\winterframework\pdbc\core\BindVars;
+use dev\winterframework\pdbc\core\BindType;
+
+$binds = (new BindVars())
+    ->add('status', 'active')
+    ->add('minAge', 18, BindType::INT);
+
+$users = $this->pdbc->queryForObjects(
+    "SELECT * FROM users WHERE status = :status AND age >= :minAge", 
+    $binds, 
+    User::class
+);
+```
+
+### PdbcTemplate Methods
+#### `execute`
+
+Execute a SQL statement with optional bind variables and an optional callback that receives the `PreparedStatement`.
+
+| Input Parameter | Type | Description |
+|-----------------|------|-------------|
+| `$sql` | `string` | The SQL statement to execute |
+| `$bindVars` | `array\|BindVars` | Optional bind variables |
+| `$action` | `PreparedStatementCallback\|null` | Optional callback receiving the `PreparedStatement` |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| Return | `mixed` | Result of execution or callback |
+
+**Example:**
+```phpt
+$affected = $this->pdbc->execute(
+    "INSERT INTO users (name, email) VALUES (?, ?)", 
+    ["Alice", "alice@example.com"]
+);
+```
+
+---
+
+#### `query`
+
+Execute a query and process results via a callback, `ResultSetExtractor`, `RowCallbackHandler`, or `RowMapper`.
+
+| Input Parameter | Type | Description |
+|-----------------|------|-------------|
+| `$sql` | `string` | The SQL query string |
+| `$bindVars` | `array\|BindVars` | Bind variables |
+| `$processor` | `callable\|ResultSetExtractor\|RowCallbackHandler\|RowMapper` | Result processor |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| Return | `mixed` | Processed result |
+
+**Example:**
+```phpt
+$names = $this->pdbc->query(
+    "SELECT name FROM users WHERE active = ?", 
+    [1], 
+    fn($rs) => $rs->getString('name')
+);
+```
+
+---
+
+#### `queryForList`
+
+Returns all rows as an array of associative arrays: `[ ['col' => 'val', ...], ... ]`.
+
+| Input Parameter | Type | Description |
+|-----------------|------|-------------|
+| `$sql` | `string` | The SQL query string |
+| `$bindVars` | `array\|BindVars` | Optional bind variables |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| Return | `array` | Array of associative rows |
+
+**Example:**
+```phpt
+$rows = $this->pdbc->queryForList("SELECT * FROM users WHERE status = ?", ["active"]);
+foreach ($rows as $row) {
+    echo $row['name'];
+}
+```
+
+---
+
+#### `queryForMap`
+
+Returns a single row as an associative array. Throws an exception if the result is not exactly one row.
+
+| Input Parameter | Type | Description |
+|-----------------|------|-------------|
+| `$sql` | `string` | The SQL query string |
+| `$bindVars` | `array\|BindVars` | Optional bind variables |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| Return | `array` | Single row as an associative array |
+
+**Example:**
+```phpt
+$user = $this->pdbc->queryForMap("SELECT * FROM users WHERE id = ?", [1]);
+echo $user['email'];
+```
+
+---
+
+#### `queryForScalar`
+
+Returns a single scalar value from the first column of the first row.
+
+| Input Parameter | Type | Description |
+|-----------------|------|-------------|
+| `$sql` | `string` | The SQL query string |
+| `$bindVars` | `array\|BindVars` | Optional bind variables |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| Return | `int\|string\|float\|bool\|null` | Scalar value |
+
+**Example:**
+```phpt
+$count = $this->pdbc->queryForScalar("SELECT COUNT(*) FROM users");
+echo "Total users: " . $count;
+```
+
+---
+
+#### `queryForObject`
+
+Returns a single row mapped to an object via `RowMapper` or class name.
+
+| Input Parameter | Type | Description |
+|-----------------|------|-------------|
+| `$sql` | `string` | The SQL query string |
+| `$bindVars` | `array\|BindVars` | Bind variables |
+| `$classOrMapper` | `string\|RowMapper\|null` | Target class name or row mapper |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| Return | `object` | Mapped object instance |
+
+**Example:**
+```phpt
+$userObj = $this->pdbc->queryForObject(
+    "SELECT id, name, email FROM users WHERE id = ?", 
+    [1], 
+    User::class
+);
+```
+
+---
+
+#### `queryForObjects`
+
+Returns an array of PPA entity objects populated from the query result. `$ppaClass` is the fully-qualified class name of a PPA entity (e.g., `User::class`).
+
+| Input Parameter | Type | Description |
+|-----------------|------|-------------|
+| `$sql` | `string` | The SQL query string |
+| `$bindVars` | `array\|BindVars` | Bind variables |
+| `$ppaClass` | `string` | Fully-qualified PPA entity class name |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| Return | `array` | Array of PPA entity objects |
+
+**Example:**
+```phpt
+$users = $this->pdbc->queryForObjects(
+    "SELECT id, name, email FROM users WHERE status = ?", 
+    ["active"], 
+    User::class
+);
+```
+
+---
+
+#### `update`
+
+Execute an INSERT/UPDATE/DELETE statement. Returns number of affected rows. Supports OUT bind variables and generated keys.
+
+| Input Parameter | Type | Description |
+|-----------------|------|-------------|
+| `$sql` | `string` | The SQL statement |
+| `$bindVars` | `array\|BindVars` | Bind variables |
+| `$outBindVars` | `array\|OutBindVars` | Optional OUT bind variables |
+| `$generatedKeys` | `array` | Optional reference array for generated keys |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| Return | `int` | Number of affected rows |
+
+**Example:**
+```phpt
+$affected = $this->pdbc->update(
+    "UPDATE users SET email = ? WHERE id = ?", 
+    ["newemail@example.com", 1]
+);
+```
+
+---
+
+#### `batchUpdate`
+
+Execute a batch of updates. `$arrayBindVars` is an array of bind-variable arrays, one per batch entry.
+
+| Input Parameter | Type | Description |
+|-----------------|------|-------------|
+| `$sql` | `string` | The SQL batch statement |
+| `$arrayBindVars` | `array` | Array of bind-variable arrays |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| Return | `array` | Batch update results |
+
+**Example:**
+```phpt
+$batchParams = [
+    ["Alice", "alice@example.com"],
+    ["Bob", "bob@example.com"]
+];
+$results = $this->pdbc->batchUpdate(
+    "INSERT INTO users (name, email) VALUES (?, ?)", 
+    $batchParams
+);
+```
+
+---
+
+#### `updateObjects`
+
+Create or update PPA entity objects in the database. Each argument must implement [`PpaEntity`](src/ppa/PpaEntity.php).
+
+| Input Parameter | Type | Description |
+|-----------------|------|-------------|
+| `...$ppaObjects` | `object` | PPA entity objects to create or update |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| Return | `void` | None |
+
+**Example:**
+```phpt
+$user = new User();
+$user->setName("Charlie");
+$user->setEmail("charlie@example.com");
+
+$this->pdbc->updateObjects($user);
+```
+
+---
+
+#### `deleteObjects`
+
+Delete PPA entity objects from the database. Each argument must implement [`PpaEntity`](src/ppa/PpaEntity.php).
+
+| Input Parameter | Type | Description |
+|-----------------|------|-------------|
+| `...$ppaObjects` | `object` | PPA entity objects to delete |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| Return | `void` | None |
+
+**Example:**
+```phpt
+$user = $this->pdbc->queryForObject("SELECT * FROM users WHERE id = ?", [1], User::class);
+$this->pdbc->deleteObjects($user);
+```
 
 
 # Transaction Management
@@ -139,6 +407,8 @@ public function executeInTransaction(): void {
 }
 
 ```
+
+> **Note:** The `-txn` suffix is part of the framework's automatic bean naming convention for each configured datasource's transaction manager (`<datasource-name>-txn`). It is only required when specifying a non-primary transaction manager via `#[Transactional("...")]` to target a specific secondary datasource. For the primary datasource or default transaction manager, plain `#[Transactional]` is sufficient.
 
 #### Example (custom transaction manager)
 ```phpt
@@ -336,31 +606,25 @@ class UserService {
 
 # Multi-Tenant Support
 
-Framework provides a `MultiTenantManager` class that can provide per-tenant `PdbcTemplate` and `PlatformTransactionManager` instances. This is useful when your application serves multiple tenants, each with their own database.
+Winter Boot provides native support for multi-tenancy via `MultiTenantManager` and `TenantDataSourceProvider`, allowing per-tenant `PdbcTemplate` and `PlatformTransactionManager` instances.
 
-## Architecture
+## Configuration via `application.yml`
 
-The framework defines a provider interface [`TenantDataSourceProvider`](src/pdbc/multitenant/TenantDataSourceProvider.php) that **you must implement**. Your implementation is responsible for returning a [`DataSourceConfig`](src/pdbc/datasource/DataSourceConfig.php) for a given tenant ID.
+You can configure multi-tenant data sources directly in your `application.yml` by registering a provider class:
 
-[`MultiTenantManager`](src/pdbc/multitenant/MultiTenantManager.php) takes your provider via constructor and lazily creates/caches per-tenant `PdbcTemplate`, `PlatformTransactionManager`, and `PdoDataSource` instances.
-
+```yaml
+multitenant-datasource:
+    - name: "tenantdb"
+      url: "mysql:host=localhost;port=3306"
+      providerClass: "App\\Config\\MyTenantDataSourceProvider"
 ```
-┌──────────────────────────────────────────────────────┐
-│  Your Application                                    │
-│                                                      │
-│  TenantDataSourceProvider (you implement)            │
-│    └─ getTenantDataSourceConfig($tenantId)           │
-│         │                                            │
-│         ▼                                            │
-│  MultiTenantManager                                  │
-│    ├─ getPdbcTemplate($tenantId) → PdbcTemplate      │
-│    └─ getTransactionManager($tenantId) → TxManager   │
-└──────────────────────────────────────────────────────┘
-```
+
+When configured, Winter Boot automatically initializes and registers a `MultiTenantManager` bean named `<name>-manager` (e.g. `tenantdb-manager`) in the application context.
+
 
 ## Step 1: Implement TenantDataSourceProvider
 
-Create a `#[Configuration]` class with a `#[Bean]` method that returns your implementation of [`TenantDataSourceProvider`](src/pdbc/multitenant/TenantDataSourceProvider.php).
+Create a `#[Configuration]` class with a `#[Bean]` method that returns your implementation of [`TenantDataSourceProvider`](src/pdbc/multitenant/TenantDataSourceProvider.php), or register your provider class in `application.yml`.
 
 ```phpt
 #[Configuration]
@@ -374,11 +638,14 @@ class MyTenantConfig {
         return new class implements TenantDataSourceProvider {
 
             public function getTenantDataSourceConfig(string $tenantId): DataSourceConfig {
-                $tenantInfo = $this->adminPdbc->fetchOne("SELECT * FROM tenants WHERE tenant_id = ?", [$tenantId]);
-                $dbHost = $tenantInfo['db_host'];
-                $dbPort = $tenantInfo['db_port'];
-                $username = $tenantInfo['username'];
-                $dbName = $tenantInfo['database'];
+                // You need to define Your YourTenantEntity class as PpaEntity
+                // @var YourTenantEntity $tenant
+                $tenant = $this->adminPdbc->queryForObject("SELECT * FROM tenants WHERE tenant_id = :tid", 
+                ['tid' => $tenantId], YourTenantEntity::class);
+                $dbHost = $tenant->dbHost;
+                $dbPort = $tenant->dbPort;
+                $username = $tenant->username;
+                $dbName = $tenant->database;
                 
                 $config = new DataSourceConfig();
                 $config->setName($tenantId);
@@ -394,54 +661,29 @@ class MyTenantConfig {
                 
                 return $config;
             }
+
+            public function getTenantDataSourceConfigs(int $offset, int $limit): array {
+                $tenants = $this->adminPdbc->queryForObjects("SELECT * FROM tenants WHERE status = 'Active' LIMIT :offset, :limit", 
+                  ['offset' => $offset, 'limit' => $limit], YourTenantEntity::class);
+                
+                $dbConfigs = [];
+                foreach ($tenants as $tenant) {
+                    $config = new DataSourceConfig();
+                    $config->setName($tenant->tenantId);
+                    $config->setUrl("mysql:host={$tenant->dbHost};port={$tenant->dbPort};dbname={$tenant->database}");
+                    $config->setUsername($tenant->username);
+                    $config->setPassword("tenant_pass");
+
+                    $dbConfigs[] = $config;
+                }
+                return $dbConfigs;
+            }
         };
     }
 }
 ```
 
-### Multiple MultiTenantManagers (e.g., region-based + product-based)
-
-```phpt
-#[Configuration]
-class MyMultiTenantConfig {
-
-    // Provider for region-based tenants
-    #[Bean("regionTenantProvider")]
-    public function regionTenantProvider(): TenantDataSourceProvider {
-        return new class implements TenantDataSourceProvider {
-            public function getTenantDataSourceConfig(string $tenantId): DataSourceConfig {
-                // query region_tenants table
-            }
-        };
-    }
-
-    // Provider for product-line tenants
-    #[Bean("productTenantProvider")]
-    public function productTenantProvider(): TenantDataSourceProvider {
-        return new class implements TenantDataSourceProvider {
-            public function getTenantDataSourceConfig(string $tenantId): DataSourceConfig {
-                // query product_tenants table
-            }
-        };
-    }
-
-    #[Bean("regionMt")]
-    public function regionMultiTenantManager(
-        #[Qualifier("regionTenantProvider")] TenantDataSourceProvider $provider
-    ): MultiTenantManager {
-        return new MultiTenantManager($provider);
-    }
-
-    #[Bean("productMt")]
-    public function productMultiTenantManager(
-        #[Qualifier("productTenantProvider")] TenantDataSourceProvider $provider
-    ): MultiTenantManager {
-        return new MultiTenantManager($provider);
-    }
-}
-```
-
-## Step 3: Use in Business Classes
+## Step 2: Use in Business Classes
 
 ```phpt
 #[Component]
@@ -479,10 +721,10 @@ class OrderService {
 #[Component]
 class CrossTenantService {
 
-    #[Autowired("regionMt")]
+    #[Autowired("regionDb-manager")]
     private MultiTenantManager $regionMt;
 
-    #[Autowired("productMt")]
+    #[Autowired("productDb-manager")]
     private MultiTenantManager $productMt;
 
     public function process(string $regionTenantId, string $productTenantId): void {
@@ -497,28 +739,45 @@ class CrossTenantService {
 
 ### MultiTenantManager
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `getPdbcTemplate(string $tenantId)` | [`PdbcTemplate`](src/pdbc/PdbcTemplate.php) | Returns a cached per-tenant `PdoTemplate` backed by a tenant-specific `PdoDataSource` |
-| `getTransactionManager(string $tenantId)` | [`PlatformTransactionManager`](src/txn/PlatformTransactionManager.php) | Returns a cached per-tenant `PdoTransactionManager` backed by the same tenant-specific `PdoDataSource` |
+The `MultiTenantManager` class manages tenant-specific data sources, `PdbcTemplate` instances, and transaction managers.
 
-### TenantDataSourceProvider
+#### `getTenantDataSourceProvider`
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `getTenantDataSourceConfig(string $tenantId)` | [`DataSourceConfig`](src/pdbc/datasource/DataSourceConfig.php) | Must return the connection configuration for the given tenant. Throw `RuntimeException` if tenant not found. |
+Returns the configured tenant data source provider instance.
 
-### Caching Behavior
+| Input Parameter | Type | Description |
+|-----------------|------|-------------|
+| None | - | - |
 
-All three layers are lazily created on first access and cached per `$tenantId` within each `MultiTenantManager` instance:
+| Output | Type | Description |
+|--------|------|-------------|
+| Return | [`TenantDataSourceProvider`](src/pdbc/multitenant/TenantDataSourceProvider.php) | The underlying tenant datasource provider |
 
-- `PdoDataSource` — created once per tenant
-- `PdoTemplate` — created once per tenant
-- `PdoTransactionManager` — created once per tenant
+---
 
+#### `getPdbcTemplate`
 
+Returns a cached per-tenant `PdbcTemplate` backed by a tenant-specific `PdoDataSource`.
 
+| Input Parameter | Type | Description |
+|-----------------|------|-------------|
+| `$tenantId` | `string` | The unique identifier of the tenant |
 
+| Output | Type | Description |
+|--------|------|-------------|
+| Return | [`PdbcTemplate`](src/pdbc/PdbcTemplate.php) | Per-tenant PdbcTemplate instance |
 
+---
 
+#### `getTransactionManager`
+
+Returns a cached per-tenant `PlatformTransactionManager` backed by the tenant-specific `PdoDataSource`.
+
+| Input Parameter | Type | Description |
+|-----------------|------|-------------|
+| `$tenantId` | `string` | The unique identifier of the tenant |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| Return | [`PlatformTransactionManager`](src/txn/PlatformTransactionManager.php) | Per-tenant transaction manager instance |
 

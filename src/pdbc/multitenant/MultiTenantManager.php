@@ -32,6 +32,15 @@ class MultiTenantManager {
     }
 
     /**
+     * Get the tenant data source provider.
+     *
+     * @return TenantDataSourceProvider
+     */
+    public function getTenantDataSourceProvider(): TenantDataSourceProvider {
+        return $this->tenantDataSourceProvider;
+    }
+
+    /**
      * Get a PdbcTemplate for the given tenant.
      * Templates are cached per tenant ID.
      *
