@@ -659,20 +659,13 @@ class MyTenantDataSourceProvider {
         return $config;
     }
 
-    public function getTenantDataSourceConfigs(int $offset, int $limit): array {
-        $tenants = $this->adminPdbc->queryForObjects("SELECT * FROM tenants WHERE status = 'Active' LIMIT :offset, :limit", 
-            ['offset' => $offset, 'limit' => $limit], YourTenantEntity::class);
+    public function getAllTenantIds(): array {
+        $tenants = $this->adminPdbc->queryForObjects("SELECT id FROM tenants WHERE status = 'Active'", 
+            [], YourTenantEntity::class);
         
-        $dbConfigs = [];
+        $allTenantIds = [];
         foreach ($tenants as $tenant) {
-            $config = new DataSourceConfig();
-            $config->setName($tenant->tenantId);
-            $config->setUrl("mysql:host={$tenant->dbHost};port={$tenant->dbPort};dbname={$tenant->database}");
-            $config->setUsername($tenant->username);
-
-            // ... other settings here ...
-
-            $dbConfigs[] = $config;
+            $allTenantIds[] = $tenant->tenantId;
         }
         return $dbConfigs;
     }

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project
+    name="sql-migration-app"
+    description="SQL Migration Service"
+    basedir="."
+    phingVersion="3.0.0-rc2"
+    default="main"
+>
+    <property file="build.properties"/>
+    <includepath classpath="./vendor/suvera/winter-boot/build/phing"/>
+    <tstamp>
+        <format property="build.time" pattern="%Y%m%d%H%M%S"/>
+    </tstamp>
+
+    <fileset dir="." id="phpSources" defaultexcludes="true">
+        <include name="bin/**"/>
+        <include name="src/**"/>
+        <include name="vendor/**"/>
+
+        <exclude name="**/vendor/phpunit/**"/>
+        <exclude name="**/vendor/sebastian/**"/>
+        <exclude name="**/.git/**"/>
+        <exclude name="**/.github/**"/>
+        <exclude name="**/.svn/**"/>
+        <exclude name="**/.idea/**"/>
+        <exclude name="**/.project/**"/>
+        <exclude name="**/.settings/**"/>
+        <exclude name="**/.phive/**"/>
+        <exclude name="**/.psalm/**"/>
+        <exclude name="**/tests/**"/>
+        <exclude name="**/Tests/**"/>
+        <exclude name="**/TESTS/**"/>
+        <exclude name="**.log"/>
+        <exclude name="**.md"/>
+        <exclude name="**/.gitignore"/>
+        <exclude name="**/.gitattributes"/>
+        <exclude name="**/.php_cs"/>
+    </fileset>
+
+    <taskdef name="RpmBuild" classname="RpmBuildTask"/>
+    <taskdef name="WinterPhar" classname="WinterPharTask"/>
+    <taskdef name="Rmdir" classname="RmdirTask"/>
+
+    <target name="main" description="Default Target">
+        <mkdir dir="target"/>
+    </target>
+
+    <!-- =========================================================== -->
+    <!-- Target: clean -->
+    <target name="clean" description="Clean Build">
+        <echo>Cleanup started ...</echo>
+        <rmdir dir="target"/>
+        <echo>Cleaning done!</echo>
+    </target>
+
+    <!-- =========================================================== -->
+    <!-- Target: GENERATE PHAR files -->
+    <target name="phar" description="Build Phar file" depends="main">
+        <echo>Building PHAR ...</echo>
+
+        <mkdir dir="target/phar"/>
+
+        <WinterPhar
+            basedir="./"
+            topDir="target/phar"
+            name="${app.id}"
+            version="${app.version}"
+            release="${app.release}"
+            summary="${app.summary}"
+            outFileProperty="phar.Filename"
+        >
+            <Stub name="service" scriptPath="bin/example-service.php"/>
+
+            <fileset refid="phpSources"/>
+
+            <metadata>
+                <element name="version" value="${app.version}"/>
+                <element name="authors">
+                    <element name="${company.name}"/>
+                </element>
+            </metadata>
+        </WinterPhar>
+        <echo>PHAR Generated!</echo>
+    </target>
+
+    <!-- =========================================================== -->
+    <!-- Target: build Docker Image -->
+    <target name="docker" description="Build Docker Image" depends="phar">
+        <echo>Building Docker Image ...</echo>
+        <exec dir="." executable="docker" level="verbose" checkreturn="true" passthru="true">
+            <arg line="build . -t ${company.id}/${app.id}:${app.version}-${app.release} -f ./Dockerfile"/>
+        </exec>
+        <echo>Docker Image Generated!</echo>
+    </target>
+
+</project>

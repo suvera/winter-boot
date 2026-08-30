@@ -23,11 +23,8 @@ interface TenantDataSourceProvider {
     public function getTenantDataSourceConfig(string $tenantId): DataSourceConfig;
 
     /**
-     * Return a list of tenant DataSource configurations.
-     *
-     * @param int $offset
-     * @param int $limit
-     * @return array<DataSourceConfig>
+     * Return a list of tenantIds.
+     * @return array<string>
      */
-    public function getTenantDataSourceConfigs(int $offset, int $limit): array;
+    public function getAllTenantIds(): array;
 }

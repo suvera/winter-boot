@@ -53,9 +53,17 @@ abstract class WinterApplicationRunner {
     protected StringSet $attributesToScan;
     protected Logger $console;
     protected string $configDir = '';
+    protected WinterCliArguments $args;
 
     public function __construct() {
         $this->scanner = ClassResourceScanner::getDefaultScanner();
+
+        $this->args = new WinterCliArguments();
+        $configDir = $this->args->get('configDir');
+        if ($configDir) {
+            $this->configDir = $configDir;
+        }
+
         // Initialize with a basic logger in case buildApplicationLogger doesn't run
         $this->console = new Logger('winter_console_logger');
         $this->console->pushHandler(new StreamHandler('php://stdout', Logger::INFO));

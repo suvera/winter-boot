@@ -136,6 +136,7 @@ Unlock the full potential of Winter Boot with our detailed documentation. Each g
 -   [**Caching**](docs/caching.md): Optimize performance with intelligent caching strategies.
 -   [**Custom StereoTypes & Aspect Oriented Magic**](docs/custom_aop.md): Discover advanced AOP techniques.
 -   [**Databases & Transactions**](docs/transactions.md): Manage your data with robust database and transaction support.
+-   [**SQL Migrations**](docs/sql-migrations.md): Execute SQL files against configured datasources with automatic version management.
 -   [**Actuator**](docs/actuator.md): Gain insights into your application's health and metrics.
 -   [**Locking**](docs/locking.md): Implement concurrency control for critical sections.
 -   [**Json and XML**](docs/json_xml.md): Seamlessly handle data serialization and deserialization.

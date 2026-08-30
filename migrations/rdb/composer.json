@@ -1,0 +1,40 @@
+{
+    "name": "suvera/sql-migration-app",
+    "description": "SQL Migration Application for Winter Boot",
+    "type": "project",
+    "homepage": "https://suvera.github.io/",
+    "config": {
+        "platform": {
+            "php": "8.5"
+        },
+        "allow-plugins": {
+            "php-http/discovery": true,
+            "tbachert/spi": true
+        }
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Suvera"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "dev\\winterboot\\migrations\\rdb\\": "src/"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
+    "require": {
+        "suvera/winter-boot": "@dev"
+    }
+}

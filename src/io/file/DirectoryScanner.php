@@ -27,6 +27,23 @@ class DirectoryScanner {
         return $files;
     }
 
+    public static function scanForSqlFiles(string $baseDir): array {
+        $files = [];
+        $dir = new RecursiveDirectoryIterator($baseDir);
+        $itr = new RecursiveIteratorIterator($dir);
+        $regex = new RegexIterator($itr, '/^.+\.sql$/', RecursiveRegexIterator::GET_MATCH);
+        foreach ($regex as $f) {
+            $file = $f[0];
+            $relative = substr($file, strlen($baseDir) + 1);
+            $files[] = [
+                'path' => $file,
+                'relative' => $relative
+            ];
+        }
+        sort($files);
+        return $files;
+    }
+
     public static function scanForPhpClasses(
         string $baseDir,
         string $namespace,

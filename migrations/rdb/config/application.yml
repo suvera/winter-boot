@@ -1,0 +1,7 @@
+winter:
+    application:
+        name: SQL Migration Application
+        id: sql-migration-app
+        version: 1.0.0
+    phpBinary:
+

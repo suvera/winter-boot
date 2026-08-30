@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace dev\winterframework\core\app;
@@ -38,14 +39,8 @@ use function Ramsey\Uuid\v4;
 class WinterWebSwooleApplication extends WinterApplicationRunner implements WinterApplication {
 
     protected WinterWebSwooleContext $webContext;
-    protected WinterCliArguments $args;
 
     public function __construct() {
-        $this->args = new WinterCliArguments();
-        $configDir = $this->args->get('configDir');
-        if ($configDir) {
-            $this->configDir = $configDir;
-        }
         parent::__construct();
     }
 
@@ -171,7 +166,9 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
 
     protected function buildSharedServer(WinterServer $wServer): void {
         $this->appCtxData->getBeanProvider()->registerInternalBean(
-            $wServer, WinterServer::class, true
+            $wServer,
+            WinterServer::class,
+            true
         );
     }
 
@@ -318,10 +315,14 @@ EOQ;
 
         $kvTpl = new KvClient($config);
         $this->appCtxData->getBeanProvider()->registerInternalBean(
-            $kvTpl, KvTemplate::class, false
+            $kvTpl,
+            KvTemplate::class,
+            false
         );
         $this->appCtxData->getBeanProvider()->registerInternalBean(
-            new KvAdapter($kvTpl), KvAdapter::class, false
+            new KvAdapter($kvTpl),
+            KvAdapter::class,
+            false
         );
 
         $kvPs = new KvServerProcess($wServer, $this->applicationContext, $config);
@@ -347,7 +348,9 @@ EOQ;
         );
 
         $this->appCtxData->getBeanProvider()->registerInternalBean(
-            new QueueClient($config), QueueSharedTemplate::class, false
+            new QueueClient($config),
+            QueueSharedTemplate::class,
+            false
         );
 
         $ps = new QueueServerProcess($wServer, $this->applicationContext, $config);

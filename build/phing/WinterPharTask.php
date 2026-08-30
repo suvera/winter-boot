@@ -97,6 +97,11 @@ class WinterPharTask extends MatchingTask {
         $stub->setScriptPath(new File($this->winterDir . '/bin/queue-server.php'));
         $this->cliStubs[] = $stub;
 
+        $stub = new CliStub();
+        $stub->setName('migrate');
+        $stub->setScriptPath(new File($this->winterDir . '/bin/sql-migrate.php'));
+        $this->cliStubs[] = $stub;
+
         $this->build();
     }
 

@@ -17,7 +17,8 @@ class WinterCliArguments {
 
         $cli->description('Service arguments')
             ->opt('configDir:c', 'Config directory.', false)
-            ->opt('stub:s', 'Stub name to execute', false);
+            ->opt('stub:s', 'Stub name to execute', false)
+            ->opt('sqlPath:s', 'SQL migration path.', false);
 
         $this->args = $cli->parse($_SERVER['argv'], true);
     }
