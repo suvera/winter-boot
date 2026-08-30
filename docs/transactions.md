@@ -624,61 +624,57 @@ When configured, Winter Boot automatically initializes and registers a `MultiTen
 
 ## Step 1: Implement TenantDataSourceProvider
 
-Create a `#[Configuration]` class with a `#[Bean]` method that returns your implementation of [`TenantDataSourceProvider`](src/pdbc/multitenant/TenantDataSourceProvider.php), or register your provider class in `application.yml`.
+Create a `#[Configuration]` class that returns your implementation of [`TenantDataSourceProvider`](src/pdbc/multitenant/TenantDataSourceProvider.php).
 
 ```phpt
+package App\Config;
+
 #[Configuration]
-class MyTenantConfig {
+class MyTenantDataSourceProvider {
 
     #[Autowired("admindb-template")]
     private PdbcTemplate $adminPdbc;
 
-    #[Bean]
-    public function tenantDataSourceProvider(): TenantDataSourceProvider {
-        return new class implements TenantDataSourceProvider {
+    public function getTenantDataSourceConfig(string $tenantId): DataSourceConfig {
+        // You need to define Your YourTenantEntity class as PpaEntity
+        // @var YourTenantEntity $tenant
+        $tenant = $this->adminPdbc->queryForObject("SELECT * FROM tenants WHERE tenant_id = :tid", 
+        ['tid' => $tenantId], YourTenantEntity::class);
+        $dbHost = $tenant->dbHost;
+        $dbPort = $tenant->dbPort;
+        $username = $tenant->username;
+        $dbName = $tenant->database;
+        
+        $config = new DataSourceConfig();
+        $config->setName($tenantId);
+        $config->setUrl("mysql:host=$dbHost;port=$dbPort;dbname=$dbName");
+        $config->setUsername($username);
+        $config->setPassword("tenant_pass");
+        // Optional settings:
+        // $config->setPersistent(true);
+        // $config->setAutoCommit(true);
+        // $config->setTimeoutSecs(30);
+        // $config->setIdleTimeout(600);
+        
+        return $config;
+    }
 
-            public function getTenantDataSourceConfig(string $tenantId): DataSourceConfig {
-                // You need to define Your YourTenantEntity class as PpaEntity
-                // @var YourTenantEntity $tenant
-                $tenant = $this->adminPdbc->queryForObject("SELECT * FROM tenants WHERE tenant_id = :tid", 
-                ['tid' => $tenantId], YourTenantEntity::class);
-                $dbHost = $tenant->dbHost;
-                $dbPort = $tenant->dbPort;
-                $username = $tenant->username;
-                $dbName = $tenant->database;
-                
-                $config = new DataSourceConfig();
-                $config->setName($tenantId);
-                $config->setUrl("mysql:host=$dbHost;port=$dbPort;dbname=$dbName");
-                $config->setUsername($username);
-                $config->setPassword("tenant_pass");
-                // Optional settings:
-                // $config->setDriverClass('dev\\winterframework\\pdbc\\pdo\\PdoDataSource');
-                // $config->setPersistent(true);
-                // $config->setAutoCommit(true);
-                // $config->setTimeoutSecs(30);
-                // $config->setIdleTimeout(600);
-                
-                return $config;
-            }
+    public function getTenantDataSourceConfigs(int $offset, int $limit): array {
+        $tenants = $this->adminPdbc->queryForObjects("SELECT * FROM tenants WHERE status = 'Active' LIMIT :offset, :limit", 
+            ['offset' => $offset, 'limit' => $limit], YourTenantEntity::class);
+        
+        $dbConfigs = [];
+        foreach ($tenants as $tenant) {
+            $config = new DataSourceConfig();
+            $config->setName($tenant->tenantId);
+            $config->setUrl("mysql:host={$tenant->dbHost};port={$tenant->dbPort};dbname={$tenant->database}");
+            $config->setUsername($tenant->username);
 
-            public function getTenantDataSourceConfigs(int $offset, int $limit): array {
-                $tenants = $this->adminPdbc->queryForObjects("SELECT * FROM tenants WHERE status = 'Active' LIMIT :offset, :limit", 
-                  ['offset' => $offset, 'limit' => $limit], YourTenantEntity::class);
-                
-                $dbConfigs = [];
-                foreach ($tenants as $tenant) {
-                    $config = new DataSourceConfig();
-                    $config->setName($tenant->tenantId);
-                    $config->setUrl("mysql:host={$tenant->dbHost};port={$tenant->dbPort};dbname={$tenant->database}");
-                    $config->setUsername($tenant->username);
-                    $config->setPassword("tenant_pass");
+            // ... other settings here ...
 
-                    $dbConfigs[] = $config;
-                }
-                return $dbConfigs;
-            }
-        };
+            $dbConfigs[] = $config;
+        }
+        return $dbConfigs;
     }
 }
 ```

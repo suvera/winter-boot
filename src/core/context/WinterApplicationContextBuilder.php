@@ -43,7 +43,6 @@ use dev\winterframework\util\concurrent\LockManager;
 use dev\winterframework\exception\WinterException;
 use dev\winterframework\exception\ClassNotFoundException;
 use dev\winterframework\type\TypeAssert;
-use Throwable;
 
 abstract class WinterApplicationContextBuilder implements ApplicationContext {
     protected BeanProviderContext $beanProvider;
@@ -234,9 +233,6 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
             if (!isset($mtDs['name'])) {
                 throw new WinterException('multitenant-datasource DataSource configured without "name" parameter');
             }
-            if (!isset($mtDs['url'])) {
-                throw new WinterException('multitenant-datasource DataSource configured without "url" parameter');
-            }
             if (!isset($mtDs['providerClass'])) {
                 throw new WinterException('multitenant-datasource DataSource configured without "providerClass" parameter');
             }
@@ -254,14 +250,7 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
 
             $providerClass = $mtDs['providerClass'];
 
-            try {
-                /* @var TenantDataSourceProvider $provider */
-                $provider = new $providerClass();
-            } catch (Throwable $e) {
-                throw new WinterException('Could not initialize the provider in multitenant-datasource DataSource configuration', 0, $e);
-            }
-
-            $mtManager = new MultiTenantManager($provider);
+            $mtManager = new MultiTenantManager($providerClass, $this);
             $this->beanProvider->registerInternalBean(
                 $mtManager,
                 MultiTenantManager::class, 
