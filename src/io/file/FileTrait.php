@@ -5,7 +5,7 @@ namespace dev\winterframework\io\file;
 
 trait FileTrait {
 
-    protected string $filePath;
+    protected string $filePath = '';
     protected string $name = '';
 
     public function canRead(): bool {
@@ -38,7 +38,7 @@ trait FileTrait {
     }
 
     public function getName(): string {
-        return empty($this->name) ? basename($this->name) : $this->name;
+        return $this->name ?: basename($this->filePath);
     }
 
     public function lastModified(): int {

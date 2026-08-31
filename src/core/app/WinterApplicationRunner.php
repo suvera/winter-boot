@@ -430,9 +430,79 @@ abstract class WinterApplicationRunner {
         $idleCheck->initialize();
     }
 
+    /**
+     * Show the application banner with relevant information. The banner can be customized by providing a 
+     * banner file in the configuration directory.
+     */
+    protected function showBanner(): void {
+        $bannerFile = $this->propertyCtx->getStr('banner.location', '');
+
+        if ($bannerFile && is_file($bannerFile)) {
+            $bannerText = file_get_contents($bannerFile);
+        } else {
+            $bannerText = <<<EOQ
+  _      _______  _______________      ___  ____  ____  ______
+ | | /| / /  _/ |/ /_  __/ __/ _ \    / _ )/ __ \/ __ \/_  __/
+ | |/ |/ // //    / / / / _// , _/   / _  / /_/ / /_/ / / /   
+ |__/|__/___/_/|_/ /_/ /___/_/|_|   /____/\____/\____/ /_/    
+
+\${winterBoot.name}: \${winterBoot.version}
+\${app.name}: \${app.version}
+\${php.name}: \${php.version}
+\${swoole.name}: \${swoole.version}
+\${rdkafka.name}: \${rdkafka.version}
+\${redis.name}: \${redis.version}
+EOQ;
+        }
+
+        $appName = $GLOBALS['winter.application.name'] ?? $this->propertyCtx->getStr('winter.application.name', '');
+        $appVersion = $GLOBALS['winter.application.version'] ?? $this->propertyCtx->getStr('winter.application.version', '');
+
+        $labels = [
+            '${winterBoot.name}' => 'Winter Boot',
+            '${winterBoot.version}' => $this->getBootVersion(),
+            '${app.name}' => $appName,
+            '${app.version}' => $appVersion,
+            '${php.name}' => 'PHP',
+            '${php.version}' => phpversion() . ', ' . php_sapi_name(),
+        ];
+        $extensions = ['swoole', 'rdkafka', 'redis'];
+        foreach ($extensions as $ext) {
+            if (extension_loaded($ext)) {
+                $labels['${' . $ext . '.name}'] = ucwords($ext);
+                $labels['${' . $ext . '.version}'] = phpversion($ext);
+            }
+        }
+
+        $bannerText = str_replace(array_keys($labels), array_values($labels), $bannerText);
+        $bannerText = preg_replace('/[\s:]+$/', '', $bannerText);
+
+        $this->console->info("\n" . $bannerText);
+    }
+
+    /**
+     * Exit the application with the specified status.
+     *
+     * @param int $status The exit status.
+     * @return void
+     */
+    public function exit(int $status = 0): void {
+        /**
+         * Exit after migrations complete.
+         *
+         * The Swoole IdleCheckRegistry timer event loop is started during datasource building
+         * (DataSourceBuilder::buildDataSource calls IdleCheckRegistry::register which calls Timer::tick).
+         * This creates a non-blocking event loop that keeps PHP running even after the main logic completes.
+         * We need explicit exit() to terminate the process.
+         */
+        IdleCheckRegistry::clearAll();
+        exit($status);
+    }
+
+    /**
+     * Run the boot application logic. This method should be implemented by subclasses to define the specific 
+     * behavior of the boot application.
+     */
     protected abstract function runBootApp(): void;
 
-    protected function showBanner(): void {
-        // template
-    }
 }

@@ -4,8 +4,8 @@ declare(strict_types=1);
 namespace dev\winterframework\telemetry\stereotype;
 
 use Attribute;
-use dev\winterframework\core\aop\AopStereoType;
-use dev\winterframework\core\aop\WinterAspect;
+use dev\winterframework\stereotype\aop\AopStereoType;
+use dev\winterframework\stereotype\aop\WinterAspect;
 use dev\winterframework\reflection\support\StereoTypeValidations;
 use dev\winterframework\telemetry\aop\TraceableAspect;
 use dev\winterframework\type\TypeAssert;

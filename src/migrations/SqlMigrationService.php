@@ -66,6 +66,12 @@ class SqlMigrationService {
             $migrations = $ds['migrations'] ?? [];
             if (!empty($migrations) && ($migrations['enabled'] ?? false)) {
                 $this->datasourceConfigs[] = $ds;
+                continue;
+            }
+
+            // Check for flattened key (YAML flatten mode)
+            if ($ds['migrations.enabled'] ?? false) {
+                $this->datasourceConfigs[] = $ds;
             }
         }
 
@@ -82,6 +88,12 @@ class SqlMigrationService {
 
             $migrations = $mtds['migrations'] ?? [];
             if (!empty($migrations) && ($migrations['enabled'] ?? false)) {
+                $this->multitenantConfigs[] = $mtds;
+                continue;
+            }
+
+            // Check for flattened key (YAML flatten mode)
+            if ($mtds['migrations.enabled'] ?? false) {
                 $this->multitenantConfigs[] = $mtds;
             }
         }

@@ -103,7 +103,7 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         return $this->beanProvider->hasBeanByClass($class);
     }
 
-    public function getProperty(string $name, mixed $default = null): string|int|float|bool|null {
+    public function getProperty(string $name, mixed $default = null): mixed {
         return $this->propertyContext->get($name, $default);
     }
 

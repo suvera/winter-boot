@@ -3,7 +3,6 @@
 namespace dev\winterframework\core\app;
 
 use dev\winterframework\migrations\SqlMigrationService;
-use dev\winterframework\exception\SqlMigrationException;
 
 final class WinterMigrationApplication  extends WinterApplicationRunner implements WinterApplication {
 
@@ -23,6 +22,7 @@ final class WinterMigrationApplication  extends WinterApplicationRunner implemen
         }
     }
 
+    #[\Override]
     protected function startBootApp(): void {
         $appClass = $this->bootApp->getClass()->getName();
         $this->applicationContext->addClass($appClass);
@@ -31,6 +31,7 @@ final class WinterMigrationApplication  extends WinterApplicationRunner implemen
         $this->runBootApp();
     }
 
+    #[\Override]
     protected function runBootApp(): void {
         $version = $this->args->getVersion();
         if ($version) {
@@ -41,10 +42,11 @@ final class WinterMigrationApplication  extends WinterApplicationRunner implemen
         if ($sqlBasePath) {
             $this->sqlBasePath = $sqlBasePath;
         } else {
-             $this->args->printError("SQL base path not provided. Use --sqlPath option to specify the path.");
-             $this->args->writeHelp();
+            $this->args->printError("SQL base path not provided. Use --sqlPath option to specify the path.");
+            $this->args->writeHelp();
             exit(1);
         }
+
         /**
          * Following things are not needed for SQL migration, so we can skip them to speed up the process.
          */
@@ -52,6 +54,8 @@ final class WinterMigrationApplication  extends WinterApplicationRunner implemen
         // $this->onApplicationReady();
 
         $this->executeSqlMigrations();
+
+        $this->exit(0);
     }
 
     private function executeSqlMigrations(): void {

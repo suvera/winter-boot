@@ -26,7 +26,7 @@ interface ApplicationContext {
 
     public function hasBeanByClass(string $class): bool;
 
-    public function getProperty(string $name, mixed $default = null): string|int|float|bool|null;
+    public function getProperty(string $name, mixed $default = null): mixed;
 
     public function getPropertyStr(string $name, ?string $default = null): string;
 

@@ -65,6 +65,8 @@ abstract class PdoOperations {
             $stmt->bindVars($bindVars);
         } else {
             foreach ($bindVars as $bindKey => $bindVal) {
+                // Convert 0-based array indices to 1-based for PDO compatibility
+                $bindKey = is_int($bindKey) ? $bindKey + 1 : $bindKey;
                 $stmt->bindValue($bindKey, $bindVal);
             }
         }

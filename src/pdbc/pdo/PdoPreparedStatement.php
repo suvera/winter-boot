@@ -172,8 +172,9 @@ class PdoPreparedStatement extends AbstractPreparedStatement {
                     if (is_null($bindVar->value)) {
                         $this->stmt->bindParam($bindKey, $bindVar->value, PDO::PARAM_NULL);
                     } else {
+                        $strlen = strlen($bindVar->value);
                         $this->stmt->bindParam($bindKey, $bindVar->value,
-                            PDO::PARAM_STR, strlen($bindVar->value));
+                            PDO::PARAM_STR, $strlen > 0 ? $strlen : 1);
                     }
                     break;
             }

@@ -11,9 +11,6 @@ use dev\winterframework\stereotype\JsonProperty;
 class HttpUploadedFile implements File {
     use FileTrait;
 
-    #[JsonProperty(name: 'name')]
-    public string $name = '';
-
     #[JsonProperty(name: 'type')]
     protected string $type = '';
 
@@ -52,7 +49,14 @@ class HttpUploadedFile implements File {
         return $ret;
     }
 
+
+
     public function getName(): string {
+        return $this->name;
+    }
+
+    #[JsonProperty(name: 'name')]
+    public function getNameJsonProperty(): string {
         return $this->name;
     }
 
