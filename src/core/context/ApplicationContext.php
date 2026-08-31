@@ -5,6 +5,7 @@ namespace dev\winterframework\core\context;
 
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\stereotype\Module;
+use dev\winterframework\core\app\WinterCliArguments;
 
 interface ApplicationContext {
     public function getId(): string;
@@ -46,5 +47,7 @@ interface ApplicationContext {
     public function getModule(string $moduleName): Module;
 
     public function getModules(): array;
+
+    public function getCliArgs(): WinterCliArguments;
 
 }

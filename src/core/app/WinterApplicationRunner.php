@@ -56,10 +56,11 @@ abstract class WinterApplicationRunner {
     protected WinterCliArguments $args;
 
     public function __construct() {
+        global $argv;
         $this->scanner = ClassResourceScanner::getDefaultScanner();
 
         $this->args = new WinterCliArguments();
-        $configDir = $this->args->get('configDir');
+        $configDir = $this->args->getConfigDir();
         if ($configDir) {
             $this->configDir = $configDir;
         }
@@ -92,7 +93,7 @@ abstract class WinterApplicationRunner {
         $this->scanAppNamespaces();
 
         $this->appCtxData = $this->buildApplicationContextData();
-        $this->applicationContext = new WinterApplicationContext($this->appCtxData);
+        $this->applicationContext = new WinterApplicationContext($this->appCtxData, $this->args);
 
         $this->buildAppContext();
 

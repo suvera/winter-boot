@@ -43,6 +43,7 @@ use dev\winterframework\util\concurrent\LockManager;
 use dev\winterframework\exception\WinterException;
 use dev\winterframework\exception\ClassNotFoundException;
 use dev\winterframework\type\TypeAssert;
+use dev\winterframework\core\app\WinterCliArguments;
 
 abstract class WinterApplicationContextBuilder implements ApplicationContext {
     protected BeanProviderContext $beanProvider;
@@ -55,7 +56,8 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
     protected int $startTime;
 
     public function __construct(
-        protected ApplicationContextData $contextData
+        protected ApplicationContextData $contextData,
+        protected WinterCliArguments $cliArgs
     ) {
         $this->startTime = intval(microtime(true) * 1000);
 
@@ -68,6 +70,10 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
 
         $this->beanProvider = new WinterBeanProviderContext($this->contextData, $this);
         $this->contextData->setBeanProvider($this->beanProvider);
+    }
+
+    public function getCliArgs(): WinterCliArguments {
+        return $this->cliArgs;
     }
 
     /**

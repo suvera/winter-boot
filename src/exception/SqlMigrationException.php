@@ -1,5 +1,5 @@
 <?php
-namespace dev\winterframework\migrations\rdb;
+namespace dev\winterframework\exception;
 
 class SqlMigrationException extends \RuntimeException {
 }

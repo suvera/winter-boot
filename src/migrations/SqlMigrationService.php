@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace dev\winterframework\migrations\rdb\svc;
+namespace dev\winterframework\migrations;
 
 use dev\winterframework\pdbc\multitenant\MultiTenantManager;
 use dev\winterframework\pdbc\PdbcTemplate;
@@ -10,33 +10,21 @@ use dev\winterframework\pdbc\datasource\DataSourceBuilder;
 use dev\winterframework\util\log\Wlf4p;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\io\file\DirectoryScanner;
-use dev\winterframework\stereotype\Service;
-use dev\winterframework\stereotype\Autowired;
-use dev\winterframework\migrations\rdb\SqlMigrationException;
-use dev\winterframework\core\app\WinterCliArguments;
+use dev\winterframework\exception\SqlMigrationException;
 
-#[Service]
 class SqlMigrationService {
     use Wlf4p;
 
     private const MIGRATIONS_TABLE_PREFIX = 'winter_migrations';
 
-    #[Autowired]
-    private ApplicationContext $appCtx;
-
-    private string $sqlBasePath;
     private array $datasourceConfigs = [];
     private array $multitenantConfigs = [];
 
-    public function __construct() {
-        $args = new WinterCliArguments();
-        $sqlBasePath = $args->get('sqlPath');
-        if ($sqlBasePath) {
-            $this->sqlBasePath = $sqlBasePath;
-        } else {
-            throw new SqlMigrationException("SQL base path not provided. Use --sqlPath option to specify the path.");
-        }
-
+    public function __construct(
+        private ApplicationContext $appCtx,
+        private string $sqlBasePath,
+        private string $configDir
+    ) {
         $this->sqlBasePath = rtrim($sqlBasePath, '/');
     }
 
