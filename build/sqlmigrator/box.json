@@ -2,32 +2,25 @@
     "base-path": "../../",
     "main": "bin/sql-migrate.php",
     "output": "target/winter-migrations-app.phar",
-
-    "chmod": "0755",
-
+    "stub": true,
+    "alias": "winter-migrations-app.phar",
+    "shebang": "#!/usr/bin/env php",
+    "intercept": false,
+    "banner": "Winter Boot SQL Migrator",
+    "chmod": "0644",
     "check-requirements": true,
-
     "directories": [
         "bin",
         "src",
         "vendor"
     ],
-
     "files": [
-        "bin/sql-migrate.php"
+        "bin/sql-migrate.php",
+        "VERSION.txt",
+        "LICENSE"
     ],
-
     "exclude-composer-files": true,
     "exclude-dev-files": true,
-
     "dump-autoload": true,
-
-    "stub": {
-        "alias": "winter-migrations-app.phar",
-        "shebang": "#!/usr/bin/env php",
-        "intercept": false,
-        "banner": "winter-migrations-app"
-    },
-
     "compression": "GZ"
 }

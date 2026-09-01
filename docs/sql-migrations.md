@@ -37,11 +37,11 @@ CREATE TABLE users (
 ### 4. Run Migrations
 
 ```bash
-# Using PHAR (migrate stub is built into your app PHAR)
-php your-app.phar migrate --sqlPath /migrations
+# Using PHAR (built with build/sqlmigrator/build.sh)
+./winter-migrations-app.phar -c /path/to/config --sqlPath /path/to/migrations
 
-# Using CLI script directly
-php bin/sql-migrate.php --sqlPath /migrations
+# Using PHP CLI directly
+php bin/sql-migrate.php -c /path/to/config --sqlPath /path/to/migrations
 ```
 
 ### 5. Verify
@@ -61,6 +61,40 @@ datasource:
         migrations:
             enabled: true
 ```
+
+### Enable Migrations for Multi-Tenant Datasources
+
+```yaml
+multitenant-datasource:
+    -   name: tenantdb
+        migrations:
+            enabled: true
+```
+
+### Native CLI Execution (`useCli`)
+
+For complex SQL migration files containing transactions (`BEGIN;`, `COMMIT;`), PL/SQL or T-SQL blocks, stored procedures, triggers, or mixed DDL/DML, you can enable native CLI execution. When `useCli: true` is set, the framework executes the entire SQL file directly via the database's native command-line client (`psql`, `mysql`, `sqlite3`, `sqlplus`, or `sqlcmd`) instead of splitting statements in PHP.
+
+```yaml
+datasource:
+    -   name: defaultdb
+        url: "pgsql:host=localhost;dbname=myapp"
+        username: "postgres"
+        password: "secretpassword"
+        migrations:
+            enabled: true
+            useCli: true
+```
+
+### Installing Native Database CLI Tools on Ubuntu
+
+To install the primary native command-line clients (`psql`, `mysql`, `sqlite3`) on Ubuntu in a single command, run:
+
+```bash
+sudo apt-get update && sudo apt-get install -y postgresql-client default-mysql-client sqlite3
+```
+
+> **Note:** For Oracle (`sqlplus`) or Microsoft SQL Server (`sqlcmd`), please follow the official Oracle or Microsoft repository installation guides for Ubuntu.
 
 ## SQL Directory Structure
 
@@ -95,66 +129,29 @@ CREATE TABLE winter_migrations (
 );
 ```
 
-> **Note:** The table is automatically created for each database type with appropriate syntax.
+> **Note:** The table is automatically created for each database type with appropriate syntax (MySQL, PostgreSQL, SQLite, Oracle, SQL Server).
+
+## Build PHAR
+
+The PHAR can be built using the `build.sh` script:
+
+```bash
+cd build/sqlmigrator
+./build.sh
+```
+
+Output: `build/sqlmigrator/target/winter-migrations-app.phar`
 
 ## Usage
 
 ### PHAR Package
 
-Build PHAR using `WinterPharTask` (the `migrate` stub is automatically included in your app PHAR):
-
 ```bash
-# Execute migrations
-php your-app.phar migrate --sqlPath /migrations
-
-# With config directory
-php your-app.phar migrate --sqlPath /migrations --configDir /app/config
+# Using PHAR
+./winter-migrations-app.phar -c /path/to/config --sqlPath /path/to/migrations
 ```
 
 ### Init Container (Kubernetes)
-
-```yaml
-initContainers:
-  - name: sql-migrations
-    image: your-app:latest
-    command: ["/bin/bash", "/app/bin/sql-migrate-init-container.sh"]
-    env:
-      - name: SQL_MIGRATION_PATH
-        value: /migrations
-      - name: CONFIG_DIR
-        value: /app/config
-    volumeMounts:
-      - name: migrations
-        mountPath: /migrations
-      - name: config
-        mountPath: /app/config
-```
-
-### Direct Command
-
-```shell
-php bin/sql-migrate.php migrate --sqlPath /path/to/migrations --configDir /path/to/config
-```
-
-## Usage
-
-### Using the PHAR Package
-
-#### Build PHAR
-
-The PHAR can be built using the `WinterPharTask` in your build system. The `migrate` stub is automatically included.
-
-#### Execute Migrations
-
-```bash
-# Using PHAR (migrate stub is built into your app PHAR)
-php your-app.phar migrate --sqlPath /path/to/migrations
-
-# With config directory
-php your-app.phar migrate --sqlPath /path/to/migrations --configDir /path/to/config
-```
-
-### Using Init Container (Kubernetes)
 
 ```yaml
 apiVersion: v1
@@ -165,7 +162,7 @@ spec:
   initContainers:
     - name: sql-migrations
       image: my-app:latest
-      command: ["/bin/bash", "/app/bin/sql-migrate-init-container.sh"]
+      command: ["/winter-migrations-app.phar"]
       env:
         - name: SQL_MIGRATION_PATH
           value: /migrations
@@ -197,22 +194,10 @@ spec:
       emptyDir: {}
 ```
 
-### Using the Command Directly
+### Direct Command
 
-```php
-<?php
-declare(strict_types=1);
-
-use dev\winterframework\pdbc\migration\SqlMigrationCommand;
-
-require_once(__DIR__ . '/vendor/autoload.php');
-
-$command = new SqlMigrationCommand();
-$command->sqlPath = '/path/to/migrations';
-$command->configDir = '/path/to/config';
-
-$exitCode = $command->execute();
-exit($exitCode);
+```bash
+php bin/sql-migrate.php -c /path/to/config --sqlPath /path/to/migrations
 ```
 
 ## SQL File Format
@@ -233,6 +218,18 @@ CREATE TABLE users (
 
 -- Add index on email
 CREATE INDEX idx_users ON users(email);
+```
+
+## Migration Execution
+
+The framework tracks executed migrations and skips them on subsequent runs:
+
+**Example Output:**
+```
+2026-09-01 11:14:49,914212 [INFO] - d.w.m.SqlMigrationService Starting SQL migrations execution from: /path/to/migrations
+2026-09-01 11:14:49,914272 [INFO] - d.w.m.SqlMigrationService Processing migrations for datasource: default
+2026-09-01 11:14:49,929826 [INFO] - d.w.m.SqlMigrationService Skipped 3 already executed migration(s)
+2026-09-01 11:14:49,929863 [INFO] - d.w.m.SqlMigrationService All SQL migrations executed successfully
 ```
 
 ## Troubleshooting
@@ -286,71 +283,13 @@ CREATE INDEX idx_users ON users(email);
 ### Logging
 
 Uses Winter Boot's logging system:
-
-```
-INFO  - Starting SQL migrations execution from: /migrations
-INFO  - Processing migrations for datasource: defaultdb
-INFO  - Executing migration: 001-init-schema.sql
-INFO  - Creating migrations table: winter_migrations_mysql
-INFO  - Migration executed successfully: 001-init-schema.sql
-INFO  - All SQL migrations executed successfully
-```
-
-## Examples
-
-### Standalone Migration Runner
-
-```php
-<?php
-declare(strict_types=1);
-
-use dev\winterframework\pdbc\migration\SqlMigrationService;
-
-require_once(__DIR__ . '/vendor/autoload.php');
-
-try {
-    $appCtx = new \dev\winterframework\core\context\WinterApplicationContext(
-        new \dev\winterframework\core\context\ApplicationContextData()
-    );
-    
-    $service = new SqlMigrationService($appCtx, '/path/to/migrations');
-    $service->executeMigrations();
-    
-    echo "SQL migrations completed successfully\n";
-    exit(0);
-} catch (\Throwable $e) {
-    echo "Migration failed: " . $e->getMessage() . "\n";
-    exit(1);
-}
-```
-
-### Integration with WinterBootApplication
-
-```php
-#[WinterBootApplication(
-    configDirectory: ['/app/config'],
-    scanNamespaces: [
-        ['App', '/app/src']
-    ]
-)]
-class MyApp {
-    
-    #[Bean]
-    public function getSqlMigrationService(ApplicationContext $appCtx): SqlMigrationService {
-        $sqlPath = $appCtx->getProperty('migrations.sqlPath', '/migrations');
-        return new SqlMigrationService($appCtx, $sqlPath);
-    }
-    
-    public function onApplicationReady(): void {
-        $service = $this->getSqlMigrationService($this->appCtx);
-        $service->executeMigrations();
-    }
-    
-    public static function main(): void {
-        (new WinterCliApplication())->run(MyApp::class);
-    }
-}
-```
+- `Starting SQL migrations execution from: /migrations`
+- `Processing migrations for datasource: defaultdb`
+- `Executing migration: 001-init-schema.sql`
+- `Creating migrations table: winter_migrations`
+- `Migration executed successfully: 001-init-schema.sql`
+- `Skipped X already executed migration(s)` (when applicable)
+- `All SQL migrations executed successfully`
 
 ## Notes
 

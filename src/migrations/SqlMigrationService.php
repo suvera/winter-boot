@@ -19,6 +19,8 @@ class SqlMigrationService {
 
     private array $datasourceConfigs = [];
     private array $multitenantConfigs = [];
+    private SqlFileStatementParser $sqlParser;
+    private CliSqlFileExecutor $cliExecutor;
 
     public function __construct(
         private ApplicationContext $appCtx,
@@ -26,6 +28,8 @@ class SqlMigrationService {
         private string $configDir
     ) {
         $this->sqlBasePath = rtrim($sqlBasePath, '/');
+        $this->sqlParser = new SqlFileStatementParser();
+        $this->cliExecutor = new CliSqlFileExecutor();
     }
 
     public function executeMigrations(): void {
@@ -46,6 +50,10 @@ class SqlMigrationService {
 
         foreach ($this->multitenantConfigs as $config) {
             $this->executeMigrationsForMultiTenantDatasource($config);
+        }
+
+        if ($this->skippedCount > 0) {
+            $this->logInfo("Skipped {$this->skippedCount} already executed migration(s)");
         }
 
         $this->logInfo("All SQL migrations executed successfully");
@@ -157,7 +165,7 @@ class SqlMigrationService {
         }
 
         /** @var MultiTenantManager $mtManager */
-        $mtManager = $this->appCtx->beanByClass(MultiTenantManager::class);
+        $mtManager = $this->appCtx->beanByNameClass($dsName . '-manager', MultiTenantManager::class);
 
         if ($mtManager === null) {
             throw new SqlMigrationException("MultiTenantManager not found for multi-tenant datasource: {$dsName}");
@@ -182,32 +190,47 @@ class SqlMigrationService {
         }
     }
 
+    private int $skippedCount = 0;
+
     private function executeSqlFile(PdbcTemplate $template, array $config, array $fileInfo): void {
         $relativePath = $fileInfo['relative'];
         $fullPath = $fileInfo['path'];
 
         if (!$this->isMigrationRequired($template, $config, $relativePath)) {
-            $this->logInfo("Migration already executed, skipping: {$relativePath}");
+            $this->skippedCount++;
             return;
         }
 
         $this->logInfo("Executing migration: {$relativePath}");
 
-        $sqlContent = file_get_contents($fullPath);
+        $migrationsConfig = $config['migrations'] ?? [];
+        $useCli = $migrationsConfig['useCli'] ?? ($config['migrations.useCli'] ?? false);
 
-        if ($sqlContent === false) {
-            throw new SqlMigrationException("Failed to read SQL file: {$fullPath}");
-        }
+        if ($useCli) {
+            $this->logInfo("Execution strategy chosen: Native CLI tool execution (useCli=true) for migration: {$relativePath}");
+            $url = $config['url'] ?? '';
+            $username = $config['username'] ?? '';
+            $password = $config['password'] ?? '';
 
-        $sqlStatements = $this->parseSqlStatements($sqlContent);
+            $this->cliExecutor->execute($url, $username, $password, $fullPath);
+        } else {
+            $this->logInfo("Execution strategy chosen: PHP statement parser execution (useCli=false) for migration: {$relativePath}");
+            $sqlContent = file_get_contents($fullPath);
 
-        foreach ($sqlStatements as $statement) {
-            $statement = trim($statement);
-            if (empty($statement) || $statement[0] === '#') {
-                continue;
+            if ($sqlContent === false) {
+                throw new SqlMigrationException("Failed to read SQL file: {$fullPath}");
             }
 
-            $template->execute($statement);
+            $sqlStatements = $this->sqlParser->parse($sqlContent);
+
+            foreach ($sqlStatements as $statement) {
+                $statement = trim($statement);
+                if (empty($statement) || $statement[0] === '#') {
+                    continue;
+                }
+
+                $template->execute($statement);
+            }
         }
 
         $this->recordMigration($template, $config, $relativePath);
@@ -317,67 +340,5 @@ class SqlMigrationService {
         }
 
         return $parts['scheme'];
-    }
-
-    private function parseSqlStatements(string $sqlContent): array {
-        $statements = [];
-        $currentStatement = '';
-        $inString = false;
-        $inComment = false;
-        $stringChar = '';
-
-        $length = strlen($sqlContent);
-
-        for ($i = 0; $i < $length; $i++) {
-            $char = $sqlContent[$i];
-            $nextChar = ($i + 1 < $length) ? $sqlContent[$i + 1] : '';
-
-            if ($inComment) {
-                if ($char === "\n") {
-                    $inComment = false;
-                }
-                continue;
-            }
-
-            if ($inString) {
-                $currentStatement .= $char;
-                if ($char === '\\' && $i + 1 < $length) {
-                    $currentStatement .= $nextChar;
-                    $i++;
-                } elseif ($char === $stringChar) {
-                    $inString = false;
-                }
-                continue;
-            }
-
-            if ($char === '#' || ($char === '-' && $nextChar === '-')) {
-                $inComment = true;
-                continue;
-            }
-
-            if ($char === "'" || $char === '"') {
-                $inString = true;
-                $stringChar = $char;
-                $currentStatement .= $char;
-                continue;
-            }
-
-            $currentStatement .= $char;
-
-            if ($char === ';') {
-                $trimmed = trim($currentStatement);
-                if (!empty($trimmed)) {
-                    $statements[] = $trimmed;
-                }
-                $currentStatement = '';
-            }
-        }
-
-        $trimmed = trim($currentStatement);
-        if (!empty($trimmed)) {
-            $statements[] = $trimmed;
-        }
-
-        return $statements;
     }
 }

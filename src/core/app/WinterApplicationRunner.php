@@ -42,6 +42,8 @@ use Monolog\Processor\ProcessIdProcessor;
 abstract class WinterApplicationRunner {
     use Wlf4p;
 
+    public const VERSION_FILE = 'VERSION.txt';
+
     protected WinterApplicationContext $applicationContext;
     protected ClassResource $bootApp;
     protected WinterBootApplication $bootConfig;
@@ -71,7 +73,7 @@ abstract class WinterApplicationRunner {
     }
 
     public function getBootVersion(): string {
-        return '1.0.0-Dev';
+        return file_get_contents(dirname(dirname(dirname(__DIR__))) . '/' . self::VERSION_FILE);
     }
 
     public final function run(string $appClass): void {

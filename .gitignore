@@ -28,7 +28,6 @@ test.xml
 test.phar
 test.sh
 testApp/
-composer.lock
 examples/MyApp/logs/*.log
 examples/MyApp/logs/*.pid
 examples/logs/MyApp.log
