@@ -10,19 +10,6 @@ use dev\winterframework\pdbc\datasource\DataSourceConfig;
  * to supply tenant-specific DataSource configurations.
  *
  * The implementation should be registered as a #[Bean] in a #[Configuration] class.
- *
- * Example:
- *   #[Configuration]
- *   class MyTenantConfig {
- *       #[Bean]
- *       public function tenantDataSourceProvider(): TenantDataSourceProvider {
- *           return new class implements TenantDataSourceProvider {
- *               public function getTenantDataSourceConfig(string $tenantId): DataSourceConfig {
- *                   // query your tenant registry table and return DataSourceConfig
- *               }
- *           };
- *       }
- *   }
  */
 interface TenantDataSourceProvider {
 
@@ -34,4 +21,10 @@ interface TenantDataSourceProvider {
      * @throws \RuntimeException if the tenant is not found
      */
     public function getTenantDataSourceConfig(string $tenantId): DataSourceConfig;
+
+    /**
+     * Return a list of tenantIds.
+     * @return array<string>
+     */
+    public function getAllTenantIds(): array;
 }

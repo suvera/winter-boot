@@ -8,16 +8,10 @@ Winter Boot offers seamless, pluggable support for **OpenTelemetry** (OTel), emp
 
 The OpenTelemetry module requires the **OpenTelemetry PHP extension** and SDK packages to be installed in your environment. If the extension is not loaded, the module will throw a `MissingExtensionException` upon initialization.
 
-### 1. Install the PHP Extension
+### Install the PHP Extension
 Ensure the `opentelemetry` extension is installed and enabled in your `php.ini`:
 ```ini
 extension=opentelemetry.so
-```
-
-### 2. Install Composer Dependencies
-Add the required OpenTelemetry packages to your `composer.json`:
-```bash
-composer require open-telemetry/opentelemetry open-telemetry/api open-telemetry/exporter-otlp
 ```
 
 > **Note on Composer Plugins (`tbachert/spi`)**:
@@ -37,7 +31,7 @@ composer require open-telemetry/opentelemetry open-telemetry/api open-telemetry/
 
 ---
 
-## 3. Getting Started
+## Getting Started
 
 To enable OpenTelemetry in your project, add the module to your `modules` configuration in `application.yml`:
 
@@ -50,7 +44,7 @@ modules:
 
 ---
 
-## 4. Configuration
+## Configuration
 
 Configure your OTel module in `opentelemetry.yaml` (or the path defined in your module configuration):
 
@@ -68,7 +62,7 @@ winter:
 
 ---
 
-## 5. Web Request Tracing
+## Web Request Tracing
 
 Automatically trace incoming HTTP requests by registering the `OpenTelemetryWebInterceptor` in your `WebMvcConfigurer` implementation:
 
@@ -87,7 +81,7 @@ class MyWebConfigurer implements WebMvcConfigurer {
 
 ---
 
-## 6. Method-Level Tracing
+## Method-Level Tracing
 
 Easily trace business logic methods using the `#[Traceable]` attribute. The framework will automatically handle span creation, completion, and exception recording.
 
@@ -104,7 +98,7 @@ class OrderService {
 
 ---
 
-## 7. Metrics & Counters
+## Metrics & Counters
 
 Record metrics declaratively using the `#[Countable]` attribute or by autowiring `OpenTelemetryMetrics`:
 
@@ -133,7 +127,7 @@ class PaymentService {
 
 ---
 
-## 8. Structured Logging
+## Structured Logging
 
 `OpenTelemetryLogs` and `OpenTelemetryMetrics` are automatically registered as beans by the `OpenTelemetryModule` and can be injected into any service:
 

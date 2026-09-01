@@ -40,6 +40,12 @@ class DataSourceConfig {
     #[JsonProperty("connection.idleTimeout")]
     protected int $idleTimeout = 600;
 
+    #[JsonProperty("migrations")]
+    protected array $migrations = [];
+
+    #[JsonProperty("providerClass")]
+    protected string $providerClass = '';
+
     public function getName(): string {
         return $this->name;
     }
@@ -150,5 +156,21 @@ class DataSourceConfig {
 
     public function setIdleTimeout(int $idleTimeout): void {
         $this->idleTimeout = $idleTimeout;
+    }
+
+    public function getMigrations(): array {
+        return $this->migrations;
+    }
+
+    public function setMigrations(array $migrations): void {
+        $this->migrations = $migrations;
+    }
+
+    public function getProviderClass(): string {
+        return $this->providerClass;
+    }
+
+    public function setProviderClass(string $providerClass): void {
+        $this->providerClass = $providerClass;
     }
 }

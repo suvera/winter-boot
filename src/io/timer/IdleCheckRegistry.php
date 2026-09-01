@@ -13,6 +13,7 @@ class IdleCheckRegistry {
     private array $callbacks = [];
     private array $initialized = [];
     private bool $timerEnabled = false;
+    private int $timerId;
 
     public function __construct() {
         $this->timerEnabled = extension_loaded('swoole');
@@ -41,8 +42,13 @@ class IdleCheckRegistry {
         /**
          * Non blocking code is recommended, do not use regular sleep() inside callbacks
          */
-        Timer::tick(mt_rand(20000, 30000), [$this, 'checkIdleIo']);
+        $timerId = Timer::tick(mt_rand(20000, 30000), [$this, 'checkIdleIo']);
+        if ($timerId === false) {
+            self::logError('Failed to start IdleCheckRegistry timer');
+            return;
+        }
 
+        $this->timerId = $timerId;
         $this->initialized[getmypid()] = true;
     }
 
@@ -56,4 +62,22 @@ class IdleCheckRegistry {
             }
         }
     }
+
+    public function clear(): void {
+        if (!$this->timerEnabled) {
+            return;
+        }
+        if ($this->timerId) {
+            Timer::clear($this->timerId);
+            unset($this->initialized[getmypid()]);
+        }
+    }
+
+    public static function clearAll(): void {
+        if (!extension_loaded('swoole')) {
+            return;
+        }
+        Timer::clearAll();
+    }
+
 }

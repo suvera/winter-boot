@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace dev\winterframework\pdbc\multitenant;
@@ -8,6 +9,8 @@ use dev\winterframework\pdbc\pdo\PdoTemplate;
 use dev\winterframework\pdbc\pdo\PdoTransactionManager;
 use dev\winterframework\pdbc\PdbcTemplate;
 use dev\winterframework\txn\PlatformTransactionManager;
+use dev\winterframework\core\context\ApplicationContext;
+use dev\winterframework\exception\BeansDependencyException;
 
 class MultiTenantManager {
 
@@ -26,9 +29,21 @@ class MultiTenantManager {
      */
     private array $dataSources = [];
 
+    private ?TenantDataSourceProvider $tenantDataSourceProvider;
+
     public function __construct(
-        private TenantDataSourceProvider $tenantDataSourceProvider
+        private string $providerClassName,
+        private ApplicationContext $appCtx
     ) {
+    }
+
+    /**
+     * Get the tenant data source provider.
+     *
+     * @return TenantDataSourceProvider
+     */
+    public function getTenantDataSourceProvider(): TenantDataSourceProvider {
+        return $this->tenantDataSourceProvider;
     }
 
     /**
@@ -69,6 +84,12 @@ class MultiTenantManager {
      */
     private function getDataSource(string $tenantId): PdoDataSource {
         if (!isset($this->dataSources[$tenantId])) {
+            if ($this->tenantDataSourceProvider === null) {
+                if (!$this->appCtx->hasBeanByClass($this->providerClassName)) {
+                    throw new BeansDependencyException('TenantDataSourceProvider bean not found for class: ' . $this->providerClassName);
+                }
+                $this->tenantDataSourceProvider = $this->appCtx->beanByClass($this->providerClassName);
+            }
             $config = $this->tenantDataSourceProvider->getTenantDataSourceConfig($tenantId);
             $this->dataSources[$tenantId] = new PdoDataSource($config);
         }

@@ -20,8 +20,6 @@ use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\stereotype\web\RequestMapping;
 use dev\winterframework\util\BeanFinderTrait;
 use dev\winterframework\web\HttpRequestDispatcher;
-use Prometheus\Storage\APC;
-use Prometheus\Storage\InMemory;
 
 class WinterWebContext implements WebContext {
     use BeanFinderTrait;

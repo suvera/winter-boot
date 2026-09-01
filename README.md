@@ -115,9 +115,7 @@ You're Done! Get ready to code!
 
 # 3. Build & Deploy Your Winter Boot Applications
 
-Winter Boot provides robust support for building and deploying your services, leveraging the powerful **[Phing](https://www.phing.info/)** build system.
-
-Explore our comprehensive guide on **[Building Services](docs/build.md)** to learn how to:
+Winter Boot provides robust support for building and deploying your services, Explore our comprehensive guide on **[Building Services](docs/build.md)** to learn how to:
 
 -   Generate optimized Phar files for easy distribution.
 -   Effortlessly build Docker Images for containerized deployments. See a practical example in the [example-service](https://github.com/suvera/winter-example-service) repository:
@@ -136,6 +134,7 @@ Unlock the full potential of Winter Boot with our detailed documentation. Each g
 -   [**Caching**](docs/caching.md): Optimize performance with intelligent caching strategies.
 -   [**Custom StereoTypes & Aspect Oriented Magic**](docs/custom_aop.md): Discover advanced AOP techniques.
 -   [**Databases & Transactions**](docs/transactions.md): Manage your data with robust database and transaction support.
+-   [**SQL Migrations**](docs/sql-migrations.md): Execute SQL files against configured datasources with automatic version management.
 -   [**Actuator**](docs/actuator.md): Gain insights into your application's health and metrics.
 -   [**Locking**](docs/locking.md): Implement concurrency control for critical sections.
 -   [**Json and XML**](docs/json_xml.md): Seamlessly handle data serialization and deserialization.

@@ -28,7 +28,7 @@
         "issues": "https://github.com/suvera/winter-boot/issues"
     },
     "bin": [
-        "build/phing/phing"
+        "bin/sql-migrate.php"
     ],
     "autoload": {
         "psr-4": {

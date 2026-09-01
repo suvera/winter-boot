@@ -5,6 +5,7 @@ namespace dev\winterframework\core\context;
 
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\stereotype\Module;
+use dev\winterframework\core\app\WinterCliArguments;
 
 interface ApplicationContext {
     public function getId(): string;
@@ -25,7 +26,7 @@ interface ApplicationContext {
 
     public function hasBeanByClass(string $class): bool;
 
-    public function getProperty(string $name, mixed $default = null): string|int|float|bool|null;
+    public function getProperty(string $name, mixed $default = null): mixed;
 
     public function getPropertyStr(string $name, ?string $default = null): string;
 
@@ -46,5 +47,7 @@ interface ApplicationContext {
     public function getModule(string $moduleName): Module;
 
     public function getModules(): array;
+
+    public function getCliArgs(): WinterCliArguments;
 
 }
