@@ -127,6 +127,10 @@ propertySources:
     -   name: env # A unique name for your property source
         provider: dev\winterframework\io\EnvPropertySource # The fully qualified class name of your PropertySource implementation
 
+    -   name: ini # A unique name for your property source
+        provider: dev\winterframework\io\IniPropertySource
+        filePath: /var/run/secrets.ini
+
     -   name: vault # Example for a hypothetical Vault property source
         provider: some\org\namespace\VaultPropertySource  # (Note: This is a demo class, not implemented in framework)
         url: https://127.0.0.1:443/ # Vault server URL
@@ -136,6 +140,7 @@ propertySources:
 # Now, effortlessly reference properties from your custom sources!
 some:
     property1: $env.SOME_VALUE # Fetches 'SOME_VALUE' from your environment variables
+    property1: $ini.dbPassword # Fetches 'SOME_VALUE' from your environment variables
     property2: $vault.some_value2 # Fetches 'some_value2' from your hypothetical VaultPropertySource
 ```
 
