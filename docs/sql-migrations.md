@@ -41,7 +41,7 @@ CREATE TABLE users (
 ./winter-migrations-app.phar -c /path/to/config --sqlPath /path/to/migrations
 
 # Using PHP CLI directly
-php bin/sql-migrate.php -c /path/to/config --sqlPath /path/to/migrations
+php bin/migrate.php -c /path/to/config --sqlPath /path/to/migrations
 ```
 
 ### 5. Verify
@@ -197,7 +197,7 @@ spec:
 ### Direct Command
 
 ```bash
-php bin/sql-migrate.php -c /path/to/config --sqlPath /path/to/migrations
+php bin/migrate.php -c /path/to/config --sqlPath /path/to/migrations
 ```
 
 ## SQL File Format

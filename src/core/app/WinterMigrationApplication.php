@@ -2,12 +2,17 @@
 
 namespace dev\winterframework\core\app;
 
+use dev\winterframework\migrations\OpenSearchMigrationService;
 use dev\winterframework\migrations\SqlMigrationService;
 
 final class WinterMigrationApplication  extends WinterApplicationRunner implements WinterApplication {
 
+    public const MIGRATION_TYPE_OPENSEARCH = 'opensearch';
+    public const MIGRATION_TYPE_SQL = 'sql';
+
     protected string $sqlBasePath;
     protected string $configDir;
+    protected ?string $migrationType = null;
 
     public function __construct() {
         parent::__construct();
@@ -47,19 +52,63 @@ final class WinterMigrationApplication  extends WinterApplicationRunner implemen
             exit(1);
         }
 
+        $this->migrationType = $this->args->getMigrationType();
+
         /**
-         * Following things are not needed for SQL migration, so we can skip them to speed up the process.
+         * Following things are not needed for migration, so we can skip them to speed up the process.
          */
         // $this->beginModules();
         // $this->onApplicationReady();
 
-        $this->executeSqlMigrations();
+        if ($this->isOpenSearchMigration()) {
+            $this->executeOpenSearchMigrations();
+        } else {
+            $this->executeSqlMigrations();
+        }
 
         $this->exit(0);
     }
 
+    #[\Override]
+    protected function initModules() {
+        // No modules needed for SQL migration
+    }
+
+    #[\Override]
+    protected function loadModules() {
+        // No modules needed for SQL migration
+    }
+
+    #[\Override]
+    protected function beginModules(): void {
+        // No modules needed for SQL migration
+    }
+
+    #[\Override]
+    protected function onApplicationReady(): void {
+        // No onApplicationReady events needed for SQL migration
+    }
+
+    private function isOpenSearchMigration(): bool {
+        return $this->migrationType !== null
+            && strtolower(trim($this->migrationType)) === self::MIGRATION_TYPE_OPENSEARCH;
+    }
+
     private function executeSqlMigrations(): void {
-        $sqlMigrationService = new SqlMigrationService($this->applicationContext, $this->sqlBasePath, $this->configDir);
+        $sqlMigrationService = new SqlMigrationService(
+            $this->applicationContext,
+            $this->sqlBasePath,
+            $this->configDir
+        );
         $sqlMigrationService->executeMigrations();
+    }
+
+    private function executeOpenSearchMigrations(): void {
+        $osMigrationService = new OpenSearchMigrationService(
+            $this->applicationContext,
+            $this->sqlBasePath,
+            $this->configDir
+        );
+        $osMigrationService->executeMigrations();
     }
 }

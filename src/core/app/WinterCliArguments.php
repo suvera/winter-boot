@@ -21,6 +21,7 @@ class WinterCliArguments {
             ->opt('configDir:c', 'Config directory.', false)
             ->opt('stub:s', 'Stub name to execute', false)
             ->opt('sqlPath:s', 'SQL migration path.', false)
+            ->opt('migrationType:m', 'Type of migration to execute (sql|opensearch). Defaults to sql.', false)
             ->opt('version:v', 'Show Version', false, 'boolean');
 
         $this->args = $this->cli->parse($_SERVER['argv'], true);
@@ -56,6 +57,10 @@ class WinterCliArguments {
 
     public function getSqlPath(): ?string {
         return $this->get('sqlPath', null);
+    }
+
+    public function getMigrationType(): ?string {
+        return $this->get('migrationType', null);
     }
 
     public function getVersion(): ?bool {

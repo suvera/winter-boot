@@ -1,6 +1,6 @@
 {
     "base-path": "../../",
-    "main": "bin/sql-migrate.php",
+    "main": "bin/migrate.php",
     "output": "target/winter-migrations-app.phar",
     "stub": true,
     "alias": "winter-migrations-app.phar",
@@ -15,7 +15,7 @@
         "vendor"
     ],
     "files": [
-        "bin/sql-migrate.php",
+        "bin/migrate.php",
         "VERSION.txt",
         "LICENSE"
     ],
