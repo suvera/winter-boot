@@ -82,7 +82,7 @@ class RefKlass extends ReflectionAbstract {
         return $obj;
     }
 
-    public function __construct(object|string $objectOrClass = null) {
+    public function __construct(object|string|null $objectOrClass = null) {
         if (is_string($objectOrClass)) {
             $this->_data['class'] = $objectOrClass;
             $this->delegate = $this->loadDelegate();

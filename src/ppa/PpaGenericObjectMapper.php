@@ -48,7 +48,6 @@ class PpaGenericObjectMapper implements PpaObjectMapper {
             }
 
             $prop = $ref->getProperty($propName);
-            $prop->setAccessible(true);
             if (is_null($data[$name])) {
                 /** @noinspection PhpRedundantOptionalArgumentInspection */
                 $prop->setValue($obj, null);
@@ -120,7 +119,6 @@ class PpaGenericObjectMapper implements PpaObjectMapper {
             }
 
             $prop = $ref->getProperty($propName);
-            $prop->setAccessible(true);
             $value = $prop->getValue($obj);
 
             if (!isset($value)) {
@@ -183,7 +181,6 @@ class PpaGenericObjectMapper implements PpaObjectMapper {
             }
 
             $prop = $ref->getProperty($propName);
-            $prop->setAccessible(true);
             $value = $prop->getValue($obj);
 
             if (!isset($value)) {
@@ -204,7 +201,6 @@ class PpaGenericObjectMapper implements PpaObjectMapper {
         $where = [];
         foreach ($entity->getIdColumns() as $propName => $column) {
             $prop = $ref->getProperty($propName);
-            $prop->setAccessible(true);
             $value = $prop->getValue($obj);
 
             $bindKey = 'b_id_' . $propName;
@@ -234,7 +230,6 @@ class PpaGenericObjectMapper implements PpaObjectMapper {
         foreach ($entity->getIdColumns() as $propName => $column) {
 
             $prop = $ref->getProperty($propName);
-            $prop->setAccessible(true);
             $value = $prop->getValue($obj);
 
             $bindKey = 'b_' . $propName;

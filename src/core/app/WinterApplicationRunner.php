@@ -473,6 +473,9 @@ EOQ;
             if (extension_loaded($ext)) {
                 $labels['${' . $ext . '.name}'] = ucwords($ext);
                 $labels['${' . $ext . '.version}'] = phpversion($ext);
+            } else {
+                $labels['${' . $ext . '.name}'] = ucwords($ext);
+                $labels['${' . $ext . '.version}'] = 'not installed';
             }
         }
 

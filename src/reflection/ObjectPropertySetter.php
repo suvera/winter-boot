@@ -20,7 +20,6 @@ trait ObjectPropertySetter {
         int $source = ObjectMapper::SOURCE_ARRAY
     ): void {
         $propertyType = ParameterType::fromType($property->getType());
-        $property->setAccessible(true);
 
         try {
             $property->setValue($obj, $propertyType->castValue(

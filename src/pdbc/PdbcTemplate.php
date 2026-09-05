@@ -20,7 +20,7 @@ interface PdbcTemplate {
     public function execute(
         string $sql,
         array|BindVars $bindVars = [],
-        PreparedStatementCallback $action = null
+        ?PreparedStatementCallback $action = null
     ): mixed;
 
     public function query(
@@ -68,7 +68,7 @@ interface PdbcTemplate {
     public function queryForObject(
         string $sql,
         array|BindVars $bindVars,
-        string|RowMapper $classOrMapper = null
+        string|RowMapper|null $classOrMapper = null
     ): object;
 
     /**

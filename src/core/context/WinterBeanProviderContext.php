@@ -613,7 +613,6 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         foreach ($ref->getProperties() as $prop) {
             $autowired = $prop->getAttributes(Autowired::class);
             if (count($autowired) > 0) {
-                $prop->setAccessible(true);
                 $prop->setValue($bean, $this->beanByClass($prop->getType()->getName()));
             }
         }
