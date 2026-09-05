@@ -243,7 +243,6 @@ class XmlReaderObjectCreator {
         $obj = $childCls->newInstance();
 
         $var = $resource->getVariable();
-        $var->setAccessible(true);
 
         try {
             $val = $var->getValue($parent);
@@ -268,7 +267,6 @@ class XmlReaderObjectCreator {
         $obj = $childCls->newInstance();
 
         $var = $resource->getVariable();
-        $var->setAccessible(true);
         $var->setValue($parent, $obj);
         return [$obj, $objCls];
     }
@@ -277,7 +275,6 @@ class XmlReaderObjectCreator {
         $node = new XmlNode($tagName);
 
         $var = $resource->getVariable();
-        $var->setAccessible(true);
         $var->setValue($obj, $node);
         return $node;
     }
@@ -286,7 +283,6 @@ class XmlReaderObjectCreator {
         $node = new XmlNode($tagName);
 
         $var = $resource->getVariable();
-        $var->setAccessible(true);
 
         try {
             $val = $var->getValue($obj);
@@ -418,7 +414,6 @@ class XmlReaderObjectCreator {
      */
     protected function setObjectAnyProperty(VariableResource $variable, object $obj, array $properties): void {
         $var = $variable->getVariable();
-        $var->setAccessible(true);
 
         // This must be Array always
         $var->setValue($obj, []);

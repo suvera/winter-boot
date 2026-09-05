@@ -119,7 +119,6 @@ class ObjectToXmlWriter {
             /** @var XmlAttribute $attr */
             $attr = $xmlAttr->getAnnotation();
             $property = $attr->getRefOwner();
-            $property->setAccessible(true);
 
             try {
                 $value = $property->getValue($object);
@@ -147,7 +146,6 @@ class ObjectToXmlWriter {
         /** @var XmlValue $attr */
         $attr = $xmlValue->getAnnotation();
         $property = $attr->getRefOwner();
-        $property->setAccessible(true);
 
         $err = false;
         try {
@@ -175,8 +173,6 @@ class ObjectToXmlWriter {
         /** @var XmlAnyAttribute $attr */
         $attr = $xmlAnyAttr->getAnnotation();
         $property = $attr->getRefOwner();
-
-        $property->setAccessible(true);
 
         try {
             $value = $property->getValue($object);
@@ -221,7 +217,6 @@ class ObjectToXmlWriter {
         }
         foreach ($xmlElements as $element) {
             $property = $element->getRefOwner();
-            $property->setAccessible(true);
 
             try {
                 $value = $property->getValue($object);
@@ -263,7 +258,6 @@ class ObjectToXmlWriter {
 
     protected function processXmlAnyElement(XmlBeanAnnotation $anyElement, object $object): void {
         $property = $anyElement->getAnnotation()->getRefOwner();
-        $property->setAccessible(true);
 
         try {
             $value = $property->getValue($object);

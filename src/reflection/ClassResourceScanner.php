@@ -100,7 +100,7 @@ class ClassResourceScanner {
     public function scanClassRecursive(
         string $fqns,
         StringSet $attributes,
-        ClassResources $resources = null
+        ?ClassResources $resources = null
     ): ClassResources {
 
         if (is_null($resources)) {

@@ -293,7 +293,6 @@ class ReflectionUtil {
         object $bean
     ): void {
         $ref = $autoValue->getRefOwner();
-        $ref->setAccessible(true);
 
         $ymlName = substr($autoValue->name, 2, -1);
         $val = null;
@@ -344,7 +343,6 @@ class ReflectionUtil {
         object $object
     ): void {
         $ref = $autoWired->getRefOwner();
-        $ref->setAccessible(true);
 
         try {
             $val = $ref->getValue($object);
@@ -377,7 +375,6 @@ class ReflectionUtil {
     public static function setProperty(object $object, string $propName, mixed $value): void {
         $ref = ReflectionRegistry::getClass($object::class);
         $prop = $ref->getProperty($propName);
-        $prop->setAccessible(true);
         $prop->setValue($object, $value);
     }
 }

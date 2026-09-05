@@ -18,7 +18,7 @@ class PdoTemplate extends PdoOperations implements PdbcTemplate {
     public function execute(
         string $sql,
         array|BindVars $bindVars = [],
-        PreparedStatementCallback $action = null
+        ?PreparedStatementCallback $action = null
     ): mixed {
         return $this->doExecute($sql, $bindVars, $action);
     }
@@ -54,7 +54,7 @@ class PdoTemplate extends PdoOperations implements PdbcTemplate {
     public function queryForObject(
         string $sql,
         BindVars|array $bindVars,
-        RowMapper|string $classOrMapper = null
+        RowMapper|string|null $classOrMapper = null
     ): object {
         return $this->doQueryForObject($sql, $bindVars, $classOrMapper);
     }

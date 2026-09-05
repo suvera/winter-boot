@@ -36,7 +36,7 @@ abstract class PdoOperations {
     protected function doExecute(
         string $sql,
         BindVars|array $bindVars = [],
-        PreparedStatementCallback $action = null
+        ?PreparedStatementCallback $action = null
     ): mixed {
 
         $stmt = $this->dataSource->getConnection()->prepareStatement($sql);
@@ -228,7 +228,7 @@ abstract class PdoOperations {
     protected function doQueryForObject(
         string $sql,
         BindVars|array $bindVars,
-        RowMapper|string $classOrMapper = null
+        RowMapper|string|null $classOrMapper = null
     ): object {
         $stmt = $this->dataSource->getConnection()->prepareStatement($sql);
 

@@ -34,7 +34,6 @@ abstract class ArrayedObject {
                 continue;
             }
 
-            $p->setAccessible(true);
             if ($p->isInitialized($this)) {
                 $arr[$p->getName()] = $p->getValue($this);
             }
