@@ -67,11 +67,14 @@ use dev\winterframework\util\yaml\YamlParser;
  * `winter_migrations` index (one document per connection + relative path,
  * same idea as the `winter_migrations` SQL table), together with a SHA-256
  * hash of the file content. Re-runs skip files whose hash is unchanged and
- * re-apply files whose content changed (templates and policies are updated in
- * place via upsert PUTs). Template/policy PUTs are natural upserts; index
+ * re-apply files whose content changed (templates are updated in place via
+ * upsert PUTs). Template PUTs are natural upserts; index
  * creation first checks whether the index already exists so re-running
  * against a cluster whose state index was lost still succeeds instead of
- * failing with `resource_already_exists_exception`. Note that re-applying an
+ * failing with `resource_already_exists_exception`. ISM policy PUTs 409 with
+ * a version conflict when the policy already exists (e.g. created outside the
+ * migrator with no state-index record); that case is likewise treated as
+ * success and adopted into the state index. Note that re-applying an
  * index-schema file does not alter a live index: OpenSearch only applies
  * settings/mappings at index-creation time.
  */
@@ -525,6 +528,22 @@ class OpenSearchMigrationService {
             return;
         }
 
+        // Policy created outside the migrator (no state-index record) racing a
+        // re-run: ISM PUT without seq_no/if_primary_term 409s with a
+        // version-conflict reason instead of upserting. Adopt it as success so
+        // recordMigration() runs and future runs skip by content hash.
+        // (Index-template PUTs are natural upserts and do not 409, so they stay strict.)
+        if ($kind === 'ism-policy'
+            && $status === 409
+            && $this->isVersionConflict($response['body'])
+        ) {
+            $this->logInfo(
+                "ISM policy '{$operation['name']}' already exists (reported by OpenSearch), "
+                . "treating as success"
+            );
+            return;
+        }
+
         throw new OpenSearchMigrationException(
             "OpenSearch migration failed for {$kind} '{$operation['name']}': "
             . "{$operation['method']} {$operation['path']} returned status {$status}: "
@@ -635,6 +654,28 @@ class OpenSearchMigrationService {
                 . $this->responseErrorReason($response['body'])
             );
         }
+    }
+
+    /**
+     * True when an error body reports a version conflict (pre-existing document).
+     *
+     * ISM's 409 body carries the conflict as a plain-string `error`
+     * ("[sf-entities]: version conflict, document already exists ..."), for
+     * which responseErrorType()/responseErrorReason() both return that string;
+     * other shapes use `error.type = version_conflict_engine_exception` with
+     * the detail in `error.reason`. Matching both spellings ("version conflict"
+     * and "version_conflict") across type and reason covers either form without
+     * weakening other 409s.
+     */
+    private function isVersionConflict(mixed $body): bool {
+        foreach ([$this->responseErrorType($body), $this->responseErrorReason($body)] as $text) {
+            if (stripos($text, 'version conflict') !== false
+                || stripos($text, 'version_conflict') !== false
+            ) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function responseErrorType(mixed $body): string {
