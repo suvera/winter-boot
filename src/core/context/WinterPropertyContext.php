@@ -166,6 +166,16 @@ final class WinterPropertyContext implements PropertyContext {
         return $token;
     }
 
+    public function resolveValue(mixed $value): mixed {
+        $this->parseValue($value);
+        return $value;
+    }
+
+    public function resolveProperties(array $data): array {
+        $this->parseValue($data);
+        return $data;
+    }
+
     public function get(string $name, mixed $default = null): mixed {
         if (array_key_exists($name, $this->data)) {
             $val = $this->data[$name];
