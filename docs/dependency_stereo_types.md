@@ -111,6 +111,54 @@ var_dump($bus);
 
 ```
 
+### Interface aliasing via `Impl` suffix
+
+A stereotype bean (`#[Service]`, `#[Component]`, etc.) is always registered under its
+concrete class. It is additionally aliased to each interface it implements **solely
+when the concrete class name ends with `Impl`** (case-sensitive,
+`str_ends_with($className, 'Impl')`, see `registerBeanProviderClassAliases()` in
+`src/core/context/WinterBeanProviderContext.php`).
+
+```phpt
+
+interface UserService {
+    public function createUser(string $name, string $email);
+}
+
+#[Service]
+class UserServiceImpl implements UserService {
+
+    public function createUser(string $name, string $email) {
+        // ...
+    }
+}
+
+// Both work: concrete class and interface resolve to the same bean
+$user1 = $appCtx->beanByClass(UserServiceImpl::class);
+$user2 = $appCtx->beanByClass(UserService::class);
+
+-------------------------------------------------
+
+// No alias without the `Impl` suffix: this resolves ONLY by concrete class
+#[Service]
+class Car implements Vehicle {
+}
+
+$car = $appCtx->beanByClass(Car::class); // works
+$vehicle = $appCtx->beanByClass(Vehicle::class); // fails: no such bean
+
+```
+
+Notes:
+
+- `#[Bean]` factory methods are not aliased this way; they register only by their
+  return type.
+- If multiple `*Impl` beans implement the same interface,
+  `beanByClass(Interface::class)` throws `NoUniqueBeanDefinitionException`;
+  disambiguate with `beanByName("beanName")`,
+  `beanByNameClass("beanName", Interface::class)`, `#[Autowired("beanName")]`,
+  or `#[Qualifier]` on the injection point.
+
 
 
 ## 3. Component
