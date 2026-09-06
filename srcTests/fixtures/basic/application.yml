@@ -1,0 +1,45 @@
+propertySources:
+    -   name: env
+        provider: winterBootTests\Support\StubPropertySource
+        dataset: env
+    -   name: ini
+        provider: winterBootTests\Support\StubPropertySource
+        dataset: ini
+    -   name: vault
+        provider: winterBootTests\Support\StubPropertySource
+        dataset: vault
+
+datasource:
+    username: "$env.dbUser || $ini.dbUser || appuser"
+    adminUser: "$env.ghost || $ini.dbUser || appuser"
+    password: "$ini.dbPass || $vault.dbPass || secret"
+    vaultPass: "$env.ghost || $vault.dbPass || secret"
+    sslEnabled: "$env.sslEnabled || $vault.sslEnabled || true"
+    retries: "$env.retries || 3"
+    zeroDefault: "$env.ghost || 0"
+    zeroString: "$env.zeroStr || dflt"
+    poolSize: "$env.poolSize || $ini.poolSize || 10"
+    timeout: "$env.ghost || $ini.ghost || 10"
+    ratio: "$env.ghost || 10.5"
+    debug: "$env.ghost || false"
+    flag: "$env.ghost || TRUE"
+    label: "$env.ghost || 'hello world'"
+    quoted: '$env.ghost || "double quoted"'
+    bare: "$env.ghost || appuser "
+    emptyFallsThrough: "$env.emptyKey || $ini.dbUser || appuser"
+    nullFallsThrough: "$vault.nullKey || dflt"
+    unknownSource: "$nosuch.key || appuser"
+    explicitNull: "$env.ghost || null"
+    directRef: "$vault.apiKey"
+    legacyUnknown: "$nosuch.key"
+    plainString: "just a plain value"
+    pipeString: "a || b"
+    unquotedChain: $env.dbUser || $ini.dbUser || appuser
+    unquotedBool: $env.ghost || false
+    unquotedInt: $env.ghost || 10
+
+native:
+    count: 0
+    enabled: false
+    nothing: null
+    name: appuser

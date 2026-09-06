@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace dev\winterframework\util;
 
 use dev\winterframework\core\context\ApplicationContextData;
+use dev\winterframework\core\context\WinterPropertyContext;
 use dev\winterframework\exception\FileNotFoundException;
 use dev\winterframework\io\file\DirectoryScanner;
 use dev\winterframework\stereotype\Module;
@@ -83,6 +84,13 @@ class ConfigFileLoader {
         foreach ($configFiles as $configFile) {
             $conf = PropertyLoader::loadProperties($configFile);
             $data = array_merge($data, $conf);
+        }
+
+        $propertyCtx = $ctxData->getPropertyContext();
+        if ($propertyCtx instanceof WinterPropertyContext) {
+            $data = $propertyCtx->resolveProperties($data);
+        } else if (method_exists($propertyCtx, 'resolveProperties')) {
+            $data = $propertyCtx->resolveProperties($data);
         }
 
         return $data;

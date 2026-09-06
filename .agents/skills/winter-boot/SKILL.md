@@ -25,6 +25,7 @@ Custom module: extend `dev\winterframework\core\app\WinterModule`.
 
 - `#[Service]` / `#[Component]` (optional name, unique) on class; `#[Configuration]` on config class; `#[Bean]` / `#[Bean("name")]` on factory method (method params autowired).
 - `#[Autowired]` / `#[Autowired("beanName")]` on property. `ApplicationContext` itself is autowirable: `beanByClass()`, `beanByName()`, `beanByNameClass()`, `hasBeanByClass/Name()`, `getProperty()/getPropertyStr/Bool/Int/Float()`, `getProperties()`.
+- Interface aliasing solely via `Impl` suffix: a stereotype bean (`#[Service]`/`#[Component]`/…) is always registered under its concrete class and additionally under each implemented interface ONLY when the class name ends with `Impl` (case-sensitive, e.g. `UserServiceImpl implements UserService` → `beanByClass(UserService::class)` works; `Car implements Vehicle` does not alias `Vehicle`). `#[Bean]` methods register only by return type (no `Impl` aliasing). Multiple `*Impl` beans for one interface → `beanByClass()` throws `NoUniqueBeanDefinitionException`; disambiguate with `beanByName()`/`beanByNameClass()`/`#[Autowired("name")]`/`#[Qualifier]`.
 - `#[Value('${myApp.db.host}')]` injects `application.yml` property.
 
 ## 3. Configuration (`application.yml` in config dir)

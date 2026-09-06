@@ -144,5 +144,39 @@ some:
     property2: $vault.some_value2 # Fetches 'some_value2' from your hypothetical VaultPropertySource
 ```
 
+## 4. Fallback Chains: `$source.key || $other.key || default`
+
+A property value can be a `||` chain. Sources are tried left to right and the
+first *present* value wins. A value is present when it is not `null` and not
+`''` — `false`, `0` and `'0'` **count as present** and stop the chain. A
+literal default at the end always applies (use it, otherwise an unresolvable
+chain throws a `PropertyException`).
+
+```yaml
+datasource:
+    username: "$env.dbUsername || $ini.dbUsername || appuser"
+    password: "$ini.dbPassword || $vault.dbPassword || secret"
+    sslEnabled: "$env.sslEnabled || $vault.sslEnabled || true"
+    poolSize: "$env.poolSize || $ini.poolSize || 10"
+    retries: "$env.retries || 0"
+    debug: "$env.debug || false"
+    optionalNote: "$env.note || null"
+    welcome: "$env.greeting || 'hello world'"
+```
+
+Rules to remember:
+
+- Literals keep their type: `true`/`false` become boolean, `10`/`0` become int,
+  `10.5` becomes float, `null`/`~` become null, quoted strings stay strings,
+  anything else (like `appuser`) is a plain string.
+- A missing key — or a key holding `null`/`''` — falls through to the next
+  term. An unknown source name is skipped the same way.
+- A single `$vault.some_value2` reference keeps its legacy meaning (a missing
+  key throws instead of falling through).
+- Strings without any `$source.key` token are left alone, so plain values like
+  `"a || b"` keep working.
+- Quoting the chain is not strictly required, but recommended: an unquoted `#`
+  would start a comment and eat your default.
+
 With Winter Boot's comprehensive configuration capabilities, you have all the tools you need to build highly adaptable, maintainable, and powerful PHP applications. Configure with confidence and unleash your creativity!
 
