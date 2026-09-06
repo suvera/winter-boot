@@ -1,0 +1,6 @@
+propertySources:
+    -   name: env
+        provider: winterBootTests\Support\StubPropertySource
+        dataset: env
+
+broken: "$env.ghost"
