@@ -53,6 +53,10 @@ trait Data {
                         $actual = get_class($arguments[0]);
                     } else if ($actual === 'integer') {
                         $actual = 'int';
+                    } else if ($actual === 'boolean') {
+                        $actual = 'bool';
+                    } else if ($actual === 'double') {
+                        $actual = 'float';
                     }
 
                     if ($actual !== $expected) {

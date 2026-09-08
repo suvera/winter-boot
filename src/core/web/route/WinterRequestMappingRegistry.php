@@ -188,7 +188,7 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
     }
 
     public function find(string $path, string $method): ?MatchedRequestMapping {
-        self::logInfo("Finding route for '$path', '$method' ");
+        self::logDebug("Finding route for '$path', '$method' ");
         $path = trim($path, '/');
         $method = strtoupper($method);
 
