@@ -1,5 +1,7 @@
 # Winter Boot - Unleash the Power of PHP 8.5+ Microservices!
 
+> **Documentation: https://suvera.mintlify.site/** — full guides, references, and module docs live there.
+
 Inspired by the elegance of Spring Boot, Winter Boot empowers you to build robust and scalable **microservices** in PHP 8.5 with unparalleled ease and familiarity. If you're a Spring Boot enthusiast looking to dive into the world of PHP, Winter Boot is your perfect gateway!
 
 **Effortless Application Setup:**
@@ -115,7 +117,7 @@ You're Done! Get ready to code!
 
 # 3. Build & Deploy Your Winter Boot Applications
 
-Winter Boot provides robust support for building and deploying your services, Explore our comprehensive guide on **[Building Services](docs/build.md)** to learn how to:
+Winter Boot provides robust support for building and deploying your services, Explore our comprehensive guide on **[Building Services](https://suvera.mintlify.site/advanced/build-deploy)** to learn how to:
 
 -   Generate optimized Phar files for easy distribution.
 -   Effortlessly build Docker Images for containerized deployments. See a practical example in the [example-service](https://github.com/suvera/winter-example-service) repository:
@@ -124,25 +126,98 @@ Winter Boot provides robust support for building and deploying your services, Ex
 
 # 4. In-Depth Documentation
 
-Unlock the full potential of Winter Boot with our detailed documentation. Each guide is crafted to help you master specific aspects of the framework:
+Full documentation lives at **https://suvera.mintlify.site/** — same content and structure as below.
 
--   [**StereoTypes & Dependency Injection**](docs/dependency_stereo_types.md): Master the art of dependency management.
--   [**Configuration**](docs/configuration.md): Learn how to configure your applications with flexibility.
--   [**Logging**](docs/logging.md): Implement effective logging for monitoring and debugging.
--   [**Application Start/Booting**](docs/application_starter.md): Understand the lifecycle of your Winter Boot application.
--   [**REST API Development**](docs/rest_api.md): Build powerful and efficient RESTful services.
--   [**Caching**](docs/caching.md): Optimize performance with intelligent caching strategies.
--   [**Custom StereoTypes & Aspect Oriented Magic**](docs/custom_aop.md): Discover advanced AOP techniques.
--   [**Databases & Transactions**](docs/transactions.md): Manage your data with robust database and transaction support.
--   [**SQL Migrations**](docs/sql-migrations.md): Execute SQL files against configured datasources with automatic version management.
--   [**Actuator**](docs/actuator.md): Gain insights into your application's health and metrics.
--   [**Locking**](docs/locking.md): Implement concurrency control for critical sections.
--   [**Json and XML**](docs/json_xml.md): Seamlessly handle data serialization and deserialization.
--   [**Async and Scheduling support**](docs/async_scheduling.md): Harness the power of asynchronous operations and scheduled tasks.
--   [**OpenTelemetry**](docs/telemetry.md): Observe your microservices with distributed tracing.
--   [**Shared In-Memory Stores**](docs/local_store.md): Utilize high-performance in-memory data stores.
--   [**Daemon Threads**](docs/daemon_threads.md): Run background processes efficiently.
--   [**Building & Deployment**](docs/build.md): Comprehensive guide to packaging and deploying your applications.
+## Framework
+
+### Getting Started
+
+-   [**Introduction**](https://suvera.mintlify.site/introduction)
+-   [**Quickstart**](https://suvera.mintlify.site/quickstart)
+-   [**Configuration**](https://suvera.mintlify.site/configuration)
+
+### Core Concepts
+
+-   [**Dependency Injection**](https://suvera.mintlify.site/core/dependency-injection)
+-   [**AOP**](https://suvera.mintlify.site/core/aop)
+-   [**App Lifecycle**](https://suvera.mintlify.site/core/application-lifecycle)
+-   [**Module System**](https://suvera.mintlify.site/core/module-system)
+
+### Web & REST
+
+-   [**REST Controllers**](https://suvera.mintlify.site/web/rest-controllers)
+-   [**Request Mapping**](https://suvera.mintlify.site/web/request-mapping)
+-   [**Interceptors**](https://suvera.mintlify.site/web/interceptors)
+
+### Data
+
+-   [**Database**](https://suvera.mintlify.site/data/database)
+-   [**Transactions**](https://suvera.mintlify.site/data/transactions)
+-   [**Migrations**](https://suvera.mintlify.site/data/migrations)
+-   [**OpenSearch Migrations**](https://suvera.mintlify.site/data/opensearch-migrations)
+
+### Async & Concurrency
+
+-   [**Async Tasks**](https://suvera.mintlify.site/async/async-tasks)
+-   [**Scheduling**](https://suvera.mintlify.site/async/scheduling)
+-   [**Daemon Threads**](https://suvera.mintlify.site/async/daemon-threads)
+-   [**Locking**](https://suvera.mintlify.site/ops/locking)
+
+### Operations
+
+-   [**Caching**](https://suvera.mintlify.site/ops/caching)
+-   [**Logging**](https://suvera.mintlify.site/ops/logging)
+-   [**Actuator**](https://suvera.mintlify.site/ops/actuator)
+-   [**Telemetry**](https://suvera.mintlify.site/ops/telemetry)
+
+### Building Applications
+
+-   [**CLI Commands**](https://suvera.mintlify.site/building/cli-commands)
+-   [**Testing**](https://suvera.mintlify.site/building/testing)
+-   [**JSON & XML**](https://suvera.mintlify.site/advanced/json-xml)
+-   [**Local Stores**](https://suvera.mintlify.site/advanced/local-stores)
+-   [**Utilities**](https://suvera.mintlify.site/building/utilities)
+-   [**Build & Deploy**](https://suvera.mintlify.site/advanced/build-deploy)
+
+## Libraries
+
+### Overview
+
+-   [**Overview**](https://suvera.mintlify.site/modules/overview)
+
+### Data
+
+-   [**Doctrine**](https://suvera.mintlify.site/modules/doctrine)
+-   [**Redis**](https://suvera.mintlify.site/modules/data-redis)
+-   [**Memcache**](https://suvera.mintlify.site/modules/data-memcache)
+
+### Embedded In-Memory Servers
+
+-   [**Memdb**](https://suvera.mintlify.site/modules/memdb)
+
+### Messaging
+
+-   [**Kafka**](https://suvera.mintlify.site/modules/kafka)
+-   [**SQS**](https://suvera.mintlify.site/modules/sqs)
+
+### Storage & Search
+
+-   [**S3**](https://suvera.mintlify.site/modules/s3)
+-   [**OpenSearch**](https://suvera.mintlify.site/modules/opensearch)
+
+### Distributed Systems
+
+-   [**Eureka**](https://suvera.mintlify.site/modules/eureka)
+-   [**DTCE**](https://suvera.mintlify.site/modules/dtce)
+
+### Planned
+
+-   [**Security**](https://suvera.mintlify.site/modules/security)
+
+## Reference
+
+-   [**Attributes**](https://suvera.mintlify.site/reference/attributes)
+-   [**application.yml**](https://suvera.mintlify.site/reference/application-yml)
 
 # 5. Extend Your Horizons with Module Extensions
 
