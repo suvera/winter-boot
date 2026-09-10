@@ -92,9 +92,9 @@ Check out the example application here [example-service](https://github.com/suve
 
 Ready to build amazing things with Winter Boot? Follow these simple steps to get started!
 
-1)  **Prerequisite:** Ensure you have PHP 8.0 (or greater) installed.
+1)  **Prerequisite:** Ensure you have PHP 8.5 (or greater) installed.
 
-2)  **Unleash Asynchronous Power (Optional but Recommended):** For blazing-fast asynchronous functions (`#[Async]`) and scheduled tasks (`#[Scheduled]`), the `swoole` extension is highly recommended.
+2)  **Unleash Asynchronous Power:** For blazing-fast asynchronous functions (`#[Async]`) and scheduled tasks (`#[Scheduled]`), the `swoole` extension is highly recommended.
     
 ```shell
 pecl install swoole
@@ -122,7 +122,6 @@ Winter Boot provides robust support for building and deploying your services, Ex
 -   Generate optimized Phar files for easy distribution.
 -   Effortlessly build Docker Images for containerized deployments. See a practical example in the [example-service](https://github.com/suvera/winter-example-service) repository:
     -   [Dockerfile](https://github.com/suvera/winter-example-service/blob/master/Dockerfile)
-    -   [build.xml](https://github.com/suvera/winter-example-service/blob/master/build.xml)
 
 # 4. In-Depth Documentation
 
