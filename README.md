@@ -190,10 +190,6 @@ Full documentation lives at **https://suvera.mintlify.site/** — same content a
 -   [**Redis**](https://suvera.mintlify.site/modules/data-redis)
 -   [**Memcache**](https://suvera.mintlify.site/modules/data-memcache)
 
-### Embedded In-Memory Servers
-
--   [**Memdb**](https://suvera.mintlify.site/modules/memdb)
-
 ### Messaging
 
 -   [**Kafka**](https://suvera.mintlify.site/modules/kafka)
@@ -212,6 +208,25 @@ Full documentation lives at **https://suvera.mintlify.site/** — same content a
 ### Planned
 
 -   [**Security**](https://suvera.mintlify.site/modules/security)
+
+### Embedded In-Memory Servers
+
+-   [**Memdb - *EXPERIMENTAL* **](https://suvera.mintlify.site/modules/memdb)
+
+## Examples
+
+Examples built with Winter Boot and Winter Modules
+
+- [Examples](https://suvera.mintlify.site/examples/overview)
+    - [Redis Example](https://suvera.mintlify.site/examples/redis-app)
+    - [Doctrine Example](https://suvera.mintlify.site/examples/doctrine-app)
+    - [SQS Consumer Example](https://suvera.mintlify.site/examples/sqs-consumer)
+    - [Kafka Consumer Example](https://suvera.mintlify.site/examples/kafka-app)
+    - [S3 Example](https://suvera.mintlify.site/examples/s3-app)
+    - [Opensearch Example](https://suvera.mintlify.site/examples/opensearch-app)
+    - [Daemon Threads Example](https://suvera.mintlify.site/examples/daemon-app)
+    - [Scheduler Example](https://suvera.mintlify.site/examples/scheduler-app)
+    - [DTCE Example](https://suvera.mintlify.site/examples/dtce-app)
 
 ## Reference
 
