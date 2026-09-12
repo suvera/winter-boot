@@ -55,7 +55,6 @@ class HttpUploadedFile implements File {
         return $this->name;
     }
 
-    #[JsonProperty(name: 'name')]
     public function getNameJsonProperty(): string {
         return $this->name;
     }

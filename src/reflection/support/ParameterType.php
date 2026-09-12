@@ -10,6 +10,7 @@ use dev\winterframework\exception\NullPointerException;
 use dev\winterframework\io\ObjectMapper;
 use dev\winterframework\reflection\ObjectCreator;
 use dev\winterframework\reflection\ref\RefKlass;
+use dev\winterframework\type\ArrayList;
 use ReflectionIntersectionType;
 use ReflectionNamedType;
 use ReflectionType;
@@ -298,6 +299,9 @@ class ParameterType {
 
             $classTypes = $this->getClassTypes();
             foreach ($classTypes as $classType) {
+                if (is_a($classType, ArrayList::class, true)) {
+                    return ObjectCreator::createList($classType, $value);
+                }
                 $cls = RefKlass::getInstance($classType);
                 if ($cls->isInstantiable()) {
                     if ($source == ObjectMapper::SOURCE_JSON || $source == ObjectMapper::SOURCE_ARRAY) {

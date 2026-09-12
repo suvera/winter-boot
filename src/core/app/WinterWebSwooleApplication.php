@@ -226,7 +226,17 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         $classes = $this->appCtxData->getResources()->getClassesByAttribute(Scheduled::class);
         $prop = $this->appCtxData->getPropertyContext();
 
+        // getClassesByAttribute() returns the SAME class resource once
+        // per annotated method, so without dedupe N #[Scheduled]
+        // methods register N*N rows and overflow the shared schedule
+        // table (observed: 9 ticks -> 81 rows on a 50-row table).
+        $seen = [];
         foreach ($classes as $clsRes) {
+            $clsName = $clsRes->getClass()->getName();
+            if (isset($seen[$clsName])) {
+                continue;
+            }
+            $seen[$clsName] = true;
             foreach ($clsRes->getMethods() as $methodRes) {
                 /** @var Scheduled $attr */
                 $attr = $methodRes->getAttribute(Scheduled::class);
