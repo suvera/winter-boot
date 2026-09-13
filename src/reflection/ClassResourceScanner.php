@@ -11,6 +11,7 @@ use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\reflection\ref\RefProperty;
 use dev\winterframework\reflection\support\MethodParameter;
 use dev\winterframework\reflection\support\MethodParameters;
+use dev\winterframework\stereotype\RestController;
 use dev\winterframework\stereotype\aop\AopStereoType;
 use dev\winterframework\stereotype\StereoType;
 use dev\winterframework\stereotype\StereoTyped;
@@ -305,6 +306,20 @@ class ClassResourceScanner {
         $proxyMethList = MethodResources::ofValues();
         $res->setProxyMethods($proxyMethList);
 
+        /**
+         * The web dispatcher invokes controller endpoints through the
+         * original reflected method (non-virtual), so proxy overrides —
+         * and with them every AOP advice — can never engage on them.
+         * Skip proxy generation for controllers entirely.
+         */
+        $skipProxy = false;
+        foreach ($attrList as $classAttr) {
+            if ($classAttr instanceof RestController) {
+                $skipProxy = true;
+                break;
+            }
+        }
+
         $methods = $ref->getMethods();
         foreach ($methods as $methodR) {
             $method = RefMethod::getInstance($methodR);
@@ -322,10 +337,10 @@ class ClassResourceScanner {
                 $methList[] = $meth;
 
                 foreach ($methAttrs as $methAttr) {
-                    if ($methAttr instanceof AopStereoType
+                    if (!$skipProxy && ($methAttr instanceof AopStereoType
                         || $methAttr instanceof Async
                         || $methAttr instanceof Scheduled
-                    ) {
+                    )) {
                         $meth->setProxyNeeded(true);
                         $res->setProxyNeeded(true);
 

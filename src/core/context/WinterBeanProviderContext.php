@@ -17,6 +17,7 @@ use dev\winterframework\reflection\proxy\ProxyGenerator;
 use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\reflection\ReflectionUtil;
+use dev\winterframework\stereotype\aop\AopStereoType;
 use dev\winterframework\stereotype\Autowired;
 use dev\winterframework\stereotype\Bean;
 use dev\winterframework\stereotype\cli\Command;
@@ -80,7 +81,7 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         }
 
         foreach ($class->getMethods() as $method) {
-            if ($method->isProxyNeeded()) {
+            if ($method->isProxyNeeded() || $this->hasAopAttributes($method)) {
                 $this->ctxData->getAopRegistry()->register($class, $method);
             }
             $this->addProviderMethod($class, $method);
@@ -100,6 +101,20 @@ final class WinterBeanProviderContext implements BeanProviderContext {
      * @param ClassResource $class
      * @param object $attribute
      */
+    /**
+     * Controllers carry no proxy (the dispatcher invokes the original
+     * method non-virtually), yet their AOP attributes still need a
+     * registered interceptor — the dispatcher drives it directly.
+     */
+    private function hasAopAttributes(MethodResource $method): bool {
+        foreach ($method->getAttributes() as $attribute) {
+            if ($attribute instanceof AopStereoType) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private function processClassAttribute(ClassResource $class, object $attribute): void {
         $attrClass = $attribute::class;
 

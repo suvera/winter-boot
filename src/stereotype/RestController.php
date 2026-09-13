@@ -27,6 +27,18 @@ class RestController implements StereoType {
         /** @var RefKlass $ref */
         TypeAssert::typeOf($ref, RefKlass::class);
         $this->cannotBeAbstractClass($ref, 'RestController');
+        $this->cannotBeCombinedWith(
+            $ref,
+            'RestController',
+            'Bean',
+            [
+                Service::class,
+                Component::class,
+                Configuration::class,
+                Module::class,
+                RestController::class,
+            ]
+        );
 
         $this->refOwner = $ref;
     }

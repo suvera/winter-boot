@@ -6,6 +6,8 @@ namespace dev\winterframework\core\context;
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\stereotype\Module;
 use dev\winterframework\core\app\WinterCliArguments;
+use dev\winterframework\web\http\HttpRequest;
+use dev\winterframework\web\http\ResponseEntity;
 
 interface ApplicationContext {
     public function getId(): string;
@@ -49,5 +51,27 @@ interface ApplicationContext {
     public function getModules(): array;
 
     public function getCliArgs(): WinterCliArguments;
+
+    /**
+     * Returns the HttpRequest currently being dispatched, or null when
+     * no HTTP request is in flight (CLI apps, tests, outside dispatch).
+     */
+    public function getCurrentHttpRequest(): ?HttpRequest;
+
+    /**
+     * @internal Framework use only — bound by the dispatcher per request.
+     */
+    public function setCurrentHttpRequest(?HttpRequest $request): void;
+
+    /**
+     * Returns the ResponseEntity currently being dispatched, or null when
+     * no HTTP request is in flight (CLI apps, tests, outside dispatch).
+     */
+    public function getCurrentHttpResponse(): ?ResponseEntity;
+
+    /**
+     * @internal Framework use only — bound by the dispatcher per request.
+     */
+    public function setCurrentHttpResponse(?ResponseEntity $response): void;
 
 }

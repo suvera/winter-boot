@@ -44,6 +44,8 @@ use dev\winterframework\exception\WinterException;
 use dev\winterframework\exception\ClassNotFoundException;
 use dev\winterframework\type\TypeAssert;
 use dev\winterframework\core\app\WinterCliArguments;
+use dev\winterframework\web\http\HttpRequest;
+use dev\winterframework\web\http\ResponseEntity;
 
 abstract class WinterApplicationContextBuilder implements ApplicationContext {
     protected BeanProviderContext $beanProvider;
@@ -54,6 +56,12 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
     protected array $moduleRegistry = [];
     private bool $built = false;
     protected int $startTime;
+    private const CURRENT_HTTP_REQUEST_KEY = 'winterCurrentHttpRequest';
+    /** @var ?\WeakReference<HttpRequest> */
+    private ?\WeakReference $currentHttpRequest = null;
+    private const CURRENT_HTTP_RESPONSE_KEY = 'winterCurrentHttpResponse';
+    /** @var ?\WeakReference<ResponseEntity> */
+    private ?\WeakReference $currentHttpResponse = null;
 
     public function __construct(
         protected ApplicationContextData $contextData,
@@ -74,6 +82,62 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
 
     public function getCliArgs(): WinterCliArguments {
         return $this->cliArgs;
+    }
+
+    public function getCurrentHttpRequest(): ?HttpRequest {
+        if ($this->isCoroutine()) {
+            $ctx = \Swoole\Coroutine::getContext();
+            $ref = $ctx[self::CURRENT_HTTP_REQUEST_KEY] ?? null;
+            return $ref instanceof \WeakReference ? $ref->get() : null;
+        }
+        return $this->currentHttpRequest?->get();
+    }
+
+    public function setCurrentHttpRequest(?HttpRequest $request): void {
+        // Held weakly: the slot must never pin the request (body, files)
+        // in memory beyond the dispatch that owns it. During dispatch the
+        // dispatcher frame itself holds the strong reference, so the value
+        // stays alive exactly while a request is in flight.
+        if ($this->isCoroutine()) {
+            $ctx = \Swoole\Coroutine::getContext();
+            if ($request === null) {
+                unset($ctx[self::CURRENT_HTTP_REQUEST_KEY]);
+            } else {
+                $ctx[self::CURRENT_HTTP_REQUEST_KEY] = \WeakReference::create($request);
+            }
+            return;
+        }
+        $this->currentHttpRequest = $request === null ? null : \WeakReference::create($request);
+    }
+
+    public function getCurrentHttpResponse(): ?ResponseEntity {
+        if ($this->isCoroutine()) {
+            $ctx = \Swoole\Coroutine::getContext();
+            $ref = $ctx[self::CURRENT_HTTP_RESPONSE_KEY] ?? null;
+            return $ref instanceof \WeakReference ? $ref->get() : null;
+        }
+        return $this->currentHttpResponse?->get();
+    }
+
+    public function setCurrentHttpResponse(?ResponseEntity $response): void {
+        // Held weakly, like the request: the slot must never pin the
+        // response in memory beyond the dispatch that owns it.
+        if ($this->isCoroutine()) {
+            $ctx = \Swoole\Coroutine::getContext();
+            if ($response === null) {
+                unset($ctx[self::CURRENT_HTTP_RESPONSE_KEY]);
+            } else {
+                $ctx[self::CURRENT_HTTP_RESPONSE_KEY] = \WeakReference::create($response);
+            }
+            return;
+        }
+        $this->currentHttpResponse = $response === null ? null : \WeakReference::create($response);
+    }
+
+    private function isCoroutine(): bool {
+        return extension_loaded('swoole')
+            && class_exists(\Swoole\Coroutine::class)
+            && \Swoole\Coroutine::getCid() > 0;
     }
 
     /**
