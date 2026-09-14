@@ -8,6 +8,7 @@ use dev\winterframework\exception\WinterException;
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\MethodResource;
 use dev\winterframework\reflection\ReflectionUtil;
+use dev\winterframework\stereotype\aop\AopStereoType;
 use ReflectionException;
 
 final class ProxyGenerator {
@@ -74,6 +75,14 @@ final class ProxyGenerator {
         return $code;
     }
 
+    // WB-014: render a default value as a valid PHP literal.
+    private static function exportDefaultValue(mixed $value): string {
+        if ($value instanceof \UnitEnum) {
+            return '\\' . $value::class . '::' . $value->name;
+        }
+        return var_export($value, true);
+    }
+
     public function generateMethod(MethodResource $method): string {
         $code = '    ';
         $m = $method->getMethod();
@@ -105,15 +114,23 @@ final class ProxyGenerator {
             if ($p->hasType()) {
                 $param .= ReflectionUtil::getParamType($p) . ' ';
             }
+            // WB-014: preserve by-reference and variadic signatures.
+            if ($p->isPassedByReference()) {
+                $param .= '&';
+            }
+            if ($p->isVariadic()) {
+                $param .= '...';
+            }
             $param .= '$' . $p->getName();
 
-            if ($p->isDefaultValueAvailable()) {
+            if ($p->isDefaultValueAvailable() && !$p->isVariadic()) {
                 try {
                     $param .= ' = ';
                     if ($p->isDefaultValueConstant()) {
                         $param .= $p->getDefaultValueConstantName();
                     } else {
-                        $param .= $p->getDefaultValue() ?? 'null';
+                        // WB-014: emit defaults as PHP literals, not raw values.
+                        $param .= self::exportDefaultValue($p->getDefaultValue());
                     }
                 } catch (ReflectionException $e) {
                     throw new WinterException('Could not create Proxy method '
@@ -195,6 +212,20 @@ EOQ;
 EOQ;
     }
 
+    // WB-002: actual class/method/attributes label for failure context.
+    private function aopContextLabel(MethodResource $method): string {
+        $names = [];
+        foreach ($method->getAttributes() as $attribute) {
+            if ($attribute instanceof AopStereoType) {
+                $names[] = (new \ReflectionClass($attribute))->getShortName();
+            }
+        }
+        $label = $method->getMethod()->getDeclaringClass()->getName()
+            . '::' . $method->getMethod()->getShortName()
+            . '() [' . implode(',', $names) . ']';
+        return addcslashes($label, "\\'");
+    }
+
     protected function buildAopProxyMethodCode(
         MethodResource $method
     ): string {
@@ -209,6 +240,7 @@ EOQ;
         $className = $method->getMethod()->getDeclaringClass()->getName();
         $className = str_replace('\\', '\\\\', $className);
         $methodName = $method->getMethod()->getShortName();
+        $contextLabel = $this->aopContextLabel($method);
 
         return <<<EOQ
         \$args = func_get_args();
@@ -217,6 +249,8 @@ EOQ;
         \$interceptor = self::\$aopRegistry->get("$className", "$methodName");
         \$executionCtx = new AopExecutionContext(\$this, \$args); 
         
+        // WB-002: execptions already handled by aspectBegin()
+        //  - setException() and setBeginFailed() already handled by aspectBegin() method.
         \$interceptor->aspectBegin(\$executionCtx);
         \$executionCtx->setBeginDone();
         
@@ -234,9 +268,11 @@ EOQ;
         } catch (Throwable \$e) {
             \$executionCtx->setException(\$e);
             \$executionCtx->setFailed();
-            
+
             \$interceptor->aspectFailed(\$executionCtx, \$e);
-            $return
+            // WB-002: log failure with context, rethrow original unchanged.
+            self::logException(\$e, 'AOP invocation failed on $contextLabel');
+            throw \$e;
         }
         
         try {

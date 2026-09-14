@@ -12,6 +12,8 @@ abstract class AbstractTransactionObject implements TransactionObject {
     private bool $readOnly = false;
     private bool $suspended = false;
     protected int $commitCounter = 0;
+    // WB-001: rollback-only tracked independently of readOnly.
+    private bool $rollbackOnly = false;
 
     public function __construct(
         private Connection $connection
@@ -53,7 +55,13 @@ abstract class AbstractTransactionObject implements TransactionObject {
     }
 
     public function isRollbackOnly(): bool {
-        return $this->isReadOnly();
+        // WB-001: explicit rollback-only, plus legacy readOnly behavior.
+        return $this->rollbackOnly || $this->isReadOnly();
+    }
+
+    // WB-001: lets participants force outer rollback without readOnly.
+    public function setRollbackOnly(bool $rollbackOnly): void {
+        $this->rollbackOnly = $rollbackOnly;
     }
 
     public function setPreviousIsolationLevel(?int $previousIsolationLevel): void {

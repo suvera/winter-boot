@@ -61,6 +61,13 @@ abstract class AbstractTransactionStatus implements TransactionStatus {
         return $this->transaction->isRollbackOnly();
     }
 
+    // WB-001: mark (shared) transaction rollback-only via the transaction object.
+    public function setRollbackOnly(bool $rollbackOnly = true): void {
+        if ($rollbackOnly && $this->transaction instanceof AbstractTransactionObject) {
+            $this->transaction->setRollbackOnly(true);
+        }
+    }
+
     public function hasSavepoint(): bool {
         return isset($this->savepoint);
     }
@@ -80,22 +87,24 @@ abstract class AbstractTransactionStatus implements TransactionStatus {
     }
 
     public function rollbackToHeldSavepoint(): void {
-        if (isset($this->savepoint)) {
-            $this->getTransaction()->rollbackToSavepoint($this->savepoint);
-            $this->getTransaction()->releaseSavepoint($this->savepoint);
-            $this->savepoint = null;
+        // WB-016: throw only when no savepoint is held.
+        if (!isset($this->savepoint)) {
+            throw new TransactionUsageException(
+                "Cannot roll back to savepoint - no savepoint associated with current transaction");
         }
-        throw new TransactionUsageException(
-            "Cannot roll back to savepoint - no savepoint associated with current transaction");
+        $this->getTransaction()->rollbackToSavepoint($this->savepoint);
+        $this->getTransaction()->releaseSavepoint($this->savepoint);
+        $this->savepoint = null;
     }
 
     public function releaseHeldSavepoint(): void {
-        if (isset($this->savepoint)) {
-            $this->getTransaction()->releaseSavepoint($this->savepoint);
-            $this->savepoint = null;
+        // WB-016: throw only when no savepoint is held.
+        if (!isset($this->savepoint)) {
+            throw new TransactionUsageException(
+                "Cannot release savepoint - no savepoint associated with current transaction");
         }
-        throw new TransactionUsageException(
-            "Cannot release savepoint - no savepoint associated with current transaction");
+        $this->getTransaction()->releaseSavepoint($this->savepoint);
+        $this->savepoint = null;
     }
 
 }

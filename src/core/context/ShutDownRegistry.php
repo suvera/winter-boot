@@ -18,9 +18,9 @@ class ShutDownRegistry {
     }
 
     public function onShutdown(): void {
-        foreach ($this->beanProviders as $key) {
+        // WB-013: iterate objects directly; indexing returns assoc data (null).
+        foreach ($this->beanProviders as $beanProvider) {
             /** @var BeanProvider $beanProvider */
-            $beanProvider = $this->beanProviders[$key];
             if ($beanProvider->hasCached() && $beanProvider->hasDestroyMethod()) {
                 $object = $beanProvider->getCached();
                 $method = $beanProvider->getDestroyMethod();

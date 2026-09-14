@@ -49,8 +49,9 @@ class InMemoryCache implements Cache {
                     $this->config->expireAfterWriteMs <= 0
                     || ($this->items[$key]->getWriteTimeMs() + $this->config->expireAfterWriteMs) > $ms
                 ) && (
+                    // WB-004: entry is valid while its access deadline is in the future.
                     $this->config->expireAfterAccessMs <= 0
-                    || ($this->items[$key]->getAccessTimeMs() + $this->config->expireAfterAccessMs) < $ms
+                    || ($this->items[$key]->getAccessTimeMs() + $this->config->expireAfterAccessMs) > $ms
                 );
 
             if (!$exist) {

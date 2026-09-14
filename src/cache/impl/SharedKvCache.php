@@ -65,21 +65,23 @@ class SharedKvCache implements Cache {
     }
 
     public function getOrProvide(string $key, callable $valueProvider): ValueWrapper {
-        $data = $this->get($key);
-        $value = null;
-        if (is_null($data)) {
-            try {
-                $value = $valueProvider();
-                if (!is_null($value)) {
-                    $this->put($key, $value);
-                }
-            } catch (Throwable $e) {
-                throw new ValueRetrievalException('Provider to cache value is failed for "'
-                    . $key . '"', 0, $e
-                );
-            }
+        // WB-005: get() never returns null; inspect the wrapped value.
+        $cached = $this->get($key);
+        if ($cached->get() !== null) {
+            return $cached;
         }
-        return is_null($value) ? SimpleValueWrapper::$NULL_VALUE : new SimpleValueWrapper($value);
+        try {
+            $value = $valueProvider();
+            if (!is_null($value)) {
+                $this->put($key, $value);
+                return new SimpleValueWrapper($value);
+            }
+        } catch (Throwable $e) {
+            throw new ValueRetrievalException('Provider to cache value is failed for "'
+                . $key . '"', 0, $e
+            );
+        }
+        return SimpleValueWrapper::$NULL_VALUE;
     }
 
     public function getAsType(string $key, string $class): ?object {
@@ -137,14 +139,18 @@ class SharedKvCache implements Cache {
             return SimpleValueWrapper::$NULL_VALUE;
         }
         $ttl = $this->calcTtl();
-        $value = serialize($value);
+        $stored = serialize($value);
 
         try {
-            $this->client->putIfNot($this->name, $key, $value, $ttl);
+            // WB-005: return the logical value, never serialization bytes.
+            if ($this->client->putIfNot($this->name, $key, $stored, $ttl)) {
+                return new SimpleValueWrapper($value);
+            }
         } catch (Throwable $e) {
             self::logException($e);
+            return new SimpleValueWrapper($value);
         }
-        return new SimpleValueWrapper($value);
+        return $this->get($key);
     }
 
 }

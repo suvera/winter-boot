@@ -33,13 +33,19 @@ class WinterServerAdmin {
         }
     }
 
+    // WB-008: admin acts only when a non-empty token is configured.
+    public function hasAuth(): bool {
+        return $this->token !== '';
+    }
+
     public function serveRequest(Request $request, Response $response): void {
         $req = new SwooleRequest($request, $response);
 
         $token = '' . $req->getPostParam('token');
         $action = $req->getPostParam('action');
 
-        if ($token !== $this->token) {
+        // WB-008: fail closed on missing auth; constant-time token compare.
+        if (!$this->hasAuth() || !hash_equals($this->token, $token)) {
             $response->status(400, 'Bad Request');
             $response->end("NOK\n");
             return;

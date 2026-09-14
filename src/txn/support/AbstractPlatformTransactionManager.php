@@ -22,6 +22,8 @@ abstract class AbstractPlatformTransactionManager implements PlatformTransaction
     protected bool $validateExistingTransaction = true;
     protected bool $rollbackOnCommitFailure = false;
     protected TransactionsHolder $txnStack;
+    // WB-001: statuses suspended by REQUIRES_NEW/NOT_SUPPORTED, resumed on completion.
+    private array $suspendedTransactions = [];
 
     public function __construct() {
         $this->txnStack = new TransactionsHolder();
@@ -117,16 +119,12 @@ abstract class AbstractPlatformTransactionManager implements PlatformTransaction
                 self::logDebug("processCommit() - Initiating transaction commit");
                 $this->doCommit($status);
                 self::logDebug("processCommit() - Commit done!");
+            } else if ($status->hasTransaction()) {
+                // WB-001: participant commits nothing; outer completion decides.
+                self::logDebug("processCommit() - Participating transaction done");
             } else {
-                if ($status->hasTransaction()) {
-                    if ($status->isRollbackOnly()) {
-                        self::logDebug("processCommit() - Participating transaction failed - "
-                            . "marking existing transaction as rollback-only");
-                    }
-                } else {
-                    self::logDebug("processCommit() - Should roll back transaction but cannot - "
-                        . "no transaction available");
-                }
+                self::logDebug("processCommit() - Should roll back transaction but cannot - "
+                    . "no transaction available");
             }
         } catch (Throwable $e) {
             throw new TransactionException('', 0, $e);
@@ -145,16 +143,16 @@ abstract class AbstractPlatformTransactionManager implements PlatformTransaction
                 self::logDebug("processRollback() - Initiating transaction rollback");
                 $this->doRollback($status);
                 self::logDebug("processRollback() - Rollback done!");
-            } else {
-                if ($status->hasTransaction()) {
-                    if ($status->isRollbackOnly()) {
-                        self::logDebug("processRollback() - Participating transaction failed - "
-                            . "marking existing transaction as rollback-only");
-                    }
-                } else {
-                    self::logDebug("processRollback() - Should roll back transaction but cannot - "
-                        . "no transaction available");
+            } else if ($status->hasTransaction()) {
+                // WB-001: participant failure marks the shared transaction rollback-only.
+                self::logDebug("processRollback() - Participating transaction failed - "
+                    . "marking existing transaction as rollback-only");
+                if ($status instanceof AbstractTransactionStatus) {
+                    $status->setRollbackOnly(true);
                 }
+            } else {
+                self::logDebug("processRollback() - Should roll back transaction but cannot - "
+                    . "no transaction available");
             }
         } catch (Throwable $e) {
             throw new TransactionException('', 0, $e);
@@ -172,16 +170,18 @@ abstract class AbstractPlatformTransactionManager implements PlatformTransaction
         }
 
         if ($definition->getPropagationBehavior() == TransactionDefinition::PROPAGATION_NOT_SUPPORTED) {
-            return $this->prepareNoTransaction($definition);
+            // WB-001: suspend the existing transaction while running non-transactionally.
+            $noTxn = $this->prepareNoTransaction($definition);
+            $this->suspendTransaction($currentStatus, $noTxn);
+            return $noTxn;
         }
 
         if ($definition->getPropagationBehavior() == TransactionDefinition::PROPAGATION_REQUIRES_NEW) {
             self::LogDebug("Suspending current transaction, creating new transaction with name ["
                 . $definition->getName() . "]");
 
-            $currentStatus->getTransaction()->suspend();
-
             $status = $this->doGetTransaction($definition);
+            $this->suspendTransaction($currentStatus, $status);
             $this->startTransaction($status);
             $this->txnStack->push($status);
             return $status;
@@ -205,9 +205,33 @@ abstract class AbstractPlatformTransactionManager implements PlatformTransaction
             return $status;
         }
 
-        $currentStatus->getTransaction()->resume();
+        // WB-001: participant shares the transaction but never completes it.
+        $participant = new ParticipatingTransactionStatus($currentStatus->getTransaction());
+        $this->txnStack->push($participant);
+        return $participant;
+    }
 
-        return $currentStatus;
+    // WB-001: park the current status until the holder status completes.
+    private function suspendTransaction(
+        TransactionStatus $currentStatus,
+        TransactionStatus $holder
+    ): void {
+        $currentStatus->getTransaction()->suspend();
+        $this->txnStack->remove($currentStatus);
+        $this->suspendedTransactions[] = ['suspended' => $currentStatus, 'holder' => $holder];
+    }
+
+    // WB-001: resume the status suspended by the completed holder, if any.
+    private function resumeSuspendedTransaction(TransactionStatus $holder): void {
+        for ($i = count($this->suspendedTransactions) - 1; $i >= 0; $i--) {
+            if ($this->suspendedTransactions[$i]['holder'] === $holder) {
+                $suspended = $this->suspendedTransactions[$i]['suspended'];
+                array_splice($this->suspendedTransactions, $i, 1);
+                $suspended->getTransaction()->resume();
+                $this->txnStack->push($suspended);
+                return;
+            }
+        }
     }
 
     /**
@@ -235,7 +259,12 @@ abstract class AbstractPlatformTransactionManager implements PlatformTransaction
     protected abstract function doRollback(TransactionStatus $status): void;
 
     protected function doCleanupAfterCompletion(TransactionStatus $status): void {
+        // WB-001: mark completed exactly once and resume any suspended status.
+        if ($status instanceof AbstractTransactionStatus) {
+            $status->setCompleted(true);
+        }
         $this->txnStack->remove($status);
+        $this->resumeSuspendedTransaction($status);
     }
 
     protected function useSavepointForNestedTransaction(): bool {

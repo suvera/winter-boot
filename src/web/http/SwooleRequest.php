@@ -22,6 +22,7 @@ class SwooleRequest extends HttpRequest {
         $this->body = $request->getContent();
         $this->contentType = $request->header['content-type'] ?? '';
 
+        // WB-010: intentional mirror for app code reading $_SERVER under Swoole.
         $_SERVER['REQUEST_METHOD'] = $this->method;
         $_SERVER['REQUEST_URI'] = $this->uri;
 

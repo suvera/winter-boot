@@ -32,10 +32,12 @@ use dev\winterframework\stereotype\test\WinterBootTest;
 use dev\winterframework\stereotype\Value;
 use dev\winterframework\stereotype\web\RequestMapping;
 use dev\winterframework\stereotype\WinterBootApplication;
+use ReflectionIntersectionType;
 use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionObject;
 use ReflectionParameter;
+use ReflectionUnionType;
 use Throwable;
 use TypeError;
 
@@ -70,7 +72,8 @@ final class WinterBeanProviderContext implements BeanProviderContext {
     }
 
     private function _addProviderClass(ClassResource $class, ?array $moreAttributes = null): void {
-        $this->validateBeanClass($class->getClass());
+        // WB-015: final is rejected only when an inheritance proxy is needed.
+        $this->validateBeanClass($class->getClass(), $class->isProxyNeeded());
         $attributes = $class->getAttributes();
         if ($moreAttributes) {
             $attributes->addAll($moreAttributes);
@@ -505,11 +508,22 @@ final class WinterBeanProviderContext implements BeanProviderContext {
     protected function buildMethodArguments(ReflectionMethod $method): array {
         $args = [];
         foreach ($method->getParameters() as $parameter) {
-            /** @var ReflectionNamedType $type */
             $type = $parameter->getType();
 
             $this->validateBeanMethodParam($method, $parameter);
 
+            // WB-017: never call named-type APIs on union/intersection types.
+            if ($type instanceof ReflectionIntersectionType) {
+                throw new TypeError("Method " . ReflectionUtil::getFqName($method)
+                    . " has intersection-typed parameter " . $parameter->getName()
+                    . ", which cannot be autowired");
+            }
+            if ($type instanceof ReflectionUnionType) {
+                $args[$parameter->getName()] = $this->beanByUnionParam($method, $parameter, $type);
+                continue;
+            }
+
+            /** @var ReflectionNamedType $type */
             if ($type->isBuiltin()) {
                 continue;
             }
@@ -527,6 +541,32 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         }
 
         return $args;
+    }
+
+    // WB-017: autowire union params via Qualifier or a single class candidate.
+    private function beanByUnionParam(
+        ReflectionMethod $method,
+        ReflectionParameter $parameter,
+        ReflectionUnionType $type
+    ): object {
+        $qualifiers = $parameter->getAttributes(Qualifier::class);
+        if (!empty($qualifiers)) {
+            /** @var Qualifier $attr */
+            $attr = $qualifiers[0]->newInstance();
+            return $this->beanByName($attr->name);
+        }
+        $classes = [];
+        foreach ($type->getTypes() as $subType) {
+            if ($subType instanceof ReflectionNamedType && !$subType->isBuiltin()) {
+                $classes[] = $subType->getName();
+            }
+        }
+        if (count($classes) === 1) {
+            return $this->beanByClass($classes[0]);
+        }
+        throw new BeansException("Method " . ReflectionUtil::getFqName($method)
+            . " has ambiguous union parameter " . $parameter->getName()
+            . ", use #[Qualifier] to select a bean");
     }
 
     private function buildInstanceByMethod(
@@ -554,15 +594,16 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         return $bean;
     }
 
-    private function validateBeanClass(RefKlass $cls) {
+    private function validateBeanClass(RefKlass $cls, bool $proxyNeeded = false) {
         if (!$cls->isInstantiable()) {
             throw new TypeError('Class ' . ReflectionUtil::getFqName($cls)
                 . ' cannot be Instantiable');
         }
 
-        if ($cls->isFinal()) {
+        // WB-015: final beans are fine unless a subclass proxy is required.
+        if ($proxyNeeded && $cls->isFinal()) {
             throw new TypeError('Class ' . ReflectionUtil::getFqName($cls)
-                . ' must not be FINAL ');
+                . ' must not be FINAL when a proxy is required ');
         }
 
         $constructor = $cls->getConstructor();
@@ -577,7 +618,6 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         ReflectionMethod $method,
         ReflectionParameter $parameter
     ): void {
-        /** @var ReflectionNamedType $type */
         $type = $parameter->getType();
         if ($type === null) {
             throw new TypeError(
@@ -587,6 +627,31 @@ final class WinterBeanProviderContext implements BeanProviderContext {
             );
         }
 
+        // WB-017: reject intersections early; unions resolve at build time.
+        if ($type instanceof ReflectionIntersectionType) {
+            throw new TypeError(
+                "Method "
+                    . ReflectionUtil::getFqName($method)
+                    . " has intersection-typed parameter " . ReflectionUtil::getFqName($parameter)
+                    . ", which cannot be autowired"
+            );
+        }
+        if ($type instanceof ReflectionUnionType) {
+            foreach ($type->getTypes() as $subType) {
+                if ($subType instanceof ReflectionNamedType && $subType->isBuiltin()
+                    && $subType->getName() !== 'null' && !$parameter->isDefaultValueAvailable()) {
+                    throw new TypeError(
+                        "Method "
+                            . ReflectionUtil::getFqName($method)
+                            . " has parameter " . ReflectionUtil::getFqName($parameter)
+                            . " without default value, so cannot instantiate this class"
+                    );
+                }
+            }
+            return;
+        }
+
+        /** @var ReflectionNamedType $type */
         if ($type->isBuiltin()) {
             if (!$parameter->isDefaultValueAvailable()) {
                 throw new TypeError(

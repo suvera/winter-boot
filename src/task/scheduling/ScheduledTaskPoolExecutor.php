@@ -77,6 +77,11 @@ class ScheduledTaskPoolExecutor implements TaskPoolExecutor {
                 continue;
             }
 
+            // WB-006: one execution at a time; overlapping runs are skipped.
+            if (!empty($row['inProgress'])) {
+                continue;
+            }
+
             $database->put($id, ['inProgress' => 1]);
 
             go(function () use ($table, $id, $appCtx, $workerId) {

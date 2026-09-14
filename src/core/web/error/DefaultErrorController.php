@@ -29,8 +29,11 @@ class DefaultErrorController implements ErrorController {
         if ($t instanceof HttpRestException) {
             $response->withStatus($t->getStatus());
             $status = $t->getStatus();
+            $error = $t->getMessage();
         } else {
             $response->withStatus($status);
+            // WB-007: hide unexpected 5xx detail; 4xx keeps framework message.
+            $error = ($t !== null && $status->getValue() < 500) ? $t->getMessage() : null;
         }
 
         $response->withContentType(MediaType::APPLICATION_JSON);
@@ -39,7 +42,7 @@ class DefaultErrorController implements ErrorController {
             'timestamp' => gmdate('Y-m-d\TH:i:s\Z'),
             'status' => $status->getValue(),
             'message' => $status->getReasonPhrase(),
-            'error' => $t ? $t->getMessage() : null
+            'error' => $error
         ]);
 
         $this->renderer->renderAndExit($response, $request);

@@ -193,6 +193,11 @@ class WinterServer {
         if (!$port) {
             return;
         }
+        // WB-008: never listen for admin shutdown without a token configured.
+        if (!$this->adminHandler->hasAuth()) {
+            self::logError('server.admin.port is set but no admin token is configured; admin listener disabled');
+            return;
+        }
         /** @var Port $servPort */
         $servPort = @$this->server->listen('127.0.0.1', $port, SWOOLE_SOCK_TCP);
 

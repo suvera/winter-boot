@@ -495,15 +495,18 @@ class DispatcherServlet implements HttpRequestDispatcher {
         if (str_contains($contentType, MediaType::APPLICATION_FORM_URLENCODED)) {
 
             try {
-                return ObjectCreator::createObject($varType, $_POST);
+                // WB-003: bind from the request, never process globals.
+                return ObjectCreator::createObject($varType, $request->getPostParams());
             } catch (Throwable $e) {
                 self::logException($e);
                 throw new WinterException('Bad Request: Unexpected data passed');
             }
         } else if (str_contains($contentType, MediaType::MULTIPART_FORM_DATA)) {
-            $data = $_POST;
-            if (isset($_FILES)) {
-                $data = array_merge($data, $_FILES);
+            // WB-003: bind from the request, never process globals.
+            $data = $request->getPostParams();
+            $files = $request->getFiles();
+            if (!empty($files)) {
+                $data = array_merge($data, $files);
             }
             try {
                 return ObjectCreator::createObject($varType, $data);
@@ -515,9 +518,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
             !$body->disableParsing
             && (empty($contentType) || str_contains($contentType, MediaType::APPLICATION_JSON))
         ) {
-
-            self::logInfo('JSON Body: ' . $rawBody);
-
+            // WB-009: never log raw bodies; they may carry credentials.
             try {
                 $row = JsonUtil::decodeArray($rawBody);
             } catch (Throwable $e) {
@@ -533,9 +534,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
             }
         } else if (!$body->disableParsing && (str_contains($contentType, MediaType::APPLICATION_XML)
             || str_contains($contentType, MediaType::TEXT_XML))) {
-
-            self::logInfo('XML Body: ' . $rawBody);
-
+            // WB-009: never log raw bodies; they may carry credentials.
             try {
                 return ObjectCreator::createObjectXml($varType, $rawBody);
             } catch (Throwable $e) {
