@@ -35,6 +35,10 @@ class AopInterceptorRegistry {
         }
     }
 
+    public function has(string $className, string $methodName): bool {
+        return isset($this->registry[$className][$methodName]);
+    }
+
     public function get(string $className, string $methodName): AopInterceptor {
         if (isset($this->registry[$className][$methodName])) {
             return $this->registry[$className][$methodName];
