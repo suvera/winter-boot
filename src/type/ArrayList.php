@@ -11,7 +11,6 @@ use OutOfBoundsException;
 
 abstract class ArrayList implements Countable, ArrayAccess, IteratorAggregate {
 
-    protected static mixed $EMPTY_LIST;
     protected bool $emptyList = false;
 
     /**
@@ -84,13 +83,10 @@ abstract class ArrayList implements Countable, ArrayAccess, IteratorAggregate {
     }
 
     public final static function emptyList(): static {
-        if (isset(static::$EMPTY_LIST)) {
-            return static::$EMPTY_LIST;
-        }
-
-        static::$EMPTY_LIST = new static();
-        static::$EMPTY_LIST->emptyList = true;
-        return static::$EMPTY_LIST;
+        // Uncached: one shared static leaked across empty-list subtypes.
+        $list = new static();
+        $list->emptyList = true;
+        return $list;
     }
 
 }

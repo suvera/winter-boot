@@ -25,7 +25,12 @@ class QueueClient implements QueueSharedTemplate {
         if ($name === 'client') {
             if (!isset($this->_client)) {
                 $this->_client = new Client(SWOOLE_SOCK_TCP | SWOOLE_KEEP);
-                if (!$this->_client->connect($this->config->getAddress(), $this->config->getPort(), -1)) {
+                // SR-008: bounded connect, never infinite.
+                if (!$this->_client->connect(
+                    $this->config->getAddress(),
+                    $this->config->getPort(),
+                    $this->config->getTimeout()
+                )) {
                     throw new QueueException("QUEUE Store Connection failed. Error: {$this->_client->errCode}");
                 }
             }
@@ -35,7 +40,12 @@ class QueueClient implements QueueSharedTemplate {
     }
 
     protected function connect(): void {
-        if (!$this->client->connect($this->config->getAddress(), $this->config->getPort(), -1)) {
+        // SR-008: bounded connect, never infinite.
+        if (!$this->client->connect(
+            $this->config->getAddress(),
+            $this->config->getPort(),
+            $this->config->getTimeout()
+        )) {
             throw new QueueException("QUEUE Store Connection failed. Error: {$this->client->errCode}");
         }
     }
@@ -100,8 +110,15 @@ class QueueClient implements QueueSharedTemplate {
         }
 
         //echo "REQ: " . $req . "\n";
-        $this->client->send($req . "\n");
-        $data = $this->client->recv();
+        // SR-008: fail fast on send/read instead of blocking forever.
+        if ($this->client->send($req . "\n") === false) {
+            throw new QueueException("QUEUE Store send failed. Error: {$this->client->errCode}");
+        }
+        $data = $this->client->recv($this->config->getTimeout());
+        if ($data === false || $data === '') {
+            throw new QueueException(
+                "QUEUE Store read timed out after {$this->config->getTimeout()}s");
+        }
         //echo "RAW: $data\n";
         $json = json_decode($data, true);
         if ($json === false || $json[0] === QueueResponse::FAILED) {

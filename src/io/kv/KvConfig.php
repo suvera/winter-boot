@@ -12,10 +12,15 @@ class KvConfig {
         protected int $port,
         protected ?string $address = null,
         protected ?string $phpBinary = null,
-        protected ?string $diskPath = null
+        protected ?string $diskPath = null,
+        // SR-008: seconds for connect/read deadlines; never infinite.
+        protected float $timeout = 5.0
     ) {
         if (!is_int($port) || !$port || $port < 1 || $port > 65535) {
             throw new KvException('KV Server port must be a number between 1 - 65535');
+        }
+        if ($this->timeout <= 0) {
+            throw new KvException('KV Store timeout must be positive seconds');
         }
 
         if (!$this->address) {
@@ -45,5 +50,10 @@ class KvConfig {
 
     public function getToken(): string {
         return $this->token;
+    }
+
+    // SR-008: connect/read deadline in seconds.
+    public function getTimeout(): float {
+        return $this->timeout;
     }
 }

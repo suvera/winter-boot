@@ -263,7 +263,9 @@ final class WinterPropertyContext implements PropertyContext {
             if (isset($data['banner.location'])) {
                 if (is_string($data['banner.location'])) {
                     if ($data['banner.location'][0] != '/') {
-                        $data['banner.location'] = $configFile . DIRECTORY_SEPARATOR . $data['banner.location'];
+                        // ARC-010: resolve against the config directory, not the file.
+                        $data['banner.location'] = dirname($configFile)
+                            . DIRECTORY_SEPARATOR . $data['banner.location'];
                     }
                 } else {
                     unset($data['banner.location']);

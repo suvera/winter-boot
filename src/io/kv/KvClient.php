@@ -35,7 +35,12 @@ class KvClient implements KvTemplate {
     }
 
     protected function connect(): void {
-        if (!$this->client->connect($this->config->getAddress(), $this->config->getPort(), -1)) {
+        // SR-008: bounded connect, never infinite.
+        if (!$this->client->connect(
+            $this->config->getAddress(),
+            $this->config->getPort(),
+            $this->config->getTimeout()
+        )) {
             throw new KvException("KV Store Connection failed. Error: {$this->client->errCode}");
         }
     }
@@ -143,8 +148,15 @@ class KvClient implements KvTemplate {
         }
 
         //echo "REQ: " . $req . "\n";
-        $this->client->send($req . "\n");
-        $data = $this->client->recv();
+        // SR-008: fail fast on send/read instead of blocking forever.
+        if ($this->client->send($req . "\n") === false) {
+            throw new KvException("KV Store send failed. Error: {$this->client->errCode}");
+        }
+        $data = $this->client->recv($this->config->getTimeout());
+        if ($data === false || $data === '') {
+            throw new KvException(
+                "KV Store read timed out after {$this->config->getTimeout()}s");
+        }
         //echo "RAW: $data\n";
         $json = json_decode($data, true);
         if ($json === false || $json[0] === KvResponse::FAILED) {
