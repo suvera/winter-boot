@@ -35,7 +35,12 @@ class KvClient implements KvTemplate {
     }
 
     protected function connect(): void {
-        if (!$this->client->connect($this->config->getAddress(), $this->config->getPort(), -1)) {
+        // SR-008: bounded connect, never infinite.
+        if (!$this->client->connect(
+            $this->config->getAddress(),
+            $this->config->getPort(),
+            $this->config->getTimeout()
+        )) {
             throw new KvException("KV Store Connection failed. Error: {$this->client->errCode}");
         }
     }
@@ -143,8 +148,15 @@ class KvClient implements KvTemplate {
         }
 
         //echo "REQ: " . $req . "\n";
-        $this->client->send($req . "\n");
-        $data = $this->client->recv();
+        // SR-008: fail fast on send/read instead of blocking forever.
+        if ($this->client->send($req . "\n") === false) {
+            throw new KvException("KV Store send failed. Error: {$this->client->errCode}");
+        }
+        $data = $this->recvFrame();
+        if ($data === false || $data === '') {
+            throw new KvException(
+                "KV Store read timed out after {$this->config->getTimeout()}s");
+        }
         //echo "RAW: $data\n";
         $json = json_decode($data, true);
         if ($json === false || $json[0] === KvResponse::FAILED) {
@@ -152,6 +164,41 @@ class KvClient implements KvTemplate {
         }
 
         return KvResponse::jsonUnSerialize($json);
+    }
+
+    /**
+     * Read one newline-terminated response frame from the server.
+     *
+     * Swoole\Client::recv() takes a buffer size in bytes, not a timeout, so
+     * a single recv() cannot bound the read. Keep reading until the trailing
+     * "\n" the server appends, giving up past the configured deadline.
+     */
+    protected function recvFrame(): string|false {
+        $deadline = microtime(true) + $this->config->getTimeout();
+        $buffer = '';
+        while (true) {
+            // EAGAIN while polling is expected; errCode is checked below.
+            $chunk = @$this->client->recv(65536);
+            if ($chunk === false) {
+                // EAGAIN: nothing arrived yet, keep waiting for the deadline.
+                if ($this->client->errCode === 11 && microtime(true) < $deadline) {
+                    usleep(10000);
+                    continue;
+                }
+                return false;
+            }
+            if ($chunk === '') {
+                return false;
+            }
+            $buffer .= $chunk;
+            $pos = strpos($buffer, "\n");
+            if ($pos !== false) {
+                return substr($buffer, 0, $pos);
+            }
+            if (microtime(true) >= $deadline) {
+                return false;
+            }
+        }
     }
 
     public function __destruct() {

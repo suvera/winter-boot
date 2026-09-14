@@ -331,6 +331,7 @@ final class AuditFixRegressionTest extends TestCase {
     }
 
     // WB-002: proxies log failures with actual class/method context, rethrow original.
+    // Begin failures stay with the interceptor (no duplicate handling here).
     public function testAopProxyRethrows(): void {
         $code = ProxyGenerator::getDefault()->generateMethod($this->proxyMethod('fails', true));
         $this->assertTrue(str_contains($code, 'aspectFailed'));
@@ -338,8 +339,7 @@ final class AuditFixRegressionTest extends TestCase {
         $this->assertFalse(str_contains($code, 'new AopException'));
         $this->assertTrue(str_contains($code, 'AOP invocation failed on'));
         $this->assertTrue(str_contains($code, 'AuditFixFixtureService::fails()'));
-        $this->assertTrue(str_contains($code, 'AOP begin failed on'));
-        $this->assertTrue(str_contains($code, 'setBeginFailed()'));
+        $this->assertFalse(str_contains($code, 'AOP begin failed on'));
     }
 
     // WB-014: generated signatures keep literal defaults, refs, variadics.

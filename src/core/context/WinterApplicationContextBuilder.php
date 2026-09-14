@@ -17,6 +17,7 @@ use dev\winterframework\core\web\error\DefaultErrorController;
 use dev\winterframework\core\web\error\ErrorController;
 use dev\winterframework\core\web\format\DefaultResponseRenderer;
 use dev\winterframework\core\web\ResponseRenderer;
+use dev\winterframework\exception\IllegalStateException;
 use dev\winterframework\exception\ModuleException;
 use dev\winterframework\exception\NoUniqueBeanDefinitionException;
 use dev\winterframework\io\metrics\prometheus\DefaultPrometheusMetricProvider;
@@ -55,6 +56,8 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
     protected ClassResourceScanner $scanner;
     protected array $moduleRegistry = [];
     private bool $built = false;
+    // ARC-001: rejects re-entry while a build is already running.
+    private bool $building = false;
     protected int $startTime;
     private const CURRENT_HTTP_REQUEST_KEY = 'winterCurrentHttpRequest';
     /** @var ?\WeakReference<HttpRequest> */
@@ -203,14 +206,24 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         if ($this->built) {
             return;
         }
-        $this->processResources();
+        // ARC-001: fail fast on re-entry; mark done only on success.
+        if ($this->building) {
+            throw new IllegalStateException('Application context build is already in progress');
+        }
+        $this->building = true;
+        try {
+            $this->processResources();
 
-        $this->registerInternals();
+            $this->registerInternals();
 
-        $this->registerDataSources();
+            $this->registerDataSources();
 
-        if ($this->bootConfig->eager) {
-            $this->eagerLoadBeans();
+            if ($this->bootConfig->eager) {
+                $this->eagerLoadBeans();
+            }
+            $this->built = true;
+        } finally {
+            $this->building = false;
         }
     }
 
@@ -359,6 +372,25 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
                 $config->isPrimary() ? [] : ['name' => $beanName],
                 false
             );
+
+            // ARC-002: each datasource gets its own named txn/template beans.
+            $this->beanProvider->registerInternalBeanMethod(
+                $beanName . DataSourceBuilder::TXN_SUFFIX,
+                '',
+                $dsBuilder,
+                'getTransactionManager',
+                ['name' => $beanName . DataSourceBuilder::TXN_SUFFIX],
+                false
+            );
+
+            $this->beanProvider->registerInternalBeanMethod(
+                $beanName . DataSourceBuilder::TEMPLATE_SUFFIX,
+                '',
+                $dsBuilder,
+                'getPdbcTemplate',
+                ['name' => $beanName . DataSourceBuilder::TEMPLATE_SUFFIX],
+                false
+            );
         }
 
         if (
@@ -374,24 +406,6 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
             $dsBuilder,
             'getPrimaryTransactionManager',
             [],
-            false
-        );
-
-        $this->beanProvider->registerInternalBeanMethod(
-            $beanName . DataSourceBuilder::TXN_SUFFIX,
-            '',
-            $dsBuilder,
-            'getTransactionManager',
-            ['name' => $beanName . DataSourceBuilder::TXN_SUFFIX],
-            false
-        );
-
-        $this->beanProvider->registerInternalBeanMethod(
-            $beanName . DataSourceBuilder::TEMPLATE_SUFFIX,
-            '',
-            $dsBuilder,
-            'getPdbcTemplate',
-            ['name' => $beanName . DataSourceBuilder::TEMPLATE_SUFFIX],
             false
         );
     }

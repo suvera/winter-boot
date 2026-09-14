@@ -11,6 +11,7 @@ use dev\winterframework\core\context\ShutDownRegistry;
 use dev\winterframework\core\context\WinterApplicationContext;
 use dev\winterframework\core\context\WinterPropertyContext;
 use dev\winterframework\core\web\config\InterceptorRegistry;
+use dev\winterframework\exception\ModuleException;
 use dev\winterframework\exception\NotWinterApplicationException;
 use dev\winterframework\exception\WinterException;
 use dev\winterframework\io\file\DirectoryScanner;
@@ -273,10 +274,30 @@ abstract class WinterApplicationRunner {
         }
     }
 
-    protected function loadModules() {
+    // ARC-009: module entries fail fast with config location, never raw offsets.
+    private function validatedModuleDefs(): array {
         $modules = $this->propertyCtx->get('modules', []);
+        if (!is_array($modules)) {
+            throw new ModuleException("Invalid 'modules' configuration: expected a list of entries");
+        }
+        foreach ($modules as $index => $moduleDef) {
+            if (!is_array($moduleDef) || !isset($moduleDef['module'])
+                || !is_string($moduleDef['module']) || trim($moduleDef['module']) === '') {
+                throw new ModuleException(
+                    "Invalid module entry at 'modules[$index]': 'module' must be a non-empty class name");
+            }
+            if (!empty($moduleDef['enabled']) && !class_exists($moduleDef['module'])) {
+                throw new ModuleException(
+                    "Module class '{$moduleDef['module']}' at 'modules[$index]' does not exist");
+            }
+        }
+        return $modules;
+    }
+
+    protected function loadModules() {
+        $modules = $this->validatedModuleDefs();
         foreach ($modules as $moduleDef) {
-            if (!$moduleDef['module'] || !$moduleDef['enabled']) {
+            if (empty($moduleDef['enabled'])) {
                 continue;
             }
             $clsRef = $this->applicationContext->addClass($moduleDef['module']);
@@ -301,9 +322,9 @@ abstract class WinterApplicationRunner {
     }
 
     protected function initModules() {
-        $modules = $this->propertyCtx->get('modules', []);
-        foreach ($modules as $moduleDef) {
-            if (!$moduleDef['module'] || !$moduleDef['enabled']) {
+        $modules = $this->validatedModuleDefs();
+        foreach ($modules as $index => $moduleDef) {
+            if (empty($moduleDef['enabled'])) {
                 continue;
             }
 
@@ -317,7 +338,13 @@ abstract class WinterApplicationRunner {
 
                 self::logInfo("Module [ $module->title ] loading.");
 
-                foreach ($module->namespaces as $nsRow) {
+                foreach ($module->namespaces as $nsIndex => $nsRow) {
+                    // ARC-009: namespace tuples must be [prefix, path] pairs.
+                    if (!is_array($nsRow) || !isset($nsRow[0], $nsRow[1])
+                        || !is_string($nsRow[0]) || !is_string($nsRow[1])) {
+                        throw new ModuleException(
+                            "Invalid namespaces entry at 'modules[$index]' #$nsIndex: expected [prefix, path]");
+                    }
                     $this->scanNamespaces[] = new Psr4Namespace($nsRow[0], $nsRow[1]);
                 }
             }

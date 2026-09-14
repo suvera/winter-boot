@@ -24,6 +24,7 @@ class CliSqlFileExecutor {
 
         $cmd = '';
         $env = [];
+        $cleanupFiles = [];
 
         switch ($driver) {
             case 'pgsql':
@@ -69,12 +70,12 @@ class CliSqlFileExecutor {
 
             case 'oci':
                 $dbname = $params['dbname'] ?? '';
+                // SR-009: password lives in a 0600 login script, never in argv.
+                $loginScript = $this->createOciLoginScript($username, $password, $dbname, $filePath);
+                $cleanupFiles[] = $loginScript;
                 $cmd = sprintf(
-                    'sqlplus -S %s/%s@%s @%s',
-                    escapeshellarg($username),
-                    escapeshellarg($password),
-                    escapeshellarg($dbname),
-                    escapeshellarg($filePath)
+                    'sqlplus -S /NOLOG @%s',
+                    escapeshellarg($loginScript)
                 );
                 break;
 
@@ -82,11 +83,12 @@ class CliSqlFileExecutor {
             case 'dblib':
                 $server = $params['server'] ?? $params['host'] ?? '127.0.0.1';
                 $dbname = $params['database'] ?? $params['dbname'] ?? '';
+                // SR-009: sqlcmd honors SQLCMDPASSWORD, so -P stays out of argv.
+                $env = ['SQLCMDPASSWORD' => $password];
                 $cmd = sprintf(
-                    'sqlcmd -S %s -U %s -P %s -d %s -i %s',
+                    'sqlcmd -S %s -U %s -d %s -i %s',
                     escapeshellarg($server),
                     escapeshellarg($username),
-                    escapeshellarg($password),
                     escapeshellarg($dbname),
                     escapeshellarg($filePath)
                 );
@@ -96,7 +98,42 @@ class CliSqlFileExecutor {
                 throw new SqlMigrationException("CLI execution not supported for database driver: '{$driver}'");
         }
 
-        $this->runCommand($cmd, $env);
+        try {
+            $this->runCommand($cmd, $env);
+        } finally {
+            foreach ($cleanupFiles as $tmpFile) {
+                @unlink($tmpFile);
+            }
+        }
+    }
+
+    // SR-009: 0600 CONNECT wrapper; quoted only when special chars require it.
+    protected function createOciLoginScript(
+        string $username,
+        string $password,
+        string $dbname,
+        string $filePath
+    ): string {
+        $script = tempnam(sys_get_temp_dir(), 'wboot-ora-');
+        if ($script === false) {
+            throw new SqlMigrationException('Could not create Oracle login script');
+        }
+        chmod($script, 0600);
+        $user = $this->quoteOciIdentifier($username);
+        $pass = $this->quoteOciIdentifier($password);
+        file_put_contents(
+            $script,
+            "CONNECT {$user}/{$pass}@{$dbname}\n@\"{$filePath}\"\nEXIT\n"
+        );
+        return $script;
+    }
+
+    // SR-009: plain Oracle identifiers stay unquoted (case-folding preserved).
+    private function quoteOciIdentifier(string $value): string {
+        if (preg_match('/^[A-Za-z0-9_#$]+$/', $value) === 1) {
+            return $value;
+        }
+        return '"' . str_replace('"', '""', $value) . '"';
     }
 
     /**
@@ -129,8 +166,9 @@ class CliSqlFileExecutor {
 
     /**
      * Executes the built command securely with proc_open.
+     * $cmd never carries secrets (SR-009), so it is safe in messages.
      */
-    private function runCommand(string $cmd, array $env): void {
+    protected function runCommand(string $cmd, array $env): void {
         $descriptors = [
             0 => ['pipe', 'r'],
             1 => ['pipe', 'w'],
