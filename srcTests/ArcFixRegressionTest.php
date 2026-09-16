@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace winterBootTests;
 
-use dev\winterframework\core\app\WinterCliApplication;
+use dev\winterframework\core\app\WinterMigrationApplication;
 use dev\winterframework\core\app\WinterApplicationRunner;
 use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\core\context\WinterApplicationContext;
@@ -112,7 +112,7 @@ final class ArcFixRegressionTest extends TestCase {
     private function validatedDefs(array $modules): array {
         $propCtx = $this->makePropCtx();
         $propCtx->set('modules', $modules);
-        $runner = (new \ReflectionClass(WinterCliApplication::class))->newInstanceWithoutConstructor();
+        $runner = (new \ReflectionClass(WinterMigrationApplication::class))->newInstanceWithoutConstructor();
         $prop = new \ReflectionProperty(WinterApplicationRunner::class, 'propertyCtx');
         $prop->setAccessible(true);
         $prop->setValue($runner, $propCtx);

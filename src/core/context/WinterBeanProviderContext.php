@@ -20,7 +20,6 @@ use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\stereotype\aop\AopStereoType;
 use dev\winterframework\stereotype\Autowired;
 use dev\winterframework\stereotype\Bean;
-use dev\winterframework\stereotype\cli\Command;
 use dev\winterframework\stereotype\Component;
 use dev\winterframework\stereotype\Configuration;
 use dev\winterframework\stereotype\Module;
@@ -132,12 +131,11 @@ final class WinterBeanProviderContext implements BeanProviderContext {
             case RestController::class:
             case Service::class:
             case WinterBootTest::class:
-            case Command::class:
             case WinterBootApplication::class:
             case Module::class:
                 /**
                  * @var Component|Configuration|RestController|Service $attribute
-                 * @var WinterBootTest|Command|Module $attribute
+                 * @var WinterBootTest|Module $attribute
                  */
                 $beanProvider = new BeanProvider($class, null, $class->isProxyNeeded());
                 $beanDef = new Bean($attribute->name);
