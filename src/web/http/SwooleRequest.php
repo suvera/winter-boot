@@ -25,10 +25,33 @@ class SwooleRequest extends HttpRequest {
         // WB-010: intentional mirror for app code reading $_SERVER under Swoole.
         $_SERVER['REQUEST_METHOD'] = $this->method;
         $_SERVER['REQUEST_URI'] = $this->uri;
+        // Mirror the TCP peer address: Swoole keeps it in
+        // $request->server['remote_addr'] and never fills
+        // $_SERVER['REMOTE_ADDR'], so app-level localhost checks would
+        // otherwise see '' and reject every request, including local ones.
+        // This is the direct peer only; X-Forwarded-For is deliberately
+        // not used here since any client can forge it.
+        $serverMirror = [
+            'remote_addr' => 'REMOTE_ADDR',
+            'remote_port' => 'REMOTE_PORT',
+            'server_addr' => 'SERVER_ADDR',
+            'server_port' => 'SERVER_PORT',
+            'server_protocol' => 'SERVER_PROTOCOL',
+            'query_string' => 'QUERY_STRING',
+            'request_time' => 'REQUEST_TIME',
+            'request_time_float' => 'REQUEST_TIME_FLOAT',
+        ];
+        foreach ($serverMirror as $src => $dest) {
+            if (isset($request->server[$src])) {
+                $_SERVER[$dest] = $request->server[$src];
+            }
+        }
 
         foreach ($request->header as $name => $value) {
-            $ucWord = ucwords(strtolower(str_replace('_', ' ', $name)));
-            $this->headers->add(str_replace(' ', '-', $ucWord), $value);
+            // Canonical 'X-Admin-Api-Key' casing: Swoole lowercases names
+            // on the wire, so capitalise every dash-separated word.
+            $ucWord = str_replace(' ', '-', ucwords(strtolower(str_replace(['-', '_'], ' ', $name))));
+            $this->headers->add($ucWord, $value);
         }
 
         $files = $request->files ?? [];
