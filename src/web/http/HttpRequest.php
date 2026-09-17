@@ -19,6 +19,14 @@ class HttpRequest {
     protected string $uri;
     protected string $body;
     protected string $contentType;
+    protected ?string $remoteAddr = null;
+    protected ?int $remotePort = null;
+    protected ?string $serverAddr = null;
+    protected ?int $serverPort = null;
+    protected ?string $serverProtocol = null;
+    protected ?string $queryString = null;
+    protected ?int $requestTime = null;
+    protected ?float $requestTimeFloat = null;
 
     public function __construct() {
         $this->queryParams = $_GET ?? [];
@@ -29,6 +37,15 @@ class HttpRequest {
 
         $this->method = isset($_SERVER['REQUEST_METHOD']) ? strtoupper($_SERVER['REQUEST_METHOD']) : '';
         $this->uri = isset($_SERVER['REQUEST_URI']) ? strtok($_SERVER['REQUEST_URI'], '?') : '';
+
+        $this->remoteAddr = isset($_SERVER['REMOTE_ADDR']) ? (string)$_SERVER['REMOTE_ADDR'] : null;
+        $this->remotePort = isset($_SERVER['REMOTE_PORT']) ? (int)$_SERVER['REMOTE_PORT'] : null;
+        $this->serverAddr = isset($_SERVER['SERVER_ADDR']) ? (string)$_SERVER['SERVER_ADDR'] : null;
+        $this->serverPort = isset($_SERVER['SERVER_PORT']) ? (int)$_SERVER['SERVER_PORT'] : null;
+        $this->serverProtocol = isset($_SERVER['SERVER_PROTOCOL']) ? (string)$_SERVER['SERVER_PROTOCOL'] : null;
+        $this->queryString = isset($_SERVER['QUERY_STRING']) ? (string)$_SERVER['QUERY_STRING'] : null;
+        $this->requestTime = isset($_SERVER['REQUEST_TIME']) ? (int)$_SERVER['REQUEST_TIME'] : null;
+        $this->requestTimeFloat = isset($_SERVER['REQUEST_TIME_FLOAT']) ? (float)$_SERVER['REQUEST_TIME_FLOAT'] : null;
 
         $body = file_get_contents('php://input');
         $this->body = is_string($body) ? $body : '';
@@ -131,11 +148,43 @@ class HttpRequest {
         return $this->uri;
     }
 
+    public function getRemoteAddr(): ?string {
+        return $this->remoteAddr;
+    }
+
+    public function getRemotePort(): ?int {
+        return $this->remotePort;
+    }
+
+    public function getServerAddr(): ?string {
+        return $this->serverAddr;
+    }
+
+    public function getServerPort(): ?int {
+        return $this->serverPort;
+    }
+
+    public function getServerProtocol(): ?string {
+        return $this->serverProtocol;
+    }
+
+    public function getQueryString(): ?string {
+        return $this->queryString;
+    }
+
+    public function getRequestTime(): ?int {
+        return $this->requestTime;
+    }
+
+    public function getRequestTimeFloat(): ?float {
+        return $this->requestTimeFloat;
+    }
+
     public function getFiles(): array {
         return $this->files;
     }
 
-    public function getFile(string $name): ?array {
+    public function getFile(string $name): null|array|HttpUploadedFile {
         return $this->files[$name] ?? null;
     }
 }

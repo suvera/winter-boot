@@ -20,6 +20,8 @@ use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\stereotype\web\RequestMapping;
 use dev\winterframework\util\BeanFinderTrait;
 use dev\winterframework\web\HttpRequestDispatcher;
+use dev\winterframework\web\session\SessionManager;
+use SessionHandlerInterface;
 
 class WinterWebContext implements WebContext {
     use BeanFinderTrait;
@@ -39,6 +41,8 @@ class WinterWebContext implements WebContext {
         $this->initDispatcherServlet();
 
         $this->buildActuator();
+
+        $this->buildSessionDefaults();
 
         $this->configureWebMvc();
     }
@@ -102,6 +106,38 @@ class WinterWebContext implements WebContext {
 
             $this->requestMapping->put($mapping);
         }
+    }
+
+    /**
+     * Registers session defaults so no per-project SessionConfig is
+     * needed for the common case. Every bean is registered with
+     * overwrite disabled: an application bean of the same class (or, for
+     * the store, the same SessionHandlerInterface return type) silently
+     * wins, following the same pattern as the actuator above.
+     *
+     * Defaults: a stateless SessionManager and PHP's file-based
+     * SessionHandler as the store. SessionOptions is deliberately NOT
+     * a bean: each login flow constructs its own (admin and user
+     * sessions need different cookies), so there is no single
+     * configuration to share. Redis
+     * (dev\winterframework\data\redis\session\RedisSessionStore in
+     * winter-data-redis) and PDBC stores are opt-in via the
+     * application's own beans.
+     */
+    protected function buildSessionDefaults(): void {
+        $provider = $this->ctxData->getBeanProvider();
+
+        $provider->registerInternalBean(
+            new SessionManager(),
+            SessionManager::class,
+            false
+        );
+
+        $provider->registerInternalBean(
+            new \SessionHandler(),
+            SessionHandlerInterface::class,
+            false
+        );
     }
 
     protected function configureWebMvc(): void {

@@ -186,6 +186,18 @@ final class WinterPropertyContext implements PropertyContext {
             return $val;
         }
 
+        // Fall back to "$source.key" references (e.g. 'ini.adminApiKey'
+        // from #[Value('${ini.adminApiKey}')]): property sources live
+        // outside the flattened yml data, so without this such lookups
+        // silently miss and callers get null/default instead of the
+        // configured secret. Yml data still wins when both exist.
+        if (!str_starts_with($name, '$')) {
+            $resolved = $this->tryResolveReference('$' . $name);
+            if ($resolved !== null) {
+                return $resolved;
+            }
+        }
+
         if (isset($default)) {
             return $default;
         }
@@ -244,7 +256,14 @@ final class WinterPropertyContext implements PropertyContext {
     }
 
     public function has(string $name): bool {
-        return array_key_exists($name, $this->data);
+        if (array_key_exists($name, $this->data)) {
+            return true;
+        }
+        // Mirror get(): a resolvable "$source.key" reference counts.
+        if (!str_starts_with($name, '$')) {
+            return $this->tryResolveReference('$' . $name) !== null;
+        }
+        return false;
     }
 
     private function loadProperties() {
