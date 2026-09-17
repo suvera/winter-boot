@@ -46,9 +46,9 @@ use Throwable;
  */
 class PdbcSessionStore implements \SessionHandlerInterface, SessionIdentityStore {
     public function __construct(
-        private PdbcTemplate $db,
-        private string $table = 'winter_sessions',
-        private int $ttlSecs = 0
+        protected PdbcTemplate $db,
+        protected string $table = 'winter_sessions',
+        protected int $ttlSecs = 0
     ) {
         if (!preg_match('/^[a-zA-Z0-9_]+$/', $this->table)) {
             throw new InvalidArgumentException(
@@ -81,7 +81,7 @@ class PdbcSessionStore implements \SessionHandlerInterface, SessionIdentityStore
     /**
      * @return array{data: string, username: string, sessionType: int}|null
      */
-    private function fetchRow(string $id): ?array {
+    protected function fetchRow(string $id): ?array {
         try {
             $row = $this->db->queryForMap(
                 'SELECT session_data, username, expiry, session_type FROM ' . $this->table
