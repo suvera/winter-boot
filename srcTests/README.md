@@ -12,6 +12,19 @@ php srcTests/run.php
 
 Exit code is `0` when all tests pass, `1` otherwise.
 
+Tests that drive the real Swoole runtime with live PDO handles live in
+`srcTests/swoole/` and run separately, one method per process:
+
+```sh
+php srcTests/swoole/run.php
+```
+
+The split exists because some Swoole builds segfault at process shutdown
+once PDO handles have lived inside coroutines (reproducible with zero
+library code). The swoole runner reports each result before that can hide
+later tests, and labels any shutdown crash as an infra event — distinct
+from a test failure.
+
 ## Layout
 
 - `run.php` — discovers `*Test.php` in this directory and runs every public

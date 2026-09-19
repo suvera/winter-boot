@@ -40,6 +40,12 @@ class DataSourceConfig {
     #[JsonProperty("connection.idleTimeout")]
     protected int $idleTimeout = 600;
 
+    #[JsonProperty("connection.maxConnections")]
+    protected int $maxConnections = 50;
+
+    #[JsonProperty("connection.maxWaitMs")]
+    protected int $maxWaitMs = 5000;
+
     #[JsonProperty("migrations")]
     protected array $migrations = [];
 
@@ -156,6 +162,22 @@ class DataSourceConfig {
 
     public function setIdleTimeout(int $idleTimeout): void {
         $this->idleTimeout = $idleTimeout;
+    }
+
+    public function getMaxConnections(): int {
+        return $this->maxConnections;
+    }
+
+    public function setMaxConnections(int $maxConnections): void {
+        $this->maxConnections = $maxConnections;
+    }
+
+    public function getMaxWaitMs(): int {
+        return $this->maxWaitMs;
+    }
+
+    public function setMaxWaitMs(int $maxWaitMs): void {
+        $this->maxWaitMs = $maxWaitMs;
     }
 
     public function getMigrations(): array {

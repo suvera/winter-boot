@@ -45,6 +45,13 @@ class PdoConnection extends AbstractConnection {
         $this->doConnect();
     }
 
+    /**
+     * WARNING: the returned raw PDO instance is bound to this connection's
+     * coroutine scope. Do not share it across Swoole coroutines (concurrent
+     * queries on one PDO handle interleave and corrupt results); always
+     * resolve the connection for the current coroutine via
+     * PdoDataSource::getConnection() instead.
+     */
     public function getPdo(): PDO {
         $this->assertConnectionOpen();
         return $this->pdo;

@@ -39,7 +39,7 @@
     "repositories": [
     ],
     "require": {
-        "php": ">=8.4",
+        "php": ">=8.5",
         "ext-posix": "*",
         "ext-pcntl": "*",
         "symfony/yaml": "5.4.x-dev || ^5.4 || ^6.0 || ^7.0",

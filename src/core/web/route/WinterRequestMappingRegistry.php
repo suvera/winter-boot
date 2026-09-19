@@ -203,40 +203,61 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
 
         $path = preg_replace('/\/+/', '/', $path);
         $pathParts = explode('/', $path);
-        $textIndex = self::$fullTextIndex[$method];
-        $matches = [];
 
-        foreach ($pathParts as $part) {
-            if (isset($textIndex[$part])) {
-                $textIndex = $textIndex[$part];
-            } else {
-                $found = false;
-                foreach ($textIndex as $regex => $others) {
-                    $newMatches = [];
-                    if (strlen($regex) > 0
-                        && $regex[0] === '/'
-                        && preg_match($regex, $part, $newMatches)
-                    ) {
-                        $textIndex = $others;
-                        $matches = array_merge($matches, $newMatches);
-                        $found = true;
-                        break;
-                    }
-                }
-                if (!$found) {
-                    return null;
-                }
+        $matches = [];
+        $node = $this->matchParts(self::$fullTextIndex[$method], $pathParts, 0, $matches);
+        if ($node === null || !isset($node['<mapping>'])) {
+            return null;
+        }
+
+        self::$cachedPaths[$path][$method] = [
+            'obj' => $node['<mapping>'][0],
+            'regex' => $node['<mapping>'][1],
+            'matches' => $matches
+        ];
+
+        return new MatchedRequestMapping(self::$cachedPaths[$path][$method]['obj'], $matches);
+    }
+
+    /**
+     * Depth-first segment match with backtracking. The first matching
+     * placeholder branch is not always the right one: sibling
+     * placeholders with different names (e.g. admin/tenant/{id} vs
+     * admin/tenant/{tenant_id}/unit) compile to different trie keys, so
+     * a greedy descent can strand at a node with no mapping while a
+     * sibling branch would match. Literal segments keep priority; every
+     * matching placeholder branch is tried until one consumes the whole
+     * path at a node carrying a mapping.
+     *
+     * @return array|null trie node after consuming all parts, else null
+     */
+    private function matchParts(array $index, array $parts, int $pos, array &$matches): ?array {
+        if ($pos >= count($parts)) {
+            return $index;
+        }
+
+        $part = $parts[$pos];
+        if (isset($index[$part]) && is_array($index[$part])) {
+            $hit = $this->matchParts($index[$part], $parts, $pos + 1, $matches);
+            if ($hit !== null && isset($hit['<mapping>'])) {
+                return $hit;
             }
         }
 
-        if (isset($textIndex['<mapping>'])) {
-            self::$cachedPaths[$path][$method] = [
-                'obj' => $textIndex['<mapping>'][0],
-                'regex' => $textIndex['<mapping>'][1],
-                'matches' => $matches
-            ];
-
-            return new MatchedRequestMapping(self::$cachedPaths[$path][$method]['obj'], $matches);
+        foreach ($index as $regex => $others) {
+            if (!is_array($others) || strlen($regex) === 0 || $regex[0] !== '/') {
+                continue;
+            }
+            $newMatches = [];
+            if (preg_match($regex, $part, $newMatches)) {
+                $saved = $matches;
+                $matches = array_merge($matches, $newMatches);
+                $hit = $this->matchParts($others, $parts, $pos + 1, $matches);
+                if ($hit !== null && isset($hit['<mapping>'])) {
+                    return $hit;
+                }
+                $matches = $saved;
+            }
         }
 
         return null;
