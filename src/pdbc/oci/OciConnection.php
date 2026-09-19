@@ -32,6 +32,13 @@ class OciConnection extends AbstractConnection {
         $this->doConnect();
     }
 
+    /**
+     * WARNING: the returned raw OCI8 resource is bound to this connection's
+     * coroutine scope. Do not share it across Swoole coroutines (concurrent
+     * use of one resource from several coroutines interleaves and corrupts
+     * results); always resolve the connection for the current coroutine via
+     * OciDataSource::getConnection() instead.
+     */
     public function getResource(): mixed {
         $this->assertConnectionOpen();
         return $this->oci;

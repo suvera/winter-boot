@@ -93,6 +93,23 @@ class DataSourceBuilder {
                 throw new WinterException('Invalid Syntax in DataSource configuration ', 0, $e);
             }
 
+            if (!array_key_exists('connection.maxConnections', $dataSource)) {
+                $ds->setMaxConnections(
+                    $this->ctx->getPropertyInt(
+                        'winter.coroutine.db.maxConnections',
+                        $ds->getMaxConnections()
+                    )
+                );
+            }
+            if (!array_key_exists('connection.maxWaitMs', $dataSource)) {
+                $ds->setMaxWaitMs(
+                    $this->ctx->getPropertyInt(
+                        'winter.coroutine.db.maxWaitMs',
+                        $ds->getMaxWaitMs()
+                    )
+                );
+            }
+
             if ($primary && $ds->isPrimary()) {
                 throw new WinterException('Two DataSources cannot have "isPrimary" set to "true"');
             }
