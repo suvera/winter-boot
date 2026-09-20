@@ -1,6 +1,6 @@
 # Winter Boot - Unleash the Power of PHP 8.5+ Microservices!
 
-> **Documentation: https://suvera.mintlify.site/** — full guides, references, and module docs live there.
+> **Documentation: https://suvera.github.io/winter-boot/** — full guides, references, and module docs live there.
 
 Inspired by the elegance of Spring Boot, Winter Boot empowers you to build robust and scalable **microservices** in PHP 8.5 with unparalleled ease and familiarity. If you're a Spring Boot enthusiast looking to dive into the world of PHP, Winter Boot is your perfect gateway!
 
@@ -117,7 +117,7 @@ You're Done! Get ready to code!
 
 # 3. Build & Deploy Your Winter Boot Applications
 
-Winter Boot provides robust support for building and deploying your services, Explore our comprehensive guide on **[Building Services](https://suvera.mintlify.site/advanced/build-deploy)** to learn how to:
+Winter Boot provides robust support for building and deploying your services, Explore our comprehensive guide on **[Building Services](https://suvera.github.io/winter-boot/advanced/build-deploy)** to learn how to:
 
 -   Generate optimized Phar files for easy distribution.
 -   Effortlessly build Docker Images for containerized deployments. See a practical example in the [example-service](https://github.com/suvera/winter-example-service) repository:
@@ -125,113 +125,113 @@ Winter Boot provides robust support for building and deploying your services, Ex
 
 # 4. In-Depth Documentation
 
-Full documentation lives at **https://suvera.mintlify.site/** — same content and structure as below.
+Full documentation lives at **https://suvera.github.io/winter-boot/** — same content and structure as below.
 
 ## Framework
 
 ### Getting Started
 
--   [**Introduction**](https://suvera.mintlify.site/introduction)
--   [**Quickstart**](https://suvera.mintlify.site/quickstart)
--   [**Configuration**](https://suvera.mintlify.site/configuration)
+-   [**Introduction**](https://suvera.github.io/winter-boot/introduction)
+-   [**Quickstart**](https://suvera.github.io/winter-boot/quickstart)
+-   [**Configuration**](https://suvera.github.io/winter-boot/configuration)
 
 ### Core Concepts
 
--   [**Dependency Injection**](https://suvera.mintlify.site/core/dependency-injection)
--   [**AOP**](https://suvera.mintlify.site/core/aop)
--   [**App Lifecycle**](https://suvera.mintlify.site/core/application-lifecycle)
--   [**Module System**](https://suvera.mintlify.site/core/module-system)
+-   [**Dependency Injection**](https://suvera.github.io/winter-boot/core/dependency-injection)
+-   [**AOP**](https://suvera.github.io/winter-boot/core/aop)
+-   [**App Lifecycle**](https://suvera.github.io/winter-boot/core/application-lifecycle)
+-   [**Module System**](https://suvera.github.io/winter-boot/core/module-system)
 
 ### Web & REST
 
--   [**REST Controllers**](https://suvera.mintlify.site/web/rest-controllers)
--   [**Request Mapping**](https://suvera.mintlify.site/web/request-mapping)
--   [**Interceptors**](https://suvera.mintlify.site/web/interceptors)
+-   [**REST Controllers**](https://suvera.github.io/winter-boot/web/rest-controllers)
+-   [**Request Mapping**](https://suvera.github.io/winter-boot/web/request-mapping)
+-   [**Interceptors**](https://suvera.github.io/winter-boot/web/interceptors)
 
 ### Data
 
--   [**Database**](https://suvera.mintlify.site/data/database)
--   [**Transactions**](https://suvera.mintlify.site/data/transactions)
--   [**Migrations**](https://suvera.mintlify.site/data/migrations)
--   [**OpenSearch Migrations**](https://suvera.mintlify.site/data/opensearch-migrations)
+-   [**Database**](https://suvera.github.io/winter-boot/data/database)
+-   [**Transactions**](https://suvera.github.io/winter-boot/data/transactions)
+-   [**Migrations**](https://suvera.github.io/winter-boot/data/migrations)
+-   [**OpenSearch Migrations**](https://suvera.github.io/winter-boot/data/opensearch-migrations)
 
 ### Async & Concurrency
 
--   [**Async Tasks**](https://suvera.mintlify.site/async/async-tasks)
--   [**Scheduling**](https://suvera.mintlify.site/async/scheduling)
--   [**Daemon Threads**](https://suvera.mintlify.site/async/daemon-threads)
--   [**Locking**](https://suvera.mintlify.site/ops/locking)
+-   [**Async Tasks**](https://suvera.github.io/winter-boot/async/async-tasks)
+-   [**Scheduling**](https://suvera.github.io/winter-boot/async/scheduling)
+-   [**Daemon Threads**](https://suvera.github.io/winter-boot/async/daemon-threads)
+-   [**Locking**](https://suvera.github.io/winter-boot/ops/locking)
 
 ### Operations
 
--   [**Caching**](https://suvera.mintlify.site/ops/caching)
--   [**Logging**](https://suvera.mintlify.site/ops/logging)
--   [**Actuator**](https://suvera.mintlify.site/ops/actuator)
--   [**Telemetry**](https://suvera.mintlify.site/ops/telemetry)
+-   [**Caching**](https://suvera.github.io/winter-boot/ops/caching)
+-   [**Logging**](https://suvera.github.io/winter-boot/ops/logging)
+-   [**Actuator**](https://suvera.github.io/winter-boot/ops/actuator)
+-   [**Telemetry**](https://suvera.github.io/winter-boot/ops/telemetry)
 
 ### Building Applications
 
--   [**CLI Commands**](https://suvera.mintlify.site/building/cli-commands)
--   [**Testing**](https://suvera.mintlify.site/building/testing)
--   [**JSON & XML**](https://suvera.mintlify.site/advanced/json-xml)
--   [**Local Stores**](https://suvera.mintlify.site/advanced/local-stores)
--   [**Utilities**](https://suvera.mintlify.site/building/utilities)
--   [**Build & Deploy**](https://suvera.mintlify.site/advanced/build-deploy)
+-   [**CLI Commands**](https://suvera.github.io/winter-boot/building/cli-commands)
+-   [**Testing**](https://suvera.github.io/winter-boot/building/testing)
+-   [**JSON & XML**](https://suvera.github.io/winter-boot/advanced/json-xml)
+-   [**Local Stores**](https://suvera.github.io/winter-boot/advanced/local-stores)
+-   [**Utilities**](https://suvera.github.io/winter-boot/building/utilities)
+-   [**Build & Deploy**](https://suvera.github.io/winter-boot/advanced/build-deploy)
 
 ## Libraries
 
 ### Overview
 
--   [**Overview**](https://suvera.mintlify.site/modules/overview)
+-   [**Overview**](https://suvera.github.io/winter-boot/modules/overview)
 
 ### Data
 
--   [**Doctrine**](https://suvera.mintlify.site/modules/doctrine)
--   [**Redis**](https://suvera.mintlify.site/modules/data-redis)
--   [**Memcache**](https://suvera.mintlify.site/modules/data-memcache)
+-   [**Doctrine**](https://suvera.github.io/winter-boot/modules/doctrine)
+-   [**Redis**](https://suvera.github.io/winter-boot/modules/data-redis)
+-   [**Memcache**](https://suvera.github.io/winter-boot/modules/data-memcache)
 
 ### Messaging
 
--   [**Kafka**](https://suvera.mintlify.site/modules/kafka)
--   [**SQS**](https://suvera.mintlify.site/modules/sqs)
+-   [**Kafka**](https://suvera.github.io/winter-boot/modules/kafka)
+-   [**SQS**](https://suvera.github.io/winter-boot/modules/sqs)
 
 ### Storage & Search
 
--   [**S3**](https://suvera.mintlify.site/modules/s3)
--   [**OpenSearch**](https://suvera.mintlify.site/modules/opensearch)
+-   [**S3**](https://suvera.github.io/winter-boot/modules/s3)
+-   [**OpenSearch**](https://suvera.github.io/winter-boot/modules/opensearch)
 
 ### Distributed Systems
 
--   [**Eureka**](https://suvera.mintlify.site/modules/eureka)
--   [**DTCE**](https://suvera.mintlify.site/modules/dtce)
+-   [**Eureka**](https://suvera.github.io/winter-boot/modules/eureka)
+-   [**DTCE**](https://suvera.github.io/winter-boot/modules/dtce)
 
 ### Planned
 
--   [**Security**](https://suvera.mintlify.site/modules/security)
+-   [**Security**](https://suvera.github.io/winter-boot/modules/security)
 
 ### Embedded In-Memory Servers
 
--   [**Memdb - *EXPERIMENTAL* **](https://suvera.mintlify.site/modules/memdb)
+-   [**Memdb - *EXPERIMENTAL* **](https://suvera.github.io/winter-boot/modules/memdb)
 
 ## Examples
 
 Examples built with Winter Boot and Winter Modules
 
-- [Examples](https://suvera.mintlify.site/examples/overview)
-    - [Redis Example](https://suvera.mintlify.site/examples/redis-app)
-    - [Doctrine Example](https://suvera.mintlify.site/examples/doctrine-app)
-    - [SQS Consumer Example](https://suvera.mintlify.site/examples/sqs-consumer)
-    - [Kafka Consumer Example](https://suvera.mintlify.site/examples/kafka-app)
-    - [S3 Example](https://suvera.mintlify.site/examples/s3-app)
-    - [Opensearch Example](https://suvera.mintlify.site/examples/opensearch-app)
-    - [Daemon Threads Example](https://suvera.mintlify.site/examples/daemon-app)
-    - [Scheduler Example](https://suvera.mintlify.site/examples/scheduler-app)
-    - [DTCE Example](https://suvera.mintlify.site/examples/dtce-app)
+- [Examples](https://suvera.github.io/winter-boot/examples/overview)
+    - [Redis Example](https://suvera.github.io/winter-boot/examples/redis-app)
+    - [Doctrine Example](https://suvera.github.io/winter-boot/examples/doctrine-app)
+    - [SQS Consumer Example](https://suvera.github.io/winter-boot/examples/sqs-consumer)
+    - [Kafka Consumer Example](https://suvera.github.io/winter-boot/examples/kafka-app)
+    - [S3 Example](https://suvera.github.io/winter-boot/examples/s3-app)
+    - [Opensearch Example](https://suvera.github.io/winter-boot/examples/opensearch-app)
+    - [Daemon Threads Example](https://suvera.github.io/winter-boot/examples/daemon-app)
+    - [Scheduler Example](https://suvera.github.io/winter-boot/examples/scheduler-app)
+    - [DTCE Example](https://suvera.github.io/winter-boot/examples/dtce-app)
 
 ## Reference
 
--   [**Attributes**](https://suvera.mintlify.site/reference/attributes)
--   [**application.yml**](https://suvera.mintlify.site/reference/application-yml)
+-   [**Attributes**](https://suvera.github.io/winter-boot/reference/attributes)
+-   [**application.yml**](https://suvera.github.io/winter-boot/reference/application-yml)
 
 # 5. Extend Your Horizons with Module Extensions
 
