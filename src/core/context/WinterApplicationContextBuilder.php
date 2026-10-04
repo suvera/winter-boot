@@ -41,6 +41,7 @@ use dev\winterframework\stereotype\WinterBootApplication;
 use dev\winterframework\txn\PlatformTransactionManager;
 use dev\winterframework\util\concurrent\DefaultLockManager;
 use dev\winterframework\util\concurrent\LockManager;
+use dev\winterframework\web\client\RestTemplate;
 use dev\winterframework\exception\WinterException;
 use dev\winterframework\exception\ClassNotFoundException;
 use dev\winterframework\type\TypeAssert;
@@ -289,6 +290,24 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         $this->beanProvider->registerInternalBean(
             new DefaultLockManager(),
             LockManager::class,
+            false
+        );
+
+        // Spring-style HTTP client, autowirable everywhere. overwrite=false so
+        // an application-defined RestTemplate @Bean always wins over this one
+        // (internals are registered after user beans, see buildContext()).
+        $this->beanProvider->registerInternalBean(
+            new RestTemplate(
+                timeout: $this->propertyContext->getFloat(
+                    'winter.rest.timeout',
+                    RestTemplate::DEFAULT_TIMEOUT
+                ),
+                connectTimeout: $this->propertyContext->getFloat(
+                    'winter.rest.connect-timeout',
+                    RestTemplate::DEFAULT_CONNECT_TIMEOUT
+                ),
+            ),
+            RestTemplate::class,
             false
         );
 
