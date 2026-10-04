@@ -1,11 +1,15 @@
 /*
  * winter_boot extension — native capabilities for PHP.
  *
- * First capability: deferred() registers callable callbacks against the
- * owning PHP function's execution scope via the Zend Observer API and runs
- * them LIFO when that scope exits (normal return, early return, or
- * exception unwinding). The extension is structured so further native
- * capabilities can be added alongside it.
+ * Capabilities: deferred()/defered() registers callable callbacks against
+ * the owning PHP function's execution scope via the Zend Observer API and
+ * runs them LIFO when that scope exits (normal return, early return, or
+ * exception unwinding); native AOP method interception via
+ * winter_boot_advise()/winter_boot_is_advised(); `#{...}` template-code
+ * evaluation via winter_boot_exec_inline() (with a compilation cache); and
+ * single-call template substitution via winter_boot_expand_template().
+ * The extension is structured so further native capabilities can be added
+ * alongside these.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -448,6 +452,11 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_winter_boot_exec_inline, 0, 0, 2)
 	ZEND_ARG_TYPE_INFO(0, vars, IS_ARRAY, 0)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_winter_boot_expand_template, 0, 0, 2)
+	ZEND_ARG_TYPE_INFO(0, template, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, pairs, IS_ARRAY, 0)
+ZEND_END_ARG_INFO()
+
 /* Register an advised method. Rejects anything the interception cannot serve
  * soundly (mirroring the proxy generator's rejections, except final and
  * private/protected methods, which native interception newly supports). */
@@ -557,6 +566,198 @@ static bool wb_is_valid_var_name(zend_string *name)
 	return true;
 }
 
+/* Compilation cache for inline code.
+ *
+ * Cache keys (code, caller scope, compile-time namespace) exist because all
+ * three shape the compiled op_array: the scope is installed on the op_array
+ * for private-member access, and unqualified names (notably `::class`)
+ * resolve against the compile-time namespace. A stored scope pointer is
+ * never trusted blindly: on a hit it must still be the live class-table
+ * entry for its name, otherwise the entry is treated as stale and replaced.
+ * Entries whose op_array owns static vars are never cached — that storage
+ * lives on the op_array, so sharing it would leak state across calls
+ * (today every call compiles fresh). The list is bounded and fails open:
+ * once full, new code simply compiles every time. The cache lives in
+ * module globals, so ZTS threads each keep their own and no locking is
+ * needed; entries are freed at request shutdown. */
+typedef struct _wb_code_entry {
+	zend_string *code;
+	zend_string *scope_name; /* owned copy of scope->name, or NULL */
+	zend_class_entry *scope; /* scope at insert; verified live on hit */
+	zend_string *ns_name; /* owned copy of the compile-time namespace, or NULL */
+	zend_op_array *op_array;
+	struct _wb_code_entry *next;
+} wb_code_entry;
+
+#define WB_CODE_CACHE_MAX 256
+
+static wb_code_entry *wb_code_cache(void)
+{
+	return (wb_code_entry *) WB_G(code_cache);
+}
+
+static void wb_code_cache_set(wb_code_entry *head)
+{
+	WB_G(code_cache) = (void *) head;
+}
+
+/* True when `ce` is still the live class-table entry for `name`. The
+ * stored pointer itself is only compared, never dereferenced, until this
+ * check passes. */
+static bool wb_scope_is_live(zend_class_entry *ce, zend_string *name)
+{
+	zend_string *lower;
+	zend_class_entry *live;
+	bool ok;
+	if (ce == NULL || name == NULL) {
+		return ce == NULL && name == NULL;
+	}
+	lower = zend_string_tolower(name);
+	live = (zend_class_entry *) zend_hash_find_ptr(CG(class_table), lower);
+	zend_string_release(lower);
+	ok = (live == ce);
+	if (ok) {
+		ok = (ce->name != NULL && zend_string_equals(ce->name, name));
+	}
+	return ok;
+}
+
+static bool wb_ns_matches(zend_string *a, zend_string *b)
+{
+	if (a == NULL || b == NULL) {
+		return a == b;
+	}
+	return zend_string_equals(a, b) != 0;
+}
+
+static void wb_code_entry_free(wb_code_entry *e)
+{
+	if (e->code != NULL) {
+		zend_string_release(e->code);
+	}
+	if (e->scope_name != NULL) {
+		zend_string_release(e->scope_name);
+	}
+	if (e->ns_name != NULL) {
+		zend_string_release(e->ns_name);
+	}
+	if (e->op_array != NULL) {
+		destroy_op_array(e->op_array);
+		efree_size(e->op_array, sizeof(zend_op_array));
+	}
+	efree(e);
+}
+
+static void wb_code_cache_free_all(void)
+{
+	wb_code_entry *e = wb_code_cache();
+	wb_code_cache_set(NULL);
+	while (e != NULL) {
+		wb_code_entry *next = e->next;
+		wb_code_entry_free(e);
+		e = next;
+	}
+}
+
+static wb_code_entry *wb_code_cache_find(
+	const char *code, size_t code_len,
+	zend_class_entry *scope, zend_string *scope_name, zend_string *ns)
+{
+	wb_code_entry *e = wb_code_cache();
+	while (e != NULL) {
+		if (ZSTR_LEN(e->code) == code_len
+			&& memcmp(ZSTR_VAL(e->code), code, code_len) == 0
+			&& wb_ns_matches(e->ns_name, ns)
+			&& ((e->scope == NULL && scope == NULL)
+				|| (e->scope != NULL && scope != NULL
+					&& zend_string_equals(e->scope_name, scope_name)))) {
+			if (wb_scope_is_live(e->scope, e->scope_name)) {
+				return e;
+			}
+			return NULL;
+		}
+		e = e->next;
+	}
+	return NULL;
+}
+
+/* Store a freshly compiled op_array. A stale entry for the same key (scope
+ * pointer recycled after a class redefinition) is replaced; when the list
+ * is full the op_array is left for the caller to execute-and-discard. */
+static void wb_code_cache_store(
+	const char *code, size_t code_len,
+	zend_class_entry *scope, zend_string *scope_name, zend_string *ns,
+	zend_op_array *op_array)
+{
+	wb_code_entry *head = wb_code_cache();
+	wb_code_entry *e = head;
+	wb_code_entry **link = &head;
+	size_t count = 0;
+	while (e != NULL) {
+		count++;
+		if (ZSTR_LEN(e->code) == code_len
+			&& memcmp(ZSTR_VAL(e->code), code, code_len) == 0
+			&& wb_ns_matches(e->ns_name, ns)
+			&& ((e->scope_name == NULL && scope_name == NULL)
+				|| (e->scope_name != NULL && scope_name != NULL
+					&& zend_string_equals(e->scope_name, scope_name)))) {
+			*link = e->next;
+			wb_code_entry_free(e);
+			count--;
+			break;
+		}
+		link = &e->next;
+		e = e->next;
+	}
+	if (count >= WB_CODE_CACHE_MAX) {
+		wb_code_cache_set(head);
+		return;
+	}
+	e = (wb_code_entry *) emalloc(sizeof(wb_code_entry));
+	e->code = zend_string_init(code, code_len, 0);
+	e->scope_name = (scope_name != NULL) ? zend_string_copy(scope_name) : NULL;
+	e->scope = scope;
+	e->ns_name = (ns != NULL) ? zend_string_copy(ns) : NULL;
+	e->op_array = op_array;
+	e->next = head;
+	wb_code_cache_set(e);
+}
+
+/* Compile inline code exactly as before (caller shapes `CG(compiler_options)`
+ * handling is the caller's job). Returns NULL with the engine exception set
+ * on failure, mirroring eval(). */
+static zend_op_array *wb_compile_inline(const char *code, size_t code_len)
+{
+	uint32_t original_compiler_options = CG(compiler_options);
+	zend_string *code_str = zend_string_init(code, code_len, 0);
+	zend_op_array *op_array;
+	CG(compiler_options) = ZEND_COMPILE_DEFAULT_FOR_EVAL;
+	op_array = zend_compile_string(code_str, "AOP inline code",
+		ZEND_COMPILE_POSITION_AFTER_OPEN_TAG);
+	CG(compiler_options) = original_compiler_options;
+	zend_string_release(code_str);
+	return op_array;
+}
+
+/* Execute a compiled inline op_array under the caller's scope. Shared by the
+ * cached and freshly-compiled paths; the op_array is never consumed here. */
+static void wb_execute_inline_op(zend_op_array *op_array, zval *retval)
+{
+	zval local_retval;
+	EG(no_extensions) = 1;
+	zend_try {
+		ZVAL_UNDEF(&local_retval);
+		zend_execute(op_array, &local_retval);
+	} zend_catch {
+		EG(no_extensions) = 0;
+		zend_bailout();
+	} zend_end_try();
+	if (!Z_ISUNDEF(local_retval)) {
+		ZVAL_COPY_VALUE(retval, &local_retval);
+	}
+	EG(no_extensions) = 0;
+}
+
 /* Evaluate AOP `#{...}` inline code with the given variables bound.
  *
  * Native counterpart of the former eval()-based template expansion, so no
@@ -565,8 +766,9 @@ static bool wb_is_valid_var_name(zend_string *name)
  * where the old `$$name` injection put them, and the table the executed
  * code frame shares. Integer keys and invalid names are ignored; the two
  * reserved names that shadowed the old wrapper's own locals are skipped.
- * Compile/runtime failures propagate to the caller unchanged (the framework
- * wraps them, as before).
+ * Compilations are cached (see above), so repeated template evaluations
+ * skip recompilation with identical results. Compile/runtime failures
+ * propagate to the caller unchanged (the framework wraps them, as before).
  */
 PHP_FUNCTION(winter_boot_exec_inline)
 {
@@ -617,36 +819,33 @@ PHP_FUNCTION(winter_boot_exec_inline)
 
 	/* Same shape as eval(): compile the code as-is (it carries its own
 	 * top-level return) and execute it. zend_eval_stringl() would wrap it
-	 * in a second return and fail to compile. */
+	 * in a second return and fail to compile. Repeat compilations come
+	 * from the cache above; anything uncacheable executes exactly as
+	 * before (fresh op_array, destroyed after use). */
 	ZVAL_UNDEF(&retval);
 	{
-		uint32_t original_compiler_options = CG(compiler_options);
-		zend_string *code_str = zend_string_init(code, code_len, 0);
-		zend_op_array *op_array;
-		CG(compiler_options) = ZEND_COMPILE_DEFAULT_FOR_EVAL;
-		op_array = zend_compile_string(code_str, "AOP inline code",
-			ZEND_COMPILE_POSITION_AFTER_OPEN_TAG);
-		CG(compiler_options) = original_compiler_options;
-		zend_string_release(code_str);
-		if (op_array != NULL) {
-			zval local_retval;
-			EG(no_extensions) = 1;
-			op_array->scope = caller->func->common.scope;
-			zend_try {
-				ZVAL_UNDEF(&local_retval);
-				zend_execute(op_array, &local_retval);
-			} zend_catch {
-				destroy_op_array(op_array);
-				efree_size(op_array, sizeof(zend_op_array));
-				zend_bailout();
-			} zend_end_try();
-			if (!Z_ISUNDEF(local_retval)) {
-				ZVAL_COPY_VALUE(&retval, &local_retval);
+		zend_class_entry *caller_scope = caller->func->common.scope;
+		zend_string *caller_ns = CG(file_context).current_namespace;
+		wb_code_entry *hit = wb_code_cache_find(
+			code, code_len, caller_scope,
+			(caller_scope != NULL) ? caller_scope->name : NULL, caller_ns);
+		if (hit != NULL) {
+			wb_execute_inline_op(hit->op_array, &retval);
+		} else {
+			zend_op_array *op_array = wb_compile_inline(code, code_len);
+			if (op_array != NULL) {
+				op_array->scope = caller_scope;
+				wb_execute_inline_op(op_array, &retval);
+				if (op_array->static_variables == NULL) {
+					wb_code_cache_store(code, code_len, caller_scope,
+						(caller_scope != NULL) ? caller_scope->name : NULL,
+						caller_ns, op_array);
+				} else {
+					zend_destroy_static_vars(op_array);
+					destroy_op_array(op_array);
+					efree_size(op_array, sizeof(zend_op_array));
+				}
 			}
-			EG(no_extensions) = 0;
-			zend_destroy_static_vars(op_array);
-			destroy_op_array(op_array);
-			efree_size(op_array, sizeof(zend_op_array));
 		}
 	}
 	if (!Z_ISUNDEF(retval)) {
@@ -654,6 +853,175 @@ PHP_FUNCTION(winter_boot_exec_inline)
 	} else if (EG(exception) == NULL) {
 		ZVAL_NULL(return_value);
 	}
+}
+
+/* Single-literal replace-all used by winter_boot_expand_template().
+ * Advances past inserted text (no rescan), mirroring one str_replace()
+ * pass for a single search element. */
+static zend_string *wb_replace_all(
+	zend_string *subject, zend_string *search, zend_string *replace)
+{
+	const char *s = ZSTR_VAL(subject);
+	size_t s_len = ZSTR_LEN(subject);
+	const char *p = ZSTR_VAL(search);
+	size_t p_len = ZSTR_LEN(search);
+	const char *r = ZSTR_VAL(replace);
+	size_t r_len = ZSTR_LEN(replace);
+	size_t count = 0;
+	size_t off = 0;
+	zend_string *out;
+	char *dst;
+	if (p_len == 0 || p_len > s_len) {
+		return zend_string_copy(subject);
+	}
+	while (off + p_len <= s_len) {
+		const char *at = (const char *) memchr(s + off, p[0], s_len - off - p_len + 1);
+		if (at == NULL) {
+			break;
+		}
+		if (p_len == 1 || memcmp(at, p, p_len) == 0) {
+			count++;
+			off = (size_t) (at - s) + p_len;
+		} else {
+			off = (size_t) (at - s) + 1;
+		}
+	}
+	if (count == 0) {
+		return zend_string_copy(subject);
+	}
+	{
+		size_t new_len;
+		if (r_len >= p_len) {
+			new_len = s_len + count * (r_len - p_len);
+		} else {
+			new_len = s_len - count * (p_len - r_len);
+		}
+		out = zend_string_alloc(new_len, 0);
+	}
+	dst = ZSTR_VAL(out);
+	off = 0;
+	while (off < s_len) {
+		const char *at = NULL;
+		if (off + p_len <= s_len) {
+			const char *cand = (const char *) memchr(s + off, p[0], s_len - off - p_len + 1);
+			if (cand != NULL && (p_len == 1 || memcmp(cand, p, p_len) == 0)) {
+				at = cand;
+			} else if (cand != NULL) {
+				/* First-char hit that is not a full match: copy through
+				 * the false start and keep scanning from there. */
+				size_t keep = (size_t) (cand - (s + off)) + 1;
+				memcpy(dst, s + off, keep);
+				dst += keep;
+				off += keep;
+				continue;
+			}
+		}
+		if (at == NULL) {
+			memcpy(dst, s + off, s_len - off);
+			dst += s_len - off;
+			break;
+		}
+		{
+			size_t keep = (size_t) (at - (s + off));
+			memcpy(dst, s + off, keep);
+			dst += keep;
+			memcpy(dst, r, r_len);
+			dst += r_len;
+			off += keep + p_len;
+		}
+	}
+	*dst = '\0';
+	return out;
+}
+
+/* Expand `#{...}` / `${...}` template placeholders in one call.
+ *
+ * Native counterpart of the str_replace($search, $replace, $template) tail
+ * of the framework's template expansion: pairs map literal placeholder
+ * text to its already-evaluated value. Substitution is sequential in pair
+ * order with all occurrences replaced per pair and no rescan of inserted
+ * text within a pair — exactly one str_replace() pass per element, so a
+ * replacement that itself contains a later placeholder re-expands, as
+ * before. Values coerce via zval_get_string (the same conversion
+ * str_replace() applies: scalars, null, objects with __toString; Error on
+ * unconvertible objects) and are all converted upfront in order, so a bad
+ * value throws before any substitution, as before. Integer keys stringify
+ * like str_replace() search elements. */
+PHP_FUNCTION(winter_boot_expand_template)
+{
+	char *tpl;
+	size_t tpl_len;
+	HashTable *pairs;
+	zend_string *result;
+	zend_string *key;
+	zval *val;
+	zend_ulong idx;
+	uint32_t n;
+
+	ZEND_PARSE_PARAMETERS_START(2, 2)
+		Z_PARAM_STRING(tpl, tpl_len)
+		Z_PARAM_ARRAY_HT(pairs)
+	ZEND_PARSE_PARAMETERS_END();
+
+	n = zend_hash_num_elements(pairs);
+	if (tpl_len == 0 || n == 0) {
+		RETURN_STRINGL(tpl, tpl_len);
+	}
+
+	result = zend_string_init(tpl, tpl_len, 0);
+	{
+		zend_string **searches = (zend_string **) safe_emalloc(n, sizeof(zend_string *), 0);
+		zend_string **replaces = (zend_string **) safe_emalloc(n, sizeof(zend_string *), 0);
+		uint32_t i = 0;
+		bool failed = false;
+		ZEND_HASH_FOREACH_KEY_VAL(pairs, idx, key, val) {
+			zval *v = val;
+			if (Z_TYPE_P(v) == IS_REFERENCE) {
+				v = Z_REFVAL_P(v);
+			}
+			if (key != NULL) {
+				searches[i] = zend_string_copy(key);
+			} else {
+				char buf[32];
+				int blen = snprintf(buf, sizeof(buf), ZEND_LONG_FMT, (zend_long) idx);
+				searches[i] = zend_string_init(buf, (size_t) blen, 0);
+			}
+			replaces[i] = zval_get_string(v);
+			if (EG(exception) != NULL || replaces[i] == NULL) {
+				if (replaces[i] != NULL) {
+					zend_string_release(replaces[i]);
+				}
+				zend_string_release(searches[i]);
+				failed = true;
+				break;
+			}
+			i++;
+		} ZEND_HASH_FOREACH_END();
+		if (failed) {
+			while (i > 0) {
+				i--;
+				zend_string_release(searches[i]);
+				zend_string_release(replaces[i]);
+			}
+			efree(searches);
+			efree(replaces);
+			zend_string_release(result);
+			RETURN_THROWS();
+		}
+		{
+			uint32_t k;
+			for (k = 0; k < n; k++) {
+				zend_string *next = wb_replace_all(result, searches[k], replaces[k]);
+				zend_string_release(result);
+				zend_string_release(searches[k]);
+				zend_string_release(replaces[k]);
+				result = next;
+			}
+		}
+		efree(searches);
+		efree(replaces);
+	}
+	RETURN_STR(result);
 }
 
 /* Strict return-type verification for values the extension delivers on the
@@ -1125,6 +1493,7 @@ static PHP_GINIT_FUNCTION(winter_boot)
 #endif
 	winter_boot_globals->frames = NULL;
 	winter_boot_globals->advice_map = NULL;
+	winter_boot_globals->code_cache = NULL;
 }
 
 static PHP_MINIT_FUNCTION(winter_boot)
@@ -1145,6 +1514,7 @@ static PHP_RINIT_FUNCTION(winter_boot)
 {
 	wb_frames_set(NULL);
 	wb_advice_map_set(NULL);
+	wb_code_cache_set(NULL);
 	return SUCCESS;
 }
 
@@ -1157,6 +1527,9 @@ static PHP_RSHUTDOWN_FUNCTION(winter_boot)
 	/* Advice entries hold no owned engine references, so freeing the map
 	 * is safe at any shutdown point. */
 	wb_advice_map_free();
+	/* Cached op_arrays own no request state (variables bind per call), so
+	 * freeing them here is safe; entries simply recompile next request. */
+	wb_code_cache_free_all();
 	return SUCCESS;
 }
 
@@ -1168,6 +1541,8 @@ static PHP_MINFO_FUNCTION(winter_boot)
 	php_info_print_table_row(2, "deferred() semantics", "LIFO on owning-function exit; runs on return and exception unwind");
 	php_info_print_table_row(2, "defered()", "alias of deferred()");
 	php_info_print_table_row(2, "native AOP", "zend_execute_ex interception; register via winter_boot_advise()");
+	php_info_print_table_row(2, "inline code", "winter_boot_exec_inline() with compilation cache");
+	php_info_print_table_row(2, "template expansion", "winter_boot_expand_template() sequential substitution");
 	php_info_print_table_end();
 }
 
@@ -1177,6 +1552,7 @@ static const zend_function_entry winter_boot_functions[] = {
 	PHP_FE(winter_boot_advise, arginfo_winter_boot_advise)
 	PHP_FE(winter_boot_is_advised, arginfo_winter_boot_is_advised)
 	PHP_FE(winter_boot_exec_inline, arginfo_winter_boot_exec_inline)
+	PHP_FE(winter_boot_expand_template, arginfo_winter_boot_expand_template)
 	PHP_FE_END
 };
 

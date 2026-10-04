@@ -6,7 +6,9 @@ core patches, no custom PHP build, no external dependencies.
 First capability: `deferred()` — Go-like deferred callbacks. Second
 capability: native AOP method interception (`winter_boot_advise()`), which
 the framework drives. Third capability: `#{...}` template evaluation
-(`winter_boot_exec_inline()`), so no `eval()` remains in PHP code — further
+(`winter_boot_exec_inline()`, with a compilation cache), so no `eval()`
+remains in PHP code. Fourth capability: single-call template substitution
+(`winter_boot_expand_template()`) for cache/lock key building — further
 native capabilities will be added alongside.
 
 ## API
@@ -134,6 +136,31 @@ ignored. Requires a userland caller scope, otherwise it throws `Error`.
 Compile/runtime failures propagate unchanged; the framework wraps them in
 `AopException` exactly like the old path.
 
+Repeated evaluations skip recompilation through a small compilation cache
+keyed by code, caller scope, and compile-time namespace (all three shape the
+compiled op_array: the scope grants private-member access, and unqualified
+names resolve against the namespace). Stored scopes are verified live against
+the class table on every hit; code owning static vars is never cached, so no
+state leaks across calls; the list is bounded (256 entries) and fails open to
+compiling every time. Results are identical to compiling fresh — see
+`tests/023-exec-inline-cache.phpt`.
+
+## Single-call template substitution (fourth capability)
+
+```php
+winter_boot_expand_template(string $template, array $pairs): string
+```
+
+Replaces each literal placeholder key with its already-evaluated value in
+pair order — one native call for the whole key instead of one
+`str_replace()` pass per placeholder from PHP. Semantics match
+`str_replace($search, $replace, $template)` exactly: all occurrences per
+pair, no rescan of inserted text within a pair (so a value containing a later
+placeholder re-expands, as before), values coerced with the same conversion
+`str_replace()` applies, converted upfront so a bad value throws before any
+substitution. See `tests/022-expand-template.phpt`, which diffs every case
+against the `str_replace()` oracle.
+
 ## Compatibility
 
 - PHP **8.5+** (uses the PHP 8.5 Zend Observer init-handler API).
@@ -209,6 +236,13 @@ Performance is intentionally **on par, not faster**: the value of the native
 implementation is guaranteed cleanup (exception unwinding, exactly-once,
 fail-closed scopes) with zero boilerplate — not speed. Correctness and
 predictable cleanup semantics take priority over performance.
+
+`benchmark/bench_expand.php` covers the template path: repeated
+`winter_boot_exec_inline()` of one method-call-shaped code string runs ~7x
+faster cached (~0.08 vs ~0.58 us/call — the compile disappears), while
+`winter_boot_expand_template()` is at parity with `str_replace()` by design
+(both are single C passes; the win is one call and one audited substitution
+path, not speed).
 
 ## Files
 

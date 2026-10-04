@@ -146,6 +146,22 @@ final class InlineExpressionTest extends TestCase {
         );
     }
 
+    public function testSequentialReexpansion(): void {
+        if (!extension_loaded('winter_boot')) {
+            $this->assertTrue(true);
+            return;
+        }
+        // An evaluated value containing a later placeholder re-expands,
+        // matching the former back-to-back str_replace() semantics.
+        $out = InlineHarness::name(
+            new ComponentName('#{name}-#{n}'),
+            $this->contextFor('pick'),
+            new stdClass(),
+            ['#{n}', 5]
+        );
+        $this->assertSame('5-5', $out);
+    }
+
     public function testMissingVarYieldsEmpty(): void {
         if (!extension_loaded('winter_boot')) {
             $this->assertTrue(true);

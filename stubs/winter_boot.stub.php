@@ -59,11 +59,23 @@ if (!extension_loaded('winter_boot')) {
 
     /**
      * Evaluate framework `#{...}` template code with variables bound.
+     * Repeat evaluations reuse a cached compilation with identical results.
      *
      * @param array<string, mixed> $vars variables visible to the code
      * @throws \Error without a userland caller scope
      */
     function winter_boot_exec_inline(string $code, array $vars): mixed {
+        throw new \LogicException('winter_boot extension is not loaded');
+    }
+
+    /**
+     * Substitute literal placeholder text with evaluated values, in pair
+     * order (str_replace semantics: all occurrences per pair, sequential
+     * passes, same value coercion).
+     *
+     * @param array<string, mixed> $pairs placeholder text => evaluated value
+     */
+    function winter_boot_expand_template(string $template, array $pairs): string {
         throw new \LogicException('winter_boot extension is not loaded');
     }
 }
