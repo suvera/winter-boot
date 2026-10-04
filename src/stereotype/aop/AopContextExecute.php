@@ -8,22 +8,15 @@ use dev\winterframework\core\aop\ex\AopException;
 use Throwable;
 
 trait AopContextExecute {
-    /** @noinspection PhpUnusedParameterInspection */
     protected static function executeInlineCode(
         string $__c_o_d_e,
         object $target,
         array $__namedArgs
     ): mixed {
-        foreach ($__namedArgs as $name => $value) {
-            if ($name == '__c_o_d_e' || $name == '__namedArgs') {
-                continue;
-            }
-
-            $$name = $value;
-        }
-
         try {
-            return eval($__c_o_d_e);
+            // Native evaluation: variables bind inside the extension, so no
+            // dynamic code evaluation remains in PHP code.
+            return winter_boot_exec_inline($__c_o_d_e, $__namedArgs);
         } catch (Throwable $e) {
             throw new AopException(
                 sprintf("Error executing AOP inline code in target [%s]: %s, [CODE]: %s", $target::class, $e->getMessage(), $__c_o_d_e),

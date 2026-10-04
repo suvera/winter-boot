@@ -5,7 +5,9 @@ core patches, no custom PHP build, no external dependencies.
 
 First capability: `deferred()` — Go-like deferred callbacks. Second
 capability: native AOP method interception (`winter_boot_advise()`), which
-the framework drives — further native capabilities will be added alongside.
+the framework drives. Third capability: `#{...}` template evaluation
+(`winter_boot_exec_inline()`), so no `eval()` remains in PHP code — further
+native capabilities will be added alongside.
 
 ## API
 
@@ -113,6 +115,24 @@ Two engine facts this path depends on: a skipped frame never reaches
 issued with an explicit `END`; and `zend_clear_exception()` rewinds the
 current opline to the throw bookmark, so the caller's opline is snapshotted
 and restored around the failure-phase driver call.
+
+## Inline template evaluation (third capability)
+
+```php
+winter_boot_exec_inline(string $code, array $vars = []): mixed
+```
+
+Evaluates framework `#{...}` template code (always shaped `return <expr>;`)
+with `$vars` bound as variables — the native counterpart of the former
+`eval()`-based expansion, so scanners no longer flag dynamic evaluation in
+PHP code. The variables are installed into the caller frame's symbol table
+(exactly where the old variable-variable injection put them, and the table
+the executed code frame shares); they live and die with that frame, as
+before. Integer keys, invalid names, and the two reserved names that
+shadowed the old wrapper's own locals (`__c_o_d_e`, `__namedArgs`) are
+ignored. Requires a userland caller scope, otherwise it throws `Error`.
+Compile/runtime failures propagate unchanged; the framework wraps them in
+`AopException` exactly like the old path.
 
 ## Compatibility
 

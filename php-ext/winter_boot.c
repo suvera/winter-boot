@@ -443,6 +443,11 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_winter_boot_is_advised, 0, 0, 2)
 	ZEND_ARG_TYPE_INFO(0, method, IS_STRING, 0)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_winter_boot_exec_inline, 0, 0, 2)
+	ZEND_ARG_TYPE_INFO(0, code, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, vars, IS_ARRAY, 0)
+ZEND_END_ARG_INFO()
+
 /* Register an advised method. Rejects anything the interception cannot serve
  * soundly (mirroring the proxy generator's rejections, except final and
  * private/protected methods, which native interception newly supports). */
@@ -525,6 +530,130 @@ PHP_FUNCTION(winter_boot_is_advised)
 		}
 	}
 	RETURN_FALSE;
+}
+
+/* Valid PHP variable names for inline-code binding (fail closed: anything
+ * else can never be referenced by the evaluated code anyway). */
+static bool wb_is_valid_var_name(zend_string *name)
+{
+	const char *p = ZSTR_VAL(name);
+	size_t len = ZSTR_LEN(name);
+	size_t i;
+	unsigned char c;
+	if (len == 0) {
+		return false;
+	}
+	c = (unsigned char) p[0];
+	if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || c >= 0x80)) {
+		return false;
+	}
+	for (i = 1; i < len; i++) {
+		c = (unsigned char) p[i];
+		if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+				|| (c >= '0' && c <= '9') || c == '_' || c >= 0x80)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/* Evaluate AOP `#{...}` inline code with the given variables bound.
+ *
+ * Native counterpart of the former eval()-based template expansion, so no
+ * PHP-level eval (and no variable-variables) remain in the framework. The
+ * variables are installed into the *caller* frame's symbol table — exactly
+ * where the old `$$name` injection put them, and the table the executed
+ * code frame shares. Integer keys and invalid names are ignored; the two
+ * reserved names that shadowed the old wrapper's own locals are skipped.
+ * Compile/runtime failures propagate to the caller unchanged (the framework
+ * wraps them, as before).
+ */
+PHP_FUNCTION(winter_boot_exec_inline)
+{
+	char *code;
+	size_t code_len;
+	HashTable *vars;
+	zend_execute_data *mine;
+	zend_execute_data *caller;
+	HashTable *ctable;
+	zval retval;
+	zend_string *key;
+	zval *val;
+
+	ZEND_PARSE_PARAMETERS_START(2, 2)
+		Z_PARAM_STRING(code, code_len)
+		Z_PARAM_ARRAY_HT(vars)
+	ZEND_PARSE_PARAMETERS_END();
+
+	mine = EG(current_execute_data);
+	caller = (mine != NULL) ? mine->prev_execute_data : NULL;
+	if (caller == NULL || caller->func == NULL
+		|| caller->func->type != ZEND_USER_FUNCTION) {
+		zend_throw_error(NULL,
+			"winter_boot_exec_inline(): requires a userland caller scope");
+		RETURN_THROWS();
+	}
+	EG(current_execute_data) = caller;
+	ctable = zend_rebuild_symbol_table();
+	EG(current_execute_data) = mine;
+	{
+		zend_ulong idx;
+		ZEND_HASH_FOREACH_KEY_VAL(vars, idx, key, val) {
+			(void) idx;
+			if (key == NULL) {
+				continue;
+			}
+			if (zend_string_equals_literal(key, "__c_o_d_e")
+				|| zend_string_equals_literal(key, "__namedArgs")) {
+				continue;
+			}
+			if (!wb_is_valid_var_name(key)) {
+				continue;
+			}
+			Z_TRY_ADDREF_P(val);
+			zend_hash_update(ctable, key, val);
+		} ZEND_HASH_FOREACH_END();
+	}
+
+	/* Same shape as eval(): compile the code as-is (it carries its own
+	 * top-level return) and execute it. zend_eval_stringl() would wrap it
+	 * in a second return and fail to compile. */
+	ZVAL_UNDEF(&retval);
+	{
+		uint32_t original_compiler_options = CG(compiler_options);
+		zend_string *code_str = zend_string_init(code, code_len, 0);
+		zend_op_array *op_array;
+		CG(compiler_options) = ZEND_COMPILE_DEFAULT_FOR_EVAL;
+		op_array = zend_compile_string(code_str, "AOP inline code",
+			ZEND_COMPILE_POSITION_AFTER_OPEN_TAG);
+		CG(compiler_options) = original_compiler_options;
+		zend_string_release(code_str);
+		if (op_array != NULL) {
+			zval local_retval;
+			EG(no_extensions) = 1;
+			op_array->scope = caller->func->common.scope;
+			zend_try {
+				ZVAL_UNDEF(&local_retval);
+				zend_execute(op_array, &local_retval);
+			} zend_catch {
+				destroy_op_array(op_array);
+				efree_size(op_array, sizeof(zend_op_array));
+				zend_bailout();
+			} zend_end_try();
+			if (!Z_ISUNDEF(local_retval)) {
+				ZVAL_COPY_VALUE(&retval, &local_retval);
+			}
+			EG(no_extensions) = 0;
+			zend_destroy_static_vars(op_array);
+			destroy_op_array(op_array);
+			efree_size(op_array, sizeof(zend_op_array));
+		}
+	}
+	if (!Z_ISUNDEF(retval)) {
+		ZVAL_COPY_VALUE(return_value, &retval);
+	} else if (EG(exception) == NULL) {
+		ZVAL_NULL(return_value);
+	}
 }
 
 /* Strict return-type verification for values the extension delivers on the
@@ -1047,6 +1176,7 @@ static const zend_function_entry winter_boot_functions[] = {
 	PHP_FE(defered, arginfo_deferred)
 	PHP_FE(winter_boot_advise, arginfo_winter_boot_advise)
 	PHP_FE(winter_boot_is_advised, arginfo_winter_boot_is_advised)
+	PHP_FE(winter_boot_exec_inline, arginfo_winter_boot_exec_inline)
 	PHP_FE_END
 };
 
