@@ -10,6 +10,7 @@ use dev\winterframework\core\context\PropertyContext;
 use dev\winterframework\core\context\ShutDownRegistry;
 use dev\winterframework\core\context\WinterApplicationContext;
 use dev\winterframework\core\context\WinterPropertyContext;
+use dev\winterframework\core\aop\NativeAopDriver;
 use dev\winterframework\core\web\config\InterceptorRegistry;
 use dev\winterframework\exception\ModuleException;
 use dev\winterframework\exception\NotWinterApplicationException;
@@ -78,6 +79,18 @@ abstract class WinterApplicationRunner {
     }
 
     public final function run(string $appClass): void {
+        // Single winter_boot capability gate for the whole framework: the
+        // extension is mandatory since 2.1.0, and every other call site
+        // assumes it is present once boot passes this point.
+        if (!extension_loaded('winter_boot')) {
+            throw new WinterException(
+                "The 'winter_boot' PHP extension is required since 2.1.0 but is not loaded. "
+                . 'Use the official Docker image (it ships the extension) or build it from the '
+                . 'php-ext directory and enable it in your PHP configuration.'
+            );
+        }
+        NativeAopDriver::setNativeActive(true);
+
         $this->bootApp = $this->buildBootApp($appClass);
         $this->processBootConfig();
 
@@ -97,6 +110,11 @@ abstract class WinterApplicationRunner {
 
         $this->appCtxData = $this->buildApplicationContextData();
         $this->applicationContext = new WinterApplicationContext($this->appCtxData, $this->args);
+
+        NativeAopDriver::boot(
+            $this->appCtxData->getAopRegistry(),
+            $this->applicationContext
+        );
 
         $this->buildAppContext();
 

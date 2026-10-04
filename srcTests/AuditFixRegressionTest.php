@@ -12,7 +12,6 @@ use dev\winterframework\core\context\ShutDownRegistry;
 use dev\winterframework\io\kv\KvTemplate;
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\MethodResource;
-use dev\winterframework\reflection\proxy\ProxyGenerator;
 use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\txn\ex\IllegalTransactionStateException;
@@ -322,36 +321,13 @@ final class AuditFixRegressionTest extends TestCase {
         });
     }
 
-    private function proxyMethod(string $name, bool $aop): MethodResource {
-        $ref = new \ReflectionMethod(AuditFixFixtureService::class, $name);
-        $res = new MethodResource();
-        $res->setMethod(RefMethod::getInstance($ref));
-        $res->setAopProxy($aop);
-        return $res;
-    }
-
-    // WB-002: proxies log failures with actual class/method context, rethrow original.
-    // Begin failures stay with the interceptor (no duplicate handling here).
-    public function testAopProxyRethrows(): void {
-        $code = ProxyGenerator::getDefault()->generateMethod($this->proxyMethod('fails', true));
-        $this->assertTrue(str_contains($code, 'aspectFailed'));
-        $this->assertTrue(str_contains($code, 'throw $e;'));
-        $this->assertFalse(str_contains($code, 'new AopException'));
-        $this->assertTrue(str_contains($code, 'AOP invocation failed on'));
-        $this->assertTrue(str_contains($code, 'AuditFixFixtureService::fails()'));
-        $this->assertFalse(str_contains($code, 'AOP begin failed on'));
-    }
-
-    // WB-014: generated signatures keep literal defaults, refs, variadics.
-    public function testProxyDefaultValues(): void {
-        $code = ProxyGenerator::getDefault()->generateMethod($this->proxyMethod('boom', true));
-        $this->assertTrue(str_contains($code, "\$label = 'x'"));
-        $this->assertTrue(str_contains($code, '$opts = '));
-        $this->assertFalse(str_contains($code, '$label = x,'));
-        $refCode = ProxyGenerator::getDefault()->generateMethod($this->proxyMethod('byRef', false));
-        $this->assertTrue(str_contains($refCode, '&$name'));
-        $this->assertTrue(str_contains($refCode, '...$rest'));
-    }
+    // WB-002 (native): failures run aspectFailed() and the original is
+    // rethrown unchanged — covered by NativeAopDriverTest (failed path)
+    // and NativeAopEndToEndTest (original propagates through interception).
+    // WB-014 (native): no signatures are generated, so literal
+    // defaults/refs/variadics need no preservation — the engine calls the
+    // real method. The generator-specific assertions above were removed
+    // with ProxyGenerator.
 
     // WB-015/WB-017: RefKlass union reflection exposes named-type gap honestly.
     public function testUnionTypeHasNoBuiltinApi(): void {

@@ -70,6 +70,20 @@ final class HttpHeaders {
 
     private array $headers = [];
 
+    /**
+     * Rejects CR/LF in header names and values to block HTTP response
+     * splitting. Header values never legitimately contain raw newlines.
+     */
+    private static function assertNoCrlf(string $headerName, string $headerValue): void {
+        if (str_contains($headerName, "\r") || str_contains($headerName, "\n")
+            || str_contains($headerValue, "\r") || str_contains($headerValue, "\n")
+        ) {
+            throw new \InvalidArgumentException(
+                'Invalid header "' . $headerName . '": CR/LF characters are not allowed'
+            );
+        }
+    }
+
     public function merge(HttpHeaders $other): void {
         if ($this === $other) {
             return;
@@ -81,6 +95,7 @@ final class HttpHeaders {
 
     public function add(string $headerName, string $headerValue): void {
         TypeAssert::notEmpty('headerName', $headerName);
+        self::assertNoCrlf($headerName, $headerValue);
 
         if (isset($this->headers[$headerName])) {
             $this->headers[$headerName][] = $headerValue;
@@ -95,11 +110,13 @@ final class HttpHeaders {
 
     public function set(string $headerName, string $headerValue): void {
         TypeAssert::notEmpty('headerName', $headerName);
+        self::assertNoCrlf($headerName, $headerValue);
         $this->headers[$headerName] = [$headerValue];
     }
 
     public function setIfNot(string $headerName, string $headerValue): void {
         TypeAssert::notEmpty('headerName', $headerName);
+        self::assertNoCrlf($headerName, $headerValue);
         if (isset($this->headers[$headerName])) {
             return;
         }

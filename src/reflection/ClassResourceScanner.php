@@ -307,10 +307,9 @@ class ClassResourceScanner {
         $res->setProxyMethods($proxyMethList);
 
         /**
-         * The web dispatcher invokes controller endpoints through the
-         * original reflected method (non-virtual), so proxy overrides —
-         * and with them every AOP advice — can never engage on them.
-         * Skip proxy generation for controllers entirely.
+         * The web dispatcher invokes controller endpoints directly and
+         * drives their AOP advice itself, so controller methods are never
+         * registered for interception. Skip them entirely.
          */
         $skipProxy = false;
         foreach ($attrList as $classAttr) {

@@ -274,7 +274,7 @@ class ParameterType {
                 $value = $value + 0;
                 if (is_float($value) && $this->hasType("float")) {
                     return $value;
-                } else if ($this->hasType("int")) {
+                } else if (is_int($value) && $this->hasType("int")) {
                     return $value;
                 }
             } else if ($this->isDateTimeType()) {

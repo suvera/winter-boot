@@ -1,0 +1,43 @@
+# Keep host-built extension objects out of the image build: the runtime image
+# is Alpine/musl while developers build on glibc hosts, so php-ext/ must
+# always compile fresh inside the builder stage.
+php-ext/autom4te.cache/
+php-ext/build/
+php-ext/modules/
+php-ext/.libs/
+php-ext/.deps/
+php-ext/Makefile
+php-ext/Makefile.fragments
+php-ext/Makefile.global
+php-ext/Makefile.objects
+php-ext/acinclude.m4
+php-ext/aclocal.m4
+php-ext/config.guess
+php-ext/config.h
+php-ext/config.h.in
+php-ext/config.log
+php-ext/config.nice
+php-ext/config.status
+php-ext/config.sub
+php-ext/configure
+php-ext/configure.ac
+php-ext/install-sh
+php-ext/libtool
+php-ext/ltmain.sh
+php-ext/missing
+php-ext/mkinstalldirs
+php-ext/run-tests.php
+php-ext/*.dep
+php-ext/*.la
+php-ext/*.lo
+php-ext/*.o
+php-ext/*.diff
+php-ext/*.exp
+php-ext/*.log
+php-ext/*.out
+php-ext/*.sh
+php-ext/tests/*.diff
+php-ext/tests/*.exp
+php-ext/tests/*.log
+php-ext/tests/*.out
+php-ext/tests/*.sh

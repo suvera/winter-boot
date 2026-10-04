@@ -268,18 +268,16 @@ final class AuditCoverageTest extends TestCase {
         $this->assertFalse($cache->has('k'));
     }
 
-    // WB-015: final beans pass unless an inheritance proxy is required.
+    // Native interception advises the original class, so no subclass is
+    // ever required: plain and final beans both validate cleanly.
     public function testFinalBeanValidation(): void {
         $ctx = (new \ReflectionClass(WinterBeanProviderContext::class))->newInstanceWithoutConstructor();
         $method = new \ReflectionMethod(WinterBeanProviderContext::class, 'validateBeanClass');
         $method->setAccessible(true);
         $final = RefKlass::getInstance(AuditCoverageFinalService::class);
         $plain = RefKlass::getInstance(AuditCoveragePlainService::class);
-        $method->invoke($ctx, $plain, false);
-        $method->invoke($ctx, $plain, true);
-        $method->invoke($ctx, $final, false);
-        $this->assertThrows(\TypeError::class, function () use ($ctx, $method, $final) {
-            $method->invoke($ctx, $final, true);
-        });
+        $method->invoke($ctx, $plain);
+        $method->invoke($ctx, $final);
+        $this->assertTrue(true);
     }
 }

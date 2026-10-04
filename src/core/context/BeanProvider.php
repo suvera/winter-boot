@@ -18,13 +18,8 @@ final class BeanProvider {
     public function __construct(
         private ClassResource $class,
         private ?MethodResource $method = null,
-        private bool $proxyUsed = false,
         private array $names = [],
     ) {
-    }
-
-    public function isProxyUsed(): bool {
-        return $this->proxyUsed;
     }
 
     public function hasCached(): bool {

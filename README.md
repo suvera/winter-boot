@@ -141,12 +141,14 @@ Full documentation lives at **https://suvera.github.io/winter-boot/** — same c
 -   [**AOP**](https://suvera.github.io/winter-boot/core/aop)
 -   [**App Lifecycle**](https://suvera.github.io/winter-boot/core/application-lifecycle)
 -   [**Module System**](https://suvera.github.io/winter-boot/core/module-system)
+-   [**Sessions**](https://suvera.github.io/winter-boot/core/request-sessions)
 
 ### Web & REST
 
 -   [**REST Controllers**](https://suvera.github.io/winter-boot/web/rest-controllers)
 -   [**Request Mapping**](https://suvera.github.io/winter-boot/web/request-mapping)
 -   [**Interceptors**](https://suvera.github.io/winter-boot/web/interceptors)
+-   [**RestTemplate**](https://suvera.github.io/winter-boot/web/rest-template)
 
 ### Data
 
@@ -177,6 +179,7 @@ Full documentation lives at **https://suvera.github.io/winter-boot/** — same c
 -   [**Local Stores**](https://suvera.github.io/winter-boot/advanced/local-stores)
 -   [**Utilities**](https://suvera.github.io/winter-boot/building/utilities)
 -   [**Build & Deploy**](https://suvera.github.io/winter-boot/advanced/build-deploy)
+-   [**Native Extension**](https://suvera.github.io/winter-boot/advanced/native-extension)
 
 ## Libraries
 
@@ -219,6 +222,7 @@ Examples built with Winter Boot and Winter Modules
 
 - [Examples](https://suvera.github.io/winter-boot/examples/overview)
     - [Redis Example](https://suvera.github.io/winter-boot/examples/redis-app)
+    - [Redis Queue Example](https://suvera.github.io/winter-boot/examples/redis-queue)
     - [Doctrine Example](https://suvera.github.io/winter-boot/examples/doctrine-app)
     - [SQS Consumer Example](https://suvera.github.io/winter-boot/examples/sqs-consumer)
     - [Kafka Consumer Example](https://suvera.github.io/winter-boot/examples/kafka-app)
@@ -227,6 +231,20 @@ Examples built with Winter Boot and Winter Modules
     - [Daemon Threads Example](https://suvera.github.io/winter-boot/examples/daemon-app)
     - [Scheduler Example](https://suvera.github.io/winter-boot/examples/scheduler-app)
     - [DTCE Example](https://suvera.github.io/winter-boot/examples/dtce-app)
+    - [AOP Example](https://suvera.github.io/winter-boot/examples/aop-app)
+
+## How To
+
+Step-by-step guides for common tasks in Winter Boot applications
+
+- [Overview](https://suvera.github.io/winter-boot/howto/overview)
+    - [RBAC](https://suvera.github.io/winter-boot/howto/rbac)
+    - [ABAC](https://suvera.github.io/winter-boot/howto/abac)
+    - [Build UI](https://suvera.github.io/winter-boot/howto/build-ui)
+    - [Email](https://suvera.github.io/winter-boot/howto/email)
+    - [PDF](https://suvera.github.io/winter-boot/howto/pdf)
+    - [Images](https://suvera.github.io/winter-boot/howto/images)
+    - [Gemini AI](https://suvera.github.io/winter-boot/howto/gemini)
 
 ## Reference
 

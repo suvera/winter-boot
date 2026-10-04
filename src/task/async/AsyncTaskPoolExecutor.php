@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace dev\winterframework\task\async;
 
+use dev\winterframework\core\aop\NativeAopDriver;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\stereotype\Autowired;
 use dev\winterframework\stereotype\Component;
@@ -76,7 +77,18 @@ class AsyncTaskPoolExecutor implements TaskPoolExecutor {
 
                 try {
                     $bean = $appCtx->beanByClass($className);
-                    $bean->$methodName(...$args);
+                    // Native path: jobs are enqueued under the real method
+                    // name, so this call would re-enqueue instead of running.
+                    // The single-shot token makes exactly this invocation run
+                    // the body (aspects included, like the proxy's Original
+                    // twin); nested async calls still enqueue normally. It is
+                    // a no-op when native interception is inactive.
+                    NativeAopDriver::bypassOnce($className, $methodName);
+                    try {
+                        $bean->$methodName(...$args);
+                    } finally {
+                        NativeAopDriver::clearBypass();
+                    }
                 } catch (Throwable $e) {
                     self::logException($e);
                 }
