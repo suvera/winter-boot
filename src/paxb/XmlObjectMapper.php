@@ -95,7 +95,9 @@ class XmlObjectMapper implements ObjectMapper {
     }
 
     protected function getLibxmlFlagValue(): int {
-        $ret = 0;
+        // WB-2.1-05: always forbid network access during parsing (defence
+        // in depth against XXE/SSRF), even if callers enable other flags.
+        $ret = LIBXML_NONET;
         foreach ($this->libXmlFlags as $key => $flag) {
             if ($flag) {
                 $ret = $ret | $key;

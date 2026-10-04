@@ -111,7 +111,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
         $this->appCtx->setCurrentHttpRequest($request);
         $this->appCtx->setCurrentHttpResponse($response);
         try {
-            $this->doDispatch($request, $response, $serverPath);
+            $this->doDispatch($request, $response, $serverPath, microtime(true));
         } finally {
             $this->appCtx->setCurrentHttpRequest(null);
             $this->appCtx->setCurrentHttpResponse(null);
@@ -132,8 +132,12 @@ class DispatcherServlet implements HttpRequestDispatcher {
     protected function doDispatch(
         HttpRequest $request,
         ResponseEntity $response,
-        mixed $serverPath
+        mixed $serverPath,
+        ?float $startTime = null
     ): void {
+        // Arrival trace: logged instantly, before routing or rendering.
+        $this->logRequestReceived($request);
+
         $uri = $request->getUri();
         $uri = trim($uri, '/');
 
@@ -145,26 +149,30 @@ class DispatcherServlet implements HttpRequestDispatcher {
         $matchedRoute = $this->mappingRegistry->find($uri, $request->getMethod());
 
         if ($matchedRoute === null) {
-            self::logError('Could not find Requested URI [' . $request->getMethod() . '] ' . $uri);
+            // WB-2.1-04: $uri is attacker-controlled; never log/echo it raw.
+            $safeUri = self::sanitizeUriForError($uri);
+            self::logError('Could not find Requested URI [' . $request->getMethod() . '] ' . $safeUri);
             $this->handleError(
                 $request,
                 $response,
                 HttpStatus::$NOT_FOUND,
                 new WinterException('Could not find Requested URI ['
-                    . $request->getMethod() . ']' . $uri),
+                    . $request->getMethod() . ']' . $safeUri),
+                $startTime
             );
             return;
         }
 
         try {
-            $this->routeRequest($matchedRoute, $request, $response);
+            $this->routeRequest($matchedRoute, $request, $response, $startTime);
         } catch (Throwable $t) {
             self::logException($t);
             $this->handleError(
                 $request,
                 $response,
                 HttpStatus::$INTERNAL_SERVER_ERROR,
-                $t
+                $t,
+                $startTime
             );
             return;
         }
@@ -184,8 +192,12 @@ class DispatcherServlet implements HttpRequestDispatcher {
         HttpRequest $request,
         ResponseEntity $response,
         HttpStatus $status,
-        ?Throwable $t = null
+        ?Throwable $t = null,
+        ?float $startTime = null
     ): void {
+        // Trace first: on classic SAPIs the error render below exits the process.
+        $this->logRequestCompleted($request, $response, $startTime, $status->getValue());
+
         $this->errorController->handleError($request, $response, $status, $t);
 
         try {
@@ -225,7 +237,8 @@ class DispatcherServlet implements HttpRequestDispatcher {
     protected function routeRequest(
         MatchedRequestMapping $route,
         HttpRequest $request,
-        ResponseEntity $response
+        ResponseEntity $response,
+        ?float $startTime = null
     ): void {
         /** @var ResponseRenderer $renderer */
         $renderer = $this->appCtx->beanByClass(ResponseRenderer::class);
@@ -267,7 +280,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
             if (!empty($consumes)) {
                 $success = false;
                 foreach ($consumes as $mediaType) {
-                    if (str_contains($contentType, $mediaType)) {
+                    if (self::isContentTypeSupported($contentType, $mediaType)) {
                         $success = true;
                         break;
                     }
@@ -282,7 +295,8 @@ class DispatcherServlet implements HttpRequestDispatcher {
                             'Bad Request: expected request types ['
                                 . implode(', ', $consumes)
                                 . ', but got "' . $contentType . '"'
-                        )
+                        ),
+                        $startTime
                     );
                     return;
                 }
@@ -306,7 +320,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 try {
                     $args[$var->getVariableName()] = $this->getRequestParamValue($request, $var);
                 } catch (WinterException $e) {
-                    $this->handleError($request, $response, HttpStatus::$BAD_REQUEST, $e);
+                    $this->handleError($request, $response, HttpStatus::$BAD_REQUEST, $e, $startTime);
                     return;
                 } catch (Throwable $e) {
                     self::logError(
@@ -314,7 +328,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
                             . $e::class . ': ' . $e->getMessage() . ', file: ' . $e->getFile()
                             . ', line: ' . $e->getLine()
                     );
-                    $this->handleError($request, $response, HttpStatus::$BAD_REQUEST);
+                    $this->handleError($request, $response, HttpStatus::$BAD_REQUEST, null, $startTime);
                     return;
                 }
             }
@@ -327,7 +341,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 try {
                     $args[$bodyMap->getVariableName()] = $this->parseBody($request, $bodyMap, $contentType);
                 } catch (WinterException $e) {
-                    $this->handleError($request, $response, HttpStatus::$BAD_REQUEST, $e);
+                    $this->handleError($request, $response, HttpStatus::$BAD_REQUEST, $e, $startTime);
                     return;
                 } catch (Throwable $e) {
                     self::logError(
@@ -335,7 +349,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
                             . $e::class . ': ' . $e->getMessage() . ', file: ' . $e->getFile()
                             . ', line: ' . $e->getLine()
                     );
-                    $this->handleError($request, $response, HttpStatus::$BAD_REQUEST);
+                    $this->handleError($request, $response, HttpStatus::$BAD_REQUEST, null, $startTime);
                     return;
                 }
             }
@@ -369,7 +383,8 @@ class DispatcherServlet implements HttpRequestDispatcher {
                         $request,
                         $response,
                         HttpStatus::$BAD_REQUEST,
-                        new WinterException('Bad Request: Missing parameter ' . $param->getName())
+                        new WinterException('Bad Request: Missing parameter ' . $param->getName()),
+                        $startTime
                     );
                     return;
                 }
@@ -458,6 +473,8 @@ class DispatcherServlet implements HttpRequestDispatcher {
             } catch (Throwable $e) {
                 self::logException($e);
             }
+
+            $this->logRequestCompleted($request, $response, $startTime);
         } finally {
             // Single observation point: stop() records on every call, so
             // the timer must stop exactly once, on all paths alike.
@@ -597,6 +614,92 @@ class DispatcherServlet implements HttpRequestDispatcher {
         }
     }
 
+
+    /**
+     * Compares media types exactly after stripping parameters (e.g.
+     * "; charset=utf-8") and case. A substring match would wrongly accept
+     * types like "application/json-malicious" for "application/json".
+     */
+    protected static function isContentTypeSupported(string $contentType, string $mediaType): bool {
+        $actual = strtolower(trim((string)strtok($contentType, ';')));
+        $expected = strtolower(trim((string)strtok($mediaType, ';')));
+        return $actual !== '' && $actual === $expected;
+    }
+
+    /**
+     * Strips control characters and truncates a request URI before it is
+     * echoed into 404 messages and logs, blocking log injection and
+     * reflected content via the error body.
+     */
+    protected static function sanitizeUriForError(string $uri): string {
+        $uri = (string)preg_replace('/[\x00-\x1F\x7F]+/', '', $uri);
+        return strlen($uri) > 512 ? substr($uri, 0, 512) : $uri;
+    }
+
+    /**
+     * Whether request tracing is enabled via
+     * `winter.web.request.enableTrace: true` in application.yml.
+     */
+    protected function isTraceEnabled(): bool {
+        return $this->ctxData->getPropertyContext()->getBool('winter.web.request.enableTrace', false);
+    }
+
+    /**
+     * Logs the arrival line instantly when a request reaches the dispatcher:
+     * HTTP method plus endpoint URI. No status or duration exists yet — the
+     * START marker tells it apart from the completion line. Only safe
+     * metadata is logged — never headers, bodies or query values.
+     *
+     * @param HttpRequest $request Incoming request.
+     */
+    protected function logRequestReceived(HttpRequest $request): void {
+        if (!$this->isTraceEnabled()) {
+            return;
+        }
+
+        // WB-2.1-04: the URI is attacker-controlled; never log it raw.
+        self::logInfo(sprintf(
+            'TRACE START %s %s',
+            $request->getMethod(),
+            self::sanitizeUriForError($request->getUri())
+        ));
+    }
+
+    /**
+     * Logs the completion line once the exchange finished (success or
+     * failure): endpoint URI, HTTP method, response status and time taken.
+     * The FINISH marker plus status/duration tell it apart from the arrival
+     * line. Only safe metadata is logged — never headers, bodies or query
+     * values.
+     *
+     * @param HttpRequest $request Finished request.
+     * @param ResponseEntity $response Finished response.
+     * @param float|null $startTime microtime(true) captured at dispatch entry.
+     * @param int|null $statusCode Explicit status (error paths set it on the
+     *     response only during rendering, so callers pass it directly).
+     */
+    protected function logRequestCompleted(
+        HttpRequest $request,
+        ResponseEntity $response,
+        ?float $startTime,
+        ?int $statusCode = null
+    ): void {
+        if (!$this->isTraceEnabled()) {
+            return;
+        }
+
+        $status = $statusCode ?? $response->getStatus()->getValue();
+        $durationMs = $startTime !== null ? (microtime(true) - $startTime) * 1000 : 0.0;
+        // WB-2.1-04: the URI is attacker-controlled; never log it raw.
+        $uri = self::sanitizeUriForError($request->getUri());
+        self::logInfo(sprintf(
+            'TRACE FINISH %s %s -> %d (%.1f ms)',
+            $request->getMethod(),
+            $uri,
+            $status,
+            $durationMs
+        ));
+    }
 
     /**
      * Interceptor execution

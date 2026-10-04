@@ -1,7 +1,6 @@
-/target/
-!.mvn/wrapper/maven-wrapper.jar
-
-### winter_boot PHP extension (php-ext/) build outputs ###
+# Keep host-built extension objects out of the image build: the runtime image
+# is Alpine/musl while developers build on glibc hosts, so php-ext/ must
+# always compile fresh inside the builder stage.
 php-ext/autom4te.cache/
 php-ext/build/
 php-ext/modules/
@@ -28,6 +27,10 @@ php-ext/ltmain.sh
 php-ext/missing
 php-ext/mkinstalldirs
 php-ext/run-tests.php
+php-ext/*.dep
+php-ext/*.la
+php-ext/*.lo
+php-ext/*.o
 php-ext/*.diff
 php-ext/*.exp
 php-ext/*.log
@@ -38,41 +41,3 @@ php-ext/tests/*.exp
 php-ext/tests/*.log
 php-ext/tests/*.out
 php-ext/tests/*.sh
-php-ext/*.dep
-php-ext/*.la
-php-ext/*.lo
-php-ext/*.o
-
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-.phing
-phing/.phing
-/vendor/
-bin/yaml-lint
-
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-
-config/config.php
-test.log
-test.php
-test2.php
-test.xml
-test.phar
-test.sh
-testApp/
-examples/MyApp/logs/*.log
-examples/MyApp/logs/*.pid
-examples/logs/MyApp.log
-logs/*.log
-
-

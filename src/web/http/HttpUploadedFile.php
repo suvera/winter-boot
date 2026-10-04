@@ -92,7 +92,12 @@ class HttpUploadedFile implements File {
                 $max = ini_get('upload_max_filesize');
                 return 'The uploaded file exceeds allowed limit ' . $max . ' bytes';
             case UPLOAD_ERR_FORM_SIZE:
+                // WB-2.1-03: MAX_FILE_SIZE is client-controlled form input;
+                // never reflect it verbatim (reflected XSS / log injection).
                 $max = $_POST['MAX_FILE_SIZE'] ?? 'unknown';
+                $max = (is_scalar($max) && preg_match('/^[0-9]+$/', (string)$max))
+                    ? (string)$max
+                    : 'unknown';
                 return 'The uploaded file exceeds allowed limit ' . $max . ' bytes specified in the form';
             case UPLOAD_ERR_PARTIAL:
                 return 'The uploaded file was only partially uploaded.';

@@ -117,7 +117,7 @@ class DefaultResponseRenderer extends AbstractResponseRenderer implements Respon
                 $entity->withContentType(mime_content_type($body->getRealPath()));
                 $entity->getHeaders()->setIfNot(
                     'Content-Disposition',
-                    'attachment; filename=' . $body->getFileName()
+                    'attachment; filename="' . self::sanitizeDownloadFileName($body->getFileName()) . '"'
                 );
             } else {
                 $handle = fopen($body->getRealPath(), 'rb');
@@ -137,6 +137,18 @@ class DefaultResponseRenderer extends AbstractResponseRenderer implements Respon
                 $stream->write($body);
             }
         }
+    }
+
+    /**
+     * Strips directories, CR/LF, quotes and backslashes from a download
+     * file name so it cannot break out of the Content-Disposition header
+     * or inject response headers. Falls back to "download" when empty.
+     */
+    protected static function sanitizeDownloadFileName(string $fileName): string {
+        $fileName = basename(str_replace('\\', '/', $fileName));
+        $fileName = (string)preg_replace('/[\x00-\x1F\x7F"\\\\]+/', '', $fileName);
+        $fileName = trim($fileName, '.');
+        return $fileName !== '' ? $fileName : 'download';
     }
 
     protected function renderBody(ResponseEntity $entity, HttpOutputStream $stream): void {
