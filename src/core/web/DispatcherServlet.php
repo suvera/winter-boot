@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace dev\winterframework\core\web;
 
 use dev\winterframework\core\aop\AopExecutionContext;
+use dev\winterframework\core\aop\NativeAopDriver;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\core\System;
@@ -36,8 +37,8 @@ use Throwable;
  * Resolves the incoming request to a controller endpoint (see
  * {@see RequestMappingRegistry}), binds request data to the endpoint
  * arguments, drives method-level AOP advice around the invocation, and
- * renders the outcome. Controller beans carry no proxy, so AOP attributes
- * on endpoints are executed here rather than through a proxy override.
+ * renders the outcome. Controller beans carry no interception, so AOP
+ * attributes on endpoints are executed here rather than through advice.
  * Any uncaught failure is mapped to an error response via the
  * {@see ErrorController}.
  */
@@ -419,25 +420,34 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 ? new AopExecutionContext($controller, $args)
                 : null;
 
-            if ($aopInterceptor !== null) {
+            // Native path: winter_boot_advise() already intercepts this
+            // method in the VM with the same protocol, so driving it here
+            // as well would run every aspect twice. Controller methods are
+            // never advised (they carry no proxy), hence the is_advised()
+            // check instead of a blanket flag.
+            $nativeDriven = $aopInterceptor !== null
+                && NativeAopDriver::isNativeActive()
+                && winter_boot_is_advised($aopOwner, $aopName);
+
+            if ($aopInterceptor !== null && !$nativeDriven) {
                 $aopInterceptor->aspectBegin($aopExCtx);
                 $aopExCtx->setBeginDone();
             }
 
-            if ($aopExCtx !== null && $aopExCtx->isStopExecution()) {
+            if ($aopExCtx !== null && !$nativeDriven && $aopExCtx->isStopExecution()) {
                 $out = $aopExCtx->getResult();
             } else {
                 try {
                     $out = $method->invokeArgs($controller, $args);
                 } catch (Throwable $e) {
-                    if ($aopInterceptor !== null) {
+                    if ($aopInterceptor !== null && !$nativeDriven) {
                         $aopExCtx->setException($e);
                         $aopExCtx->setFailed();
                         $aopInterceptor->aspectFailed($aopExCtx, $e);
                     }
                     throw $e;
                 }
-                if ($aopInterceptor !== null) {
+                if ($aopInterceptor !== null && !$nativeDriven) {
                     $aopExCtx->setSuccess();
                     $aopExCtx->setResult($out);
                     try {

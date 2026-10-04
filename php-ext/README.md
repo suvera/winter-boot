@@ -3,8 +3,9 @@
 Native capabilities for PHP, implemented as a Zend Engine extension. No PHP
 core patches, no custom PHP build, no external dependencies.
 
-First capability: `deferred()` — Go-like deferred callbacks. Further native
-capabilities will be added alongside it.
+First capability: `deferred()` — Go-like deferred callbacks. Second
+capability: native AOP method interception (`winter_boot_advise()`), which
+the framework drives — further native capabilities will be added alongside.
 
 ## API
 
@@ -81,6 +82,37 @@ return value.
 This is deliberately **not** full Go `defer` compatibility: there are no named
 return values to mutate, callbacks cannot alter the return value, and the
 fatal-error/abrupt-termination paths above never run callbacks.
+
+## Native AOP interception (second capability)
+
+```php
+winter_boot_advise(string $class, string $method): void
+winter_boot_is_advised(string $class, string $method): bool
+```
+
+Registers a userland class method for VM interception. Each intercepted call
+replays the framework's aspect protocol in C by delegating to
+`NativeAopDriver::begin()` / `::finish()`:
+
+- `begin()` returns `proceed=false` + `value` to skip the body (the value is
+  strictly verified against the declared return type), or `proceed=true` +
+  `exCtx`/`interceptor` to run it.
+- On body return, `finish($exCtx, $interceptor, 'returned', $value)` runs the
+  commit phase; on body throw, `finish(..., 'threw', $throwable)` runs the
+  failure phase and the original exception propagates unchanged.
+
+Fail-closed rules: advising abstract methods, constructors, destructors, or
+unknown methods throws `Error`; registration is idempotent. Only
+methods of the advised bean family intercept (a shared inherited op-array
+never matches an unrelated subclass); stale entries can never match a
+recycled op-array address (pointer + scope + name are all checked). Advice is
+request-bound. Internal (C) functions cannot be advised.
+
+Two engine facts this path depends on: a skipped frame never reaches
+`ZEND_RETURN`, so the extension balances the observer `BEGIN` the VM already
+issued with an explicit `END`; and `zend_clear_exception()` rewinds the
+current opline to the throw bookmark, so the caller's opline is snapshotted
+and restored around the failure-phase driver call.
 
 ## Compatibility
 

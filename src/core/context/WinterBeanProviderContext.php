@@ -11,9 +11,9 @@ use dev\winterframework\exception\BeansException;
 use dev\winterframework\exception\ClassNotFoundException;
 use dev\winterframework\exception\NoUniqueBeanDefinitionException;
 use dev\winterframework\exception\WinterException;
+use dev\winterframework\core\aop\NativeAopDriver;
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\reflection\MethodResource;
-use dev\winterframework\reflection\proxy\ProxyGenerator;
 use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\reflection\ReflectionUtil;
@@ -71,8 +71,7 @@ final class WinterBeanProviderContext implements BeanProviderContext {
     }
 
     private function _addProviderClass(ClassResource $class, ?array $moreAttributes = null): void {
-        // WB-015: final is rejected only when an inheritance proxy is needed.
-        $this->validateBeanClass($class->getClass(), $class->isProxyNeeded());
+        $this->validateBeanClass($class->getClass());
         $attributes = $class->getAttributes();
         if ($moreAttributes) {
             $attributes->addAll($moreAttributes);
@@ -104,9 +103,8 @@ final class WinterBeanProviderContext implements BeanProviderContext {
      * @param object $attribute
      */
     /**
-     * Controllers carry no proxy (the dispatcher invokes the original
-     * method non-virtually), yet their AOP attributes still need a
-     * registered interceptor — the dispatcher drives it directly.
+     * Controllers carry no interception, yet their AOP attributes still
+     * need a registered interceptor — the dispatcher drives it directly.
      */
     private function hasAopAttributes(MethodResource $method): bool {
         foreach ($method->getAttributes() as $attribute) {
@@ -137,7 +135,7 @@ final class WinterBeanProviderContext implements BeanProviderContext {
                  * @var Component|Configuration|RestController|Service $attribute
                  * @var WinterBootTest|Module $attribute
                  */
-                $beanProvider = new BeanProvider($class, null, $class->isProxyNeeded());
+                $beanProvider = new BeanProvider($class, null);
                 $beanDef = new Bean($attribute->name);
                 if ($attrClass == Module::class) {
                     $beanDef->destroyMethod = $attribute->destroyMethod ?: null;
@@ -152,7 +150,7 @@ final class WinterBeanProviderContext implements BeanProviderContext {
                     && !$this->hasBeanByClass($class->getClass()->getName())
                 ) {
                     /** @var HealthInformer|InfoInformer $attribute */
-                    $beanProvider = new BeanProvider($class, null, $class->isProxyNeeded());
+                    $beanProvider = new BeanProvider($class, null);
                     $beanDef = new Bean();
                     $this->registerBeanProvider($beanProvider, $beanDef);
                 }
@@ -196,7 +194,7 @@ final class WinterBeanProviderContext implements BeanProviderContext {
                 . ReflectionUtil::getFqName($method));
         }
 
-        $beanProvider = new BeanProvider($class, $method, $returnClass->isProxyNeeded());
+        $beanProvider = new BeanProvider($class, $method);
         $this->registerBeanProvider($beanProvider, $beanDef);
     }
 
@@ -392,32 +390,31 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         unset($this->beanResolutionOrder[$beanId]);
     }
 
-    private function buildProxyClass(BeanProvider $beanProvider): ClassResource {
-        if (!$beanProvider->isProxyUsed()) {
-            return $beanProvider->getClass();
+    /**
+     * The bean keeps its original class; each method carrying advice is
+     * intercepted in the VM via winter_boot_advise(). Registration is
+     * idempotent, so repeated bean builds for the same class simply
+     * re-assert the same entries.
+     */
+    private function applyNativeAdvice(BeanProvider $beanProvider): ClassResource {
+        $class = $beanProvider->getClass();
+
+        if (count($class->getProxyMethods()) === 0) {
+            return $class;
         }
 
-        $className = ProxyGenerator::getProxyClassName($beanProvider->getClass()->getClass()->getName());
+        $className = $class->getClass()->getName();
 
-        if (!class_exists($className)) {
-            $proxyCode = ProxyGenerator::getDefault()->generateClass($beanProvider->getClass());
-            try {
-                eval($proxyCode);
-            } catch (Throwable $e) {
-                throw new BeansException(
-                    sprintf("Failed to evaluate generated proxy class [%s] for target [%s]: %s", $className, $beanProvider->getClass()->getClass()->getName(), $e->getMessage()),
-                    $e->getCode(),
-                    $e
-                );
+        foreach ($class->getProxyMethods() as $method) {
+            /** @var MethodResource $method */
+            $ref = $method->getMethod();
+            if ($ref->isAbstract() || $ref->isConstructor() || $ref->isDestructor()) {
+                continue;
             }
+            winter_boot_advise($className, $ref->getShortName());
         }
 
-        $clsRes = $this->appCtx->addClass($className);
-
-        $clsRes->getAttributes()->addAll($beanProvider->getClass()->getAttributes()->getArray());
-        $clsRes->getVariables()->addAll($beanProvider->getClass()->getVariables()->getArray());
-
-        return $clsRes;
+        return $class;
     }
 
     /**
@@ -427,7 +424,7 @@ final class WinterBeanProviderContext implements BeanProviderContext {
      * @return object
      */
     private function buildInstanceForClass(BeanProvider $beanProvider): object {
-        $class = $this->buildProxyClass($beanProvider);
+        $class = $this->applyNativeAdvice($beanProvider);
 
         try {
             /**
@@ -592,16 +589,10 @@ final class WinterBeanProviderContext implements BeanProviderContext {
         return $bean;
     }
 
-    private function validateBeanClass(RefKlass $cls, bool $proxyNeeded = false) {
+    private function validateBeanClass(RefKlass $cls) {
         if (!$cls->isInstantiable()) {
             throw new TypeError('Class ' . ReflectionUtil::getFqName($cls)
                 . ' cannot be Instantiable');
-        }
-
-        // WB-015: final beans are fine unless a subclass proxy is required.
-        if ($proxyNeeded && $cls->isFinal()) {
-            throw new TypeError('Class ' . ReflectionUtil::getFqName($cls)
-                . ' must not be FINAL when a proxy is required ');
         }
 
         $constructor = $cls->getConstructor();

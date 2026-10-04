@@ -20,6 +20,7 @@ extern zend_module_entry winter_boot_module_entry;
 
 ZEND_BEGIN_MODULE_GLOBALS(winter_boot)
 	void *frames; /* wb_defer_frame* head; void* keeps the public header free of internals */
+	void *advice_map; /* HashTable* of wb_advice*, keyed by function pointer */
 ZEND_END_MODULE_GLOBALS(winter_boot)
 
 #ifdef ZTS
