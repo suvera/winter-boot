@@ -244,6 +244,7 @@ Step-by-step guides for common tasks in Winter Boot applications
     - [Email](https://suvera.github.io/winter-boot/howto/email)
     - [PDF](https://suvera.github.io/winter-boot/howto/pdf)
     - [Images](https://suvera.github.io/winter-boot/howto/images)
+    - [Gemini AI](https://suvera.github.io/winter-boot/howto/gemini)
 
 ## Reference
 
