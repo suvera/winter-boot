@@ -110,7 +110,7 @@ class JsonProperty implements StereoType {
                 $checkName = $checkDef[0];
                 $msg = FieldValidator::getInstance()->validate($checkName, $paramName, $this->paramType, $value, $checkDef);
             } else {
-                $msg = 'Property ' . $paramName ? $paramName : $this->name . ' is defined with an invalid validator type';
+                $msg = 'Property ' . ($paramName ?: $this->name) . ' is defined with an invalid validator type';
             }
 
             if ($msg) {

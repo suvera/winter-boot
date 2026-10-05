@@ -82,7 +82,7 @@ class InMemoryCache implements Cache {
                 . $key . '"', 0, $e
             );
         }
-        $this->items[$key] = new SimpleValueWrapper($value);
+        $this->put($key, $value);
         return $this->items[$key];
     }
 
@@ -115,7 +115,9 @@ class InMemoryCache implements Cache {
 
     public function put(string $key, mixed $value): void {
         if (!isset($this->items[$key]) && count($this->items) >= $this->config->maximumSize) {
-            array_shift($this->items);
+            // unset the oldest entry; array_shift() would renumber
+            // integer-like keys ("42" => 0) and serve wrong values.
+            unset($this->items[array_key_first($this->items)]);
         }
 
         $this->items[$key] = new SimpleValueWrapper($value instanceof ValueWrapper ? $value->get() : $value);

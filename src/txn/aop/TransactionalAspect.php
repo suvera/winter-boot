@@ -133,8 +133,26 @@ class TransactionalAspect implements WinterAspect {
             }
         }
 
-        if ($rollBack) {
+        self::completeAfterFailure($txnMgr, $txnStatus, $rollBack);
+    }
+
+    /**
+     * Finish a transaction whose method threw: roll back, or commit when
+     * noRollbackFor matched. Leaving it open would keep the connection in
+     * a transaction (and the status on the stack) after the method ends.
+     */
+    public static function completeAfterFailure(
+        PlatformTransactionManager $txnMgr,
+        TransactionStatus $txnStatus,
+        bool $rollBack
+    ): void {
+        if ($txnStatus->isCompleted()) {
+            return;
+        }
+        if ($rollBack || $txnStatus->isRollbackOnly()) {
             $txnMgr->rollback($txnStatus);
+        } else {
+            $txnMgr->commit($txnStatus);
         }
     }
 

@@ -11,11 +11,12 @@ use dev\winterframework\pdbc\ResultSet;
 use dev\winterframework\pdbc\Statement;
 use dev\winterframework\pdbc\support\AbstractConnection;
 use dev\winterframework\pdbc\support\DatabaseMetaData;
+use dev\winterframework\pdbc\support\ResettableConnection;
 use dev\winterframework\txn\Savepoint;
 use PDO;
 use Throwable;
 
-class PdoConnection extends AbstractConnection {
+class PdoConnection extends AbstractConnection implements ResettableConnection {
     private ?PDO $pdo = null;
 
     /*
@@ -96,6 +97,21 @@ class PdoConnection extends AbstractConnection {
 
     public function isClosed(): bool {
         return is_null($this->pdo);
+    }
+
+    public function resetForReuse(): bool {
+        if ($this->pdo === null) {
+            return false;
+        }
+        try {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            return true;
+        } catch (Throwable $e) {
+            self::logException($e, 'Could not reset pooled connection, discarding it. ');
+            return false;
+        }
     }
 
     public function setSchema(string $schema): void {

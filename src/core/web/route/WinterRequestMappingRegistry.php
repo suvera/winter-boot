@@ -20,6 +20,12 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
     use Wlf4p;
 
     /**
+     * Upper bound on the resolved-path cache. Paths with variables are
+     * unbounded (/users/{id}), so the oldest entries are dropped beyond it.
+     */
+    public const MAX_CACHED_PATHS = 1024;
+
+    /**
      * @var RequestMapping[]
      */
     private static array $byId = [];
@@ -210,6 +216,9 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
             return null;
         }
 
+        if (!isset(self::$cachedPaths[$path]) && count(self::$cachedPaths) >= self::MAX_CACHED_PATHS) {
+            unset(self::$cachedPaths[array_key_first(self::$cachedPaths)]);
+        }
         self::$cachedPaths[$path][$method] = [
             'obj' => $node['<mapping>'][0],
             'regex' => $node['<mapping>'][1],
@@ -263,23 +272,40 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
         return null;
     }
 
+    /**
+     * Remove every route whose declared path equals $path (as declared,
+     * e.g. "users/{id}") or, failing that, whose pattern matches it.
+     */
     public function delete(string $path): void {
         $path = trim($path, '/');
-
-        if (isset(self::$cachedPaths[$path])) {
-            foreach (self::$cachedPaths[$path] as $def) {
-                unset(self::$byRegex[$def['regex']]);
+        // Declared templates compare in raw form: "users/{id}" -> "users/id".
+        $declared = (string)preg_replace('/\{([^}:]+)(:[^}]*)?\}/', '$1', $path);
+        $targets = [];
+        foreach (self::$byId as $id => $mapping) {
+            foreach ($mapping->getUriPaths() as $uriPath) {
+                $normalized = trim($uriPath->getNormalized(), '/');
+                $regex = '/^' . $uriPath->getRegex() . '$/';
+                if ($normalized === $path || trim($uriPath->getRaw(), '/') === $declared
+                    || preg_match($regex, $path)) {
+                    $targets[$id] = $mapping;
+                }
             }
-
-            unset(self::$cachedPaths[$path]);
+        }
+        if (empty($targets)) {
             return;
         }
-
-        foreach (self::$byRegex as $regex => $mapping) {
-            if (preg_match($regex, $path)) {
-                unset(self::$byRegex[$regex]);
-                break;
-            }
+        foreach ($targets as $id => $mapping) {
+            unset(self::$byId[$id]);
+        }
+        // Rebuild the indexes from the remaining mappings.
+        $remaining = self::$byId;
+        self::$byId = [];
+        self::$byUriMethod = [];
+        self::$byRegex = [];
+        self::$fullTextIndex = [];
+        self::$cachedPaths = [];
+        foreach ($remaining as $mapping) {
+            $this->put($mapping);
         }
     }
 

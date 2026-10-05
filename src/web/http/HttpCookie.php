@@ -11,7 +11,8 @@ class HttpCookie {
         public string $path = '',
         public string $domain = '',
         public bool $secure = false,
-        public bool $httponly = false
+        public bool $httponly = false,
+        public string $samesite = ''
     ) {
     }
 }

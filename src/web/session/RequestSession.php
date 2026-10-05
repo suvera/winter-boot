@@ -15,6 +15,8 @@ namespace dev\winterframework\web\session;
  */
 class RequestSession {
     private bool $destroyed = false;
+    /** Ids replaced by regenerateId(); their store rows are destroyed on commit. */
+    private array $previousIds = [];
 
     /**
      * @param array<string,mixed> $data
@@ -71,6 +73,22 @@ class RequestSession {
 
     public function isDestroyed(): bool {
         return $this->destroyed;
+    }
+
+    /**
+     * Rotate the session id, keeping the data. Call it on login and on any
+     * privilege change so an id known before authentication becomes useless.
+     */
+    public function regenerateId(): void {
+        if (!$this->new) {
+            $this->previousIds[] = $this->id;
+        }
+        $this->id = SessionManager::newId();
+    }
+
+    /** @return string[] */
+    public function getPreviousIds(): array {
+        return $this->previousIds;
     }
 
     /**

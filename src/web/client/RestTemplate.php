@@ -414,29 +414,44 @@ class RestTemplate {
         if ($query === []) {
             return $url;
         }
-        $parts = parse_url($url);
-        if ($parts === false) {
+        if (parse_url($url) === false) {
             throw new RestClientException('Invalid request url: ' . self::sanitizeUrl($url));
         }
-        $existing = [];
-        if (isset($parts['query']) && $parts['query'] !== '') {
-            parse_str($parts['query'], $existing);
-        }
-        $merged = array_merge($existing, $query);
-        $qs = http_build_query($merged);
 
+        $fragment = '';
+        $hash = strpos($url, '#');
+        if ($hash !== false) {
+            $fragment = substr($url, $hash);
+            $url = substr($url, 0, $hash);
+        }
         $base = $url;
+        $existing = '';
         $pos = strpos($url, '?');
         if ($pos !== false) {
             $base = substr($url, 0, $pos);
+            $existing = substr($url, $pos + 1);
         }
-        $hash = strpos($base, '#');
-        $fragment = '';
-        if ($hash !== false) {
-            $fragment = substr($base, $hash);
-            $base = substr($base, 0, $hash);
+
+        // Keep existing pairs verbatim (parse_str() would rename "user.id"
+        // to "user_id"); drop only those overridden by $query.
+        $kept = [];
+        foreach ($existing === '' ? [] : explode('&', $existing) as $pair) {
+            if ($pair === '') {
+                continue;
+            }
+            $name = urldecode(explode('=', $pair, 2)[0]);
+            $root = explode('[', $name, 2)[0];
+            if (array_key_exists($name, $query) || array_key_exists($root, $query)) {
+                continue;
+            }
+            $kept[] = $pair;
         }
-        return $qs !== '' ? $base . '?' . $qs . $fragment : $base . $fragment;
+        $added = http_build_query($query);
+        if ($added !== '') {
+            $kept[] = $added;
+        }
+        $qs = implode('&', $kept);
+        return ($qs !== '' ? $base . '?' . $qs : $base) . $fragment;
     }
 
     /**

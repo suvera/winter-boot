@@ -32,7 +32,8 @@ class CachePutAspect implements WinterAspect {
     public function commit(AopContext $ctx, AopExecutionContext $exCtx, mixed $result): void {
         $caches = $this->getCaches($ctx, self::OPERATION, $exCtx);
         $key = $this->generateKey($ctx, $exCtx);
-        self::logInfo(self::OPERATION . ': Cache Commit on KEY: ' . $key, [$result]);
+        // Never log keys or values: both can carry user data.
+        self::logDebug(self::OPERATION . ': cache commit');
 
         //echo "\n" . self:: OPERATION . " - Cache Key: $key\n";
         foreach ($caches as $cache) {

@@ -120,11 +120,21 @@ class QueueClient implements QueueSharedTemplate {
                 "QUEUE Store read timed out after {$this->config->getTimeout()}s");
         }
         //echo "RAW: $data\n";
-        $json = json_decode($data, true);
-        if ($json === false || $json[0] === QueueResponse::FAILED) {
-            self::logError('Queue Command failed ' . $data);
-        }
+        return self::decodeResponse($data);
+    }
 
+    /**
+     * Decode one response frame. Payloads are never logged: they can hold
+     * cached values or queued messages.
+     */
+    public static function decodeResponse(string $data): QueueResponse {
+        $json = json_decode($data, true);
+        if (!is_array($json)) {
+            throw new QueueException('Queue Store returned an undecodable response (' . strlen($data) . ' bytes)');
+        }
+        if (($json[0] ?? null) === QueueResponse::FAILED) {
+            self::logError('Queue Command failed');
+        }
         return QueueResponse::jsonUnSerialize($json);
     }
 

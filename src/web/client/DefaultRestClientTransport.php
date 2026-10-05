@@ -46,6 +46,14 @@ class DefaultRestClientTransport implements RestClientTransport {
                 'Invalid request url: ' . RestTemplate::sanitizeUrl($url)
             );
         }
+        // Only http(s): file://, gopher://, php:// ... would turn a URL taken
+        // from input into local file reads or SSRF against internal services.
+        $scheme = strtolower((string)($parts['scheme'] ?? ''));
+        if ($scheme !== 'http' && $scheme !== 'https') {
+            throw new RestClientException(
+                'Unsupported url scheme (only http/https): ' . RestTemplate::sanitizeUrl($url)
+            );
+        }
         foreach ($headers as $name => $value) {
             self::assertNoCrlf((string)$name, (string)$value);
         }
@@ -162,6 +170,7 @@ class DefaultRestClientTransport implements RestClientTransport {
             CURLOPT_CONNECTTIMEOUT,
             (int)ceil($connectTimeout > 0 ? $connectTimeout : RestTemplate::DEFAULT_CONNECT_TIMEOUT)
         );
+        curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $this->sslVerification);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $this->sslVerification ? 2 : 0);
         curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($ch, string $line) use (&$responseHeaders): int {

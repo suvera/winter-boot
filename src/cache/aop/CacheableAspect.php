@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace dev\winterframework\cache\aop;
 
+use dev\winterframework\cache\ValueWrapper;
+use dev\winterframework\cache\impl\SimpleValueWrapper;
 use dev\winterframework\core\aop\AopExecutionContext;
 use dev\winterframework\core\aop\ex\AopStopExecution;
 use dev\winterframework\stereotype\aop\AopContext;
@@ -19,21 +21,28 @@ class CacheableAspect implements WinterAspect {
     public function begin(AopContext $ctx, AopExecutionContext $exCtx): void {
         $caches = $this->getCaches($ctx, self::OPERATION, $exCtx);
         $key = $this->generateKey($ctx, $exCtx);
-        self::logInfo(self::OPERATION . ': Cache checking for KEY: ' . $key);
 
         foreach ($caches as $cache) {
-            if ($cache->has($key)) {
-                self::logInfo(self::OPERATION . ': cache value found in the "'
-                    . $cache->getName()
-                    . '", for the KEY: ' . $key);
-                $exCtx->stopExecution($cache->get($key)->get());
-                break;
-            } else {
-                self::logInfo(self::OPERATION . ': cache value *NOT* found in the "'
-                    . $cache->getName()
-                    . '", for the KEY: ' . $key);
+            if (!$cache->has($key)) {
+                continue;
             }
+            // has() and get() are two calls: the entry may expire in between.
+            $value = $cache->get($key);
+            if (!self::isHit($value)) {
+                continue;
+            }
+            self::logDebug(self::OPERATION . ': cache hit in "' . $cache->getName() . '"');
+            $exCtx->stopExecution($value->get());
+            break;
         }
+    }
+
+    /**
+     * A hit is any wrapper except the shared miss sentinel the built-in
+     * caches return for absent/expired keys.
+     */
+    public static function isHit(ValueWrapper $value): bool {
+        return $value !== SimpleValueWrapper::$NULL_VALUE;
     }
 
     public function beginFailed(
@@ -49,7 +58,8 @@ class CacheableAspect implements WinterAspect {
     public function commit(AopContext $ctx, AopExecutionContext $exCtx, mixed $result): void {
         $caches = $this->getCaches($ctx, self::OPERATION, $exCtx);
         $key = $this->generateKey($ctx, $exCtx);
-        self::logInfo(self::OPERATION . ': Cache Commit on KEY: ' . $key, [$result]);
+        // Never log keys or values: both can carry user data.
+        self::logDebug(self::OPERATION . ': cache commit');
 
         foreach ($caches as $cache) {
             $cache->put($key, $result);

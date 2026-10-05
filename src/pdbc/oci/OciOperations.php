@@ -280,7 +280,8 @@ abstract class OciOperations {
             $this->applyOutBindVars($stmt, $outBindVars);
             $ret = $stmt->executeUpdate();
             foreach ($stmt->getOutValues() as $key => $value) {
-                $key = (substr($key, 0, 2) == 'b_') ? substr($key, 2) : $key;
+                $key = (string)$key;
+                $key = str_starts_with($key, 'b_') ? substr($key, 2) : $key;
                 $generatedKeys[$key] = $value;
             }
         } catch (Throwable $e) {

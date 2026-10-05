@@ -34,7 +34,8 @@ class CliSqlFileExecutor {
                 
                 $env = ['PGPASSWORD' => $password];
                 $cmd = sprintf(
-                    'psql -h %s -p %s -U %s -d %s -f %s',
+                    // ON_ERROR_STOP: psql otherwise exits 0 after SQL errors.
+                    'psql -v ON_ERROR_STOP=1 -h %s -p %s -U %s -d %s -f %s',
                     escapeshellarg($host),
                     escapeshellarg($port),
                     escapeshellarg($username),
@@ -86,7 +87,8 @@ class CliSqlFileExecutor {
                 // SR-009: sqlcmd honors SQLCMDPASSWORD, so -P stays out of argv.
                 $env = ['SQLCMDPASSWORD' => $password];
                 $cmd = sprintf(
-                    'sqlcmd -S %s -U %s -d %s -i %s',
+                    // -b: exit non-zero on SQL errors.
+                    'sqlcmd -b -S %s -U %s -d %s -i %s',
                     escapeshellarg($server),
                     escapeshellarg($username),
                     escapeshellarg($dbname),
@@ -123,7 +125,9 @@ class CliSqlFileExecutor {
         $pass = $this->quoteOciIdentifier($password);
         file_put_contents(
             $script,
-            "CONNECT {$user}/{$pass}@{$dbname}\n@\"{$filePath}\"\nEXIT\n"
+            // WHENEVER: sqlplus otherwise exits 0 after SQL errors.
+            "WHENEVER OSERROR EXIT FAILURE\nWHENEVER SQLERROR EXIT SQL.SQLCODE\n"
+            . "CONNECT {$user}/{$pass}@{$dbname}\n@\"{$filePath}\"\nEXIT\n"
         );
         return $script;
     }
@@ -182,14 +186,12 @@ class CliSqlFileExecutor {
         if (is_resource($process)) {
             fclose($pipes[0]);
 
-            $stdout = stream_get_contents($pipes[1]);
+            [$stdout, $stderr] = self::drainPipes($pipes[1], $pipes[2]);
             fclose($pipes[1]);
+            fclose($pipes[2]);
             if ($stdout !== '') {
                 $this->logInfo("SQL execution output:\n" . $stdout);
             }
-
-            $stderr = stream_get_contents($pipes[2]);
-            fclose($pipes[2]);
             if ($stderr !== '') {
                 $this->logWarning("SQL execution warnings:\n" . $stderr);
             }
@@ -204,5 +206,38 @@ class CliSqlFileExecutor {
         } else {
             throw new SqlMigrationException("Failed to spawn process for command: {$cmd}");
         }
+    }
+
+    /**
+     * Read stdout and stderr together. Reading one to EOF first deadlocks
+     * once the child fills the other pipe's buffer (~64 KB).
+     *
+     * @param resource $out
+     * @param resource $err
+     * @return array{0: string, 1: string}
+     */
+    private static function drainPipes($out, $err): array {
+        $buffers = [(int)$out => '', (int)$err => ''];
+        $open = [$out, $err];
+        stream_set_blocking($out, false);
+        stream_set_blocking($err, false);
+        while (!empty($open)) {
+            $read = $open;
+            $write = null;
+            $except = null;
+            if (stream_select($read, $write, $except, 5) === false) {
+                break;
+            }
+            foreach ($read as $stream) {
+                $chunk = fread($stream, 65536);
+                if ($chunk !== false && $chunk !== '') {
+                    $buffers[(int)$stream] .= $chunk;
+                }
+                if (feof($stream)) {
+                    $open = array_filter($open, fn($s) => $s !== $stream);
+                }
+            }
+        }
+        return [$buffers[(int)$out], $buffers[(int)$err]];
     }
 }

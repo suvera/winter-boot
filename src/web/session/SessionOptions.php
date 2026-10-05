@@ -18,7 +18,10 @@ class SessionOptions {
         public string $path = '/',
         public string $domain = '',
         public bool $secure = false,
-        public bool $httponly = true
+        public bool $httponly = true,
+        // Lax matches what browsers assume when the attribute is missing;
+        // 'Strict', 'None' (requires secure) or '' (omit) are also accepted.
+        public string $samesite = 'Lax'
     ) {
     }
 }

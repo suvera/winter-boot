@@ -30,6 +30,21 @@ caching, async, modules).
 - Never log secrets, raw bodies, headers, or query values (see `DispatcherServlet`
   conventions: `sanitizeUriForError()`, no-raw-body logging).
 - Never commit, push, or tag unless explicitly asked. Leave work uncommitted for review.
+- Per-request state belongs to the coroutine scope, never to a singleton field or a
+  static: key it by `CoroutineScopeProvider::getScopeId()` and drop it in `defer()`
+  (see `AbstractPlatformTransactionManager::txnStack()`).
+- Pools fail closed: a coroutine never falls back to a shared/process connection, and
+  a connection is reset (`ResettableConnection::resetForReuse()`) before it is reused.
+  PDO/OCI pooling lives once in `pdbc/support/ScopedConnectionPool`.
+- Data read back from stores is decoded with `SerializationUtil::unserialize()`, never
+  a bare `unserialize()`.
+- Caches, labels and lookup tables keyed by request data need a size cap (see
+  `WinterRequestMappingRegistry::MAX_CACHED_PATHS`); metric labels use route templates.
+- Keep pure logic in small static helpers (e.g. `DispatcherServlet::stripContextPath()`)
+  so tests can cover it without booting the server.
+- Proving "fails before the fix": run the new tests against a clean checkout of `HEAD`
+  with a **copied** `vendor/` (a symlinked `vendor/` autoloads the working tree's `src/`).
+- `CHANGELOG.md`: one line per change, grouped under Fixed / Security / Added / Changed.
 
 ## Docs Sync (mandatory)
 

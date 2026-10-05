@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace dev\winterframework\core\app;
 
+use dev\winterframework\util\SerializationUtil;
 use Cascade\Cascade;
 use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\core\context\PropertyContext;
@@ -74,6 +75,22 @@ abstract class WinterApplicationRunner {
         $this->console->pushHandler(new StreamHandler('php://stdout', Logger::INFO));
     }
 
+    /**
+     * winter.security.unserialize.allowedClasses: list of classes stores may
+     * rebuild (sessions, shared cache/queue). Absent keeps any class allowed.
+     */
+    private function configureUnserialize(): void {
+        $key = 'winter.security.unserialize.allowedClasses';
+        if (!$this->propertyCtx->has($key)) {
+            return;
+        }
+        $value = $this->propertyCtx->get($key);
+        if (is_string($value)) {
+            $value = array_values(array_filter(array_map('trim', explode(',', $value))));
+        }
+        SerializationUtil::setAllowedClasses(is_array($value) ? $value : (bool)$value);
+    }
+
     public function getBootVersion(): string {
         return file_get_contents(dirname(dirname(dirname(__DIR__))) . '/' . self::VERSION_FILE);
     }
@@ -103,6 +120,7 @@ abstract class WinterApplicationRunner {
             $this->bootConfig->configDirectory,
             $this->bootConfig->profile
         );
+        $this->configureUnserialize();
         self::logInfo('Starting Application ' . $this->bootApp->getClass()->getShortName());
         $this->showBanner();
 

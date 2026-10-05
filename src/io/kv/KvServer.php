@@ -18,6 +18,11 @@ class KvServer {
 
         'daemonize' => false,
         'backlog' => 256,
+        // One request per "\n"-terminated line: TCP may split or merge
+        // writes, so a single receive event is not a message boundary.
+        'open_eof_split' => true,
+        'package_eof' => "\n",
+        'package_max_length' => 16 * 1024 * 1024,
     ];
     protected Server $server;
 
@@ -37,7 +42,7 @@ class KvServer {
 
     /** @noinspection PhpUnusedParameterInspection */
     public function onConnect(Server $server, int $fd, int $reactorId): void {
-        echo "Client [$fd] [$reactorId] connected\n";
+        // Connections are not logged: one line per client would flood stdout.
     }
 
     /** @noinspection PhpUnusedParameterInspection */
@@ -66,7 +71,7 @@ class KvServer {
             return;
         }
 
-        if ($req->getToken() !== $this->token) {
+        if (!hash_equals($this->token, (string)$req->getToken())) {
             $resp->setError('Error: Token does not match');
             $server->send($fd, $resp . "\n");
             return;

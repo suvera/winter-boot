@@ -144,10 +144,11 @@ class ResponseEntity {
         string $path = '',
         string $domain = '',
         bool $secure = false,
-        bool $httponly = false
+        bool $httponly = false,
+        string $samesite = ''
     ): self {
 
-        $this->cookies[] = new HttpCookie($name, $value, $expires, $path, $domain, $secure, $httponly);
+        $this->cookies[] = new HttpCookie($name, $value, $expires, $path, $domain, $secure, $httponly, $samesite);
 
         return $this;
     }

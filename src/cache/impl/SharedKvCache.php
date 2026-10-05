@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace dev\winterframework\cache\impl;
 
+use dev\winterframework\util\SerializationUtil;
 use dev\winterframework\cache\Cache;
 use dev\winterframework\cache\CacheConfiguration;
 use dev\winterframework\cache\ValueRetrievalException;
@@ -56,7 +57,7 @@ class SharedKvCache implements Cache {
         try {
             $data = $this->client->get($this->name, $key);
             if (!is_null($data)) {
-                $data = unserialize($data);
+                $data = SerializationUtil::unserialize($data);
             }
         } catch (Throwable $e) {
             self::logException($e);
