@@ -17,6 +17,7 @@ use dev\winterframework\exception\NullPointerException;
 use dev\winterframework\exception\WinterException;
 use dev\winterframework\io\metrics\prometheus\PrometheusMetricRegistry;
 use dev\winterframework\reflection\ObjectCreator;
+use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\stereotype\web\RequestBody;
 use dev\winterframework\stereotype\web\RequestParam;
 use dev\winterframework\util\BeanFinderTrait;
@@ -652,7 +653,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
      *
      * @return string[]
      */
-    public static function missingParameters(\ReflectionFunctionAbstract $method, array $args): array {
+    public static function missingParameters(\ReflectionFunctionAbstract|RefMethod $method, array $args): array {
         $missing = [];
         foreach ($method->getParameters() as $param) {
             if (array_key_exists($param->getName(), $args) || $param->isOptional()) {

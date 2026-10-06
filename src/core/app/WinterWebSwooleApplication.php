@@ -79,20 +79,18 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         $wServer->addEventCallback('request', [$this, 'serveRequest']);
 
         $wServer->addEventCallback('start', function (Server $server) use ($wServer) {
-            // NOTE: Do NOT call posix_setpgid() on the master process.
-            // The master must stay in the terminal's foreground process group
-            // so it can receive SIGINT (Ctrl+C) and initiate graceful shutdown.
-            // Workers and manager are still moved to the master's process group
-            // in their respective callbacks, so posix_kill(-$master_pid, SIGKILL)
-            // can still kill the entire tree.
+            // NOTE: Do NOT call posix_setpgid() here or in the worker/manager
+            // callbacks. Every process must stay in the terminal's foreground
+            // process group so Ctrl+C (SIGINT) reaches it. In SWOOLE_BASE mode
+            // master_pid is a worker's own pid (or 0), so setpgid() would move
+            // workers into new groups the terminal never signals; shutdown
+            // stops them through the pid table instead.
             $wServer->addPid('master', $server->master_pid, ProcessType::MASTER);
             self::logInfo("Http server started on $server->host:" . $server->port . ', pid:' . getmypid()
                 . ', master_pid:' . $server->master_pid);
         });
 
         $wServer->addEventCallback('workerStart', function (Server $server, int $workerId) use ($wServer) {
-            posix_setpgid(getmypid(), $server->master_pid);
-
             /** @var IdleCheckRegistry $idleCheck */
             $idleCheck = $wServer->getAppCtx()->beanByClass(IdleCheckRegistry::class);
             $idleCheck->initialize();
@@ -108,10 +106,9 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
             }
 
             $wServer->addPid('worker-' . $workerId, getmypid(), $psType);
-        });
+        }, true);
 
         $wServer->addEventCallback('managerStart', function (Server $server) use ($wServer) {
-            posix_setpgid(getmypid(), $server->master_pid);
             $wServer->addPid('manager', getmypid(), ProcessType::MANAGER);
 
             /** @var IdleCheckRegistry $idleCheck */
@@ -119,7 +116,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
             $idleCheck->initialize();
             self::logInfo("Http Manager started " . ', pid:' . getmypid()
                 . ', master_pid:' . $server->master_pid);
-        });
+        }, true);
 
         $wServer->addEventCallback('pipeMessage', function (Server $server, $srcWorkerId, $data) {
             if (str_starts_with($data, 'json:')) {

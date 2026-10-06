@@ -43,6 +43,9 @@
 - RestTemplate: `HEAD` requests over cURL no longer wait for a body until the timeout.
 - RestTemplate: a custom error handler that returns now gets the raw string body instead of a JSON-decode failure.
 - `RequestMappingRegistry::delete()` of a concrete path no longer also removes the template route it matches.
+- Web: routed requests no longer fail with a 500 `TypeError` in `DispatcherServlet::missingParameters()` (it now accepts `RefMethod`).
+- Server: event callbacks are grouped case-insensitively, so a module's `WorkerStart` no longer replaces the framework's `workerStart` handler (workers were never registered for shutdown).
+- Server: workers and the manager stay in the terminal's process group, so Ctrl+C stops every process instead of leaving workers running.
 
 ### Security
 - Actuator `configprops` and `env` mask values whose keys look secret (password, token, key, secret, ...).

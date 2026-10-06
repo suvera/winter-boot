@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace winterBootTests;
 
+use dev\winterframework\core\context\WinterServer;
+use dev\winterframework\core\web\DispatcherServlet;
 use dev\winterframework\core\web\route\WinterRequestMappingRegistry;
 use dev\winterframework\pdbc\Connection;
 use dev\winterframework\pdbc\DataSource;
@@ -190,6 +192,31 @@ final class ReviewFix210Test extends TestCase {
         $session->destroy();
         $mgr->commit($session, new ResponseEntity(), $store, $opts);
         $this->assertSame([], $store->rows, 'every session row must be gone after logout');
+    }
+
+    // The dispatcher hands missingParameters() the RefMethod wrapper; a
+    // TypeError there turned every routed request into a 500.
+    public function testMissingParametersAcceptsRefMethod(): void {
+        $ref = RefMethod::getInstance(new \ReflectionMethod(ReviewFixRouteController::class, 'user'));
+        $this->assertSame([], DispatcherServlet::missingParameters($ref, ['id' => '7']));
+        $this->assertSame(['id'], DispatcherServlet::missingParameters($ref, []));
+    }
+
+    // Swoole's on() is case-insensitive and keeps one handler per event: a
+    // module's 'WorkerStart' must not replace the framework's 'workerStart'
+    // (which registers worker pids for shutdown), and framework callbacks
+    // registered with $first run before a module's never-returning loop.
+    public function testEventCallbacksGroupCaseInsensitively(): void {
+        $server = (new \ReflectionClass(WinterServer::class))->newInstanceWithoutConstructor();
+        $calls = [];
+        $server->addEventCallback('WorkerStart', function () use (&$calls) { $calls[] = 'module'; });
+        $server->addEventCallback('workerStart', function () use (&$calls) { $calls[] = 'framework'; }, true);
+        $callbacks = (new \ReflectionProperty(WinterServer::class, 'eventCallbacks'))->getValue($server);
+        $this->assertSame(['workerstart'], array_keys($callbacks));
+        foreach ($callbacks['workerstart'] as $cb) {
+            $cb();
+        }
+        $this->assertSame(['framework', 'module'], $calls);
     }
 
     // Deleting a concrete route keeps the template route it also matches.

@@ -126,11 +126,23 @@ class WinterServer {
         return $this->scheduledTables[$workerId] ?? null;
     }
 
-    public function addEventCallback(string $eventName, callable $callback): void {
-        if (!isset($this->eventCallbacks[$eventName])) {
-            $this->eventCallbacks[$eventName] = [];
+    /**
+     * Swoole event names are case-insensitive and on() keeps only the last
+     * handler per event, so callbacks are grouped by the lower-cased name:
+     * 'workerStart' and 'WorkerStart' must share one handler, not replace
+     * each other. $first runs the callback before those already added (a
+     * module callback may never return, e.g. a worker loop).
+     */
+    public function addEventCallback(string $eventName, callable $callback, bool $first = false): void {
+        $key = strtolower($eventName);
+        if (!isset($this->eventCallbacks[$key])) {
+            $this->eventCallbacks[$key] = [];
         }
-        $this->eventCallbacks[$eventName][] = $callback;
+        if ($first) {
+            array_unshift($this->eventCallbacks[$key], $callback);
+        } else {
+            $this->eventCallbacks[$key][] = $callback;
+        }
     }
 
     protected function registerEventCallbacks(): void {
@@ -173,10 +185,7 @@ class WinterServer {
             self::registerProcessSignals();
             ServerPidManager::registerProcessSignals();
         };
-        if (!isset($this->eventCallbacks['start'])) {
-            $this->eventCallbacks['start'] = [];
-        }
-        array_unshift($this->eventCallbacks['start'], $signalCb);
+        $this->addEventCallback('start', $signalCb, true);
 
         // Register event callbacks before start
         $this->registerEventCallbacks();
