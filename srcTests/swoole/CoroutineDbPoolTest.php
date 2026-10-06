@@ -187,15 +187,55 @@ class CoroutineDbPoolTest {
         $ds = new PdoDataSource($this->sqliteConfig(1, 0));
         $exhausted = null;
         run(function () use ($ds, &$exhausted): void {
-            $ds->getConnection();
-            try {
-                $ds->beginIsolation();
-            } catch (PoolExhaustedException $e) {
-                $exhausted = $e;
-            }
+            $ds->beginIsolation();
+            Coroutine::create(function () use ($ds, &$exhausted): void {
+                try {
+                    $ds->getConnection();
+                } catch (PoolExhaustedException $e) {
+                    $exhausted = $e;
+                }
+            });
         });
         if (!$exhausted instanceof PoolExhaustedException) {
-            throw new \Exception('expected isolation beyond maxConnections to fail closed');
+            throw new \Exception('expected a top-level isolation to take the only slot');
+        }
+    }
+
+    // A coroutine that already holds a connection must not wait for a slot
+    // to start REQUIRES_NEW: concurrent holders would deadlock on each other.
+    public function testNestedIsolationNeverDeadlocks(): void {
+        $ds = new PdoDataSource($this->sqliteConfig(1, 0));
+        $pair = null;
+        run(function () use ($ds, &$pair): void {
+            $outer = $ds->getConnection();
+            $inner = $ds->beginIsolation();
+            $pair = [$outer, $inner];
+            $ds->endIsolation();
+        });
+        if ($pair === null || $pair[0] === $pair[1]) {
+            throw new \Exception('expected nested isolation to get its own connection beyond the cap');
+        }
+    }
+
+    // The connection a finished nested isolation returns to the idle list
+    // must not admit a new request while its caller still holds a slot.
+    public function testIdleFromNestedIsolationDoesNotBypassCap(): void {
+        $ds = new PdoDataSource($this->sqliteConfig(1, 0));
+        $exhausted = null;
+        run(function () use ($ds, &$exhausted): void {
+            $ds->getConnection();
+            $ds->beginIsolation();
+            $ds->endIsolation();
+            Coroutine::create(function () use ($ds, &$exhausted): void {
+                try {
+                    $ds->getConnection();
+                } catch (PoolExhaustedException $e) {
+                    $exhausted = $e;
+                }
+            });
+        });
+        if (!$exhausted instanceof PoolExhaustedException) {
+            throw new \Exception('expected the cap to hold while the outer caller keeps its slot');
         }
     }
 }

@@ -448,6 +448,9 @@ class DispatcherServlet implements HttpRequestDispatcher {
                     } catch (Throwable $e) {
                         $aopExCtx->setException($e);
                         $aopExCtx->setCommitFailed();
+                        if ($aopExCtx->getPropagatedCommitFailure() === $e) {
+                            throw $e;
+                        }
                         self::logException($e);
                     }
                 }

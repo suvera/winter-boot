@@ -6,6 +6,7 @@ namespace dev\winterframework\core\app;
 
 use dev\winterframework\core\context\WinterServer;
 use dev\winterframework\core\context\WinterWebSwooleContext;
+use dev\winterframework\exception\WinterException;
 use dev\winterframework\io\kv\KvClient;
 use dev\winterframework\io\kv\KvConfig;
 use dev\winterframework\io\kv\KvServerProcess;
@@ -158,7 +159,46 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
             }
         }
 
+        // Absent means Swoole's default (0: no runtime hooks).
+        if (array_key_exists('hook_flags', $args)) {
+            $args['hook_flags'] = self::resolveHookFlags($args['hook_flags']);
+        }
+
         return $args;
+    }
+
+    /**
+     * server.swoole.hook_flags accepts a number, a SWOOLE_HOOK_* constant
+     * name, or a list of names OR'ed together; a "-NAME" entry removes that
+     * flag (e.g. [SWOOLE_HOOK_ALL, -SWOOLE_HOOK_CURL]). Unknown names fail
+     * startup instead of silently running without the intended hooks.
+     */
+    public static function resolveHookFlags(mixed $value): int {
+        if (is_int($value)) {
+            return $value;
+        }
+        $flags = 0;
+        foreach (is_array($value) ? $value : [$value] as $entry) {
+            if (is_int($entry) || (is_string($entry) && ctype_digit($entry))) {
+                $flags |= (int)$entry;
+                continue;
+            }
+            $name = is_string($entry) ? trim($entry) : '';
+            $remove = str_starts_with($name, '-');
+            if ($remove) {
+                $name = ltrim(substr($name, 1));
+            }
+            if (!str_starts_with($name, 'SWOOLE_HOOK_')) {
+                $name = 'SWOOLE_HOOK_' . strtoupper($name);
+            }
+            if (!preg_match('/^SWOOLE_HOOK_[A-Z_]+$/', $name) || !defined($name)) {
+                throw new WinterException('Invalid server.swoole.hook_flags entry: '
+                    . (is_scalar($entry) ? (string)$entry : get_debug_type($entry)));
+            }
+            $bit = (int)constant($name);
+            $flags = $remove ? ($flags & ~$bit) : ($flags | $bit);
+        }
+        return $flags;
     }
 
     protected function buildSharedServer(WinterServer $wServer): void {

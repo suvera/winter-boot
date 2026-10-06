@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace winterBootTests;
 
+use dev\winterframework\core\aop\AopInterceptorRegistry;
+use dev\winterframework\core\context\ApplicationContextData;
+use dev\winterframework\core\context\WinterApplicationContextBuilder;
+use dev\winterframework\core\context\WinterBeanProviderContext;
 use dev\winterframework\core\context\WinterServer;
 use dev\winterframework\core\web\DispatcherServlet;
 use dev\winterframework\core\web\route\WinterRequestMappingRegistry;
@@ -95,6 +99,18 @@ class ReviewFixRouteController {
 
     #[GetMapping(path: '/rf-users/me')]
     public function me(): void {
+    }
+}
+
+/** Bean factory whose first build fails, like a DataSource whose database is down. */
+final class ReviewFixFlakyFactory {
+    public int $calls = 0;
+
+    public function build(): \ArrayObject {
+        if (++$this->calls === 1) {
+            throw new \RuntimeException('database unavailable');
+        }
+        return new \ArrayObject();
     }
 }
 
@@ -217,6 +233,50 @@ final class ReviewFix210Test extends TestCase {
             $cb();
         }
         $this->assertSame(['framework', 'module'], $calls);
+    }
+
+    public static function beanProvider(): WinterBeanProviderContext {
+        $ctxData = new ApplicationContextData();
+        $appCtx = new class extends WinterApplicationContextBuilder {
+            public function __construct() {
+            }
+
+            public function getId(): string {
+                return 'test';
+            }
+
+            public function getApplicationName(): string {
+                return 'test';
+            }
+
+            public function getApplicationVersion(): string {
+                return 'test';
+            }
+
+            public function getStartupDate(): int {
+                return 0;
+            }
+        };
+        $provider = new WinterBeanProviderContext($ctxData, $appCtx);
+        $ctxData->setBeanProvider($provider);
+        $ctxData->setAopRegistry(new AopInterceptorRegistry($ctxData, $appCtx));
+        return $provider;
+    }
+
+    // A failed bean build must not leave the bean marked "in progress",
+    // or every later lookup reports a dependency cycle instead of retrying.
+    public function testFailedBeanBuildCanBeRetried(): void {
+        $provider = self::beanProvider();
+        $factory = new ReviewFixFlakyFactory();
+        $provider->registerInternalBeanMethod('flaky', '', $factory, 'build');
+        try {
+            $provider->beanByName('flaky');
+            throw new \LogicException('expected the first build to fail');
+        } catch (\RuntimeException $e) {
+            $this->assertTrue(str_contains($e->getMessage(), 'database unavailable'), $e->getMessage());
+        }
+        $this->assertTrue($provider->beanByName('flaky') instanceof \ArrayObject);
+        $this->assertSame(2, $factory->calls);
     }
 
     // Deleting a concrete route keeps the template route it also matches.

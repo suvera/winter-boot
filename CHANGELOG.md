@@ -38,7 +38,11 @@
 - Native AOP: sibling beans that inherit the same advised method are all intercepted (the last bean built no longer silently disables the others' aspects).
 - Native AOP: advised calls report the bean class, not the declaring parent, so inherited methods find their interceptor and `#[Async]` jobs resolve the right bean.
 - PDBC: a coroutine woken by a released connection now takes it instead of opening another, so `maxConnections` is no longer exceeded.
-- PDBC: `REQUIRES_NEW`/`NOT_SUPPORTED` connections count against `maxConnections`, and ending them wakes waiting coroutines.
+- PDBC: `REQUIRES_NEW`/`NOT_SUPPORTED` connections count against `maxConnections`, and ending them wakes waiting coroutines. A nested one (the caller already holds a connection) never waits for a slot, so concurrent callers cannot deadlock on the pool.
+- PDBC: an idle connection no longer admits a new request while the pool is at `maxConnections`.
+- PDBC: `PoolExhaustedException` names the real settings (`winter.coroutine.db.maxConnections` / `connection.maxConnections`) instead of a Doctrine key.
+- Beans: concurrent first requests no longer fail with a false "beans form a cycle" error when a bean's construction yields (e.g. a DataSource opening a hooked connection); the second request waits for the first build.
+- Beans: a bean whose construction failed can be built again on the next lookup instead of reporting a dependency cycle forever.
 - Transactions: `REQUIRES_NEW`/`NOT_SUPPORTED` on a custom DataSource without `IsolatedConnectionProvider` run on the shared connection again (with a warning) instead of throwing.
 - RestTemplate: `HEAD` requests over cURL no longer wait for a body until the timeout.
 - RestTemplate: a custom error handler that returns now gets the raw string body instead of a JSON-decode failure.
@@ -54,6 +58,7 @@
 - Sessions: `destroy()` after `regenerateId()` also deletes the pre-rotation session row, so the old id cannot stay logged in.
 
 ### Added
+- `server.swoole.hook_flags` accepts `SWOOLE_HOOK_*` names, a list of names (OR'ed) and `-NAME` removals besides a number; unknown names fail startup. Default unchanged (absent = Swoole's 0, no runtime hooks).
 - `RequestSession::regenerateId()` to rotate the session id on login.
 - `SessionOptions::$samesite` (default `Lax`) and `samesite` on `HttpCookie`/`ResponseEntity::withCookie()`.
 - `winter.security.unserialize.allowedClasses` to restrict classes rebuilt from session, shared cache and shared queue data.

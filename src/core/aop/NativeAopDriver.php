@@ -17,7 +17,8 @@ use Throwable;
  *  - begin() runs aspectBegin(); stopExecution() short-circuits the body
  *    (proceed=false + result), otherwise the body runs (proceed=true).
  *  - finish() runs aspectFailed() on body exceptions or aspectCommit() on
- *    return values, with the same log-and-swallow commit semantics.
+ *    return values. Commit failures are logged and swallowed, except those
+ *    of PropagatesCommitFailure aspects (transactions), which are rethrown.
  *  - async methods enqueue under their real name and return null, exactly
  *    like the generated enqueue stub.
  *
@@ -137,6 +138,11 @@ final class NativeAopDriver {
             $exCtx->setException($e);
             $exCtx->setCommitFailed();
 
+            if ($exCtx->getPropagatedCommitFailure() === $e) {
+                // e.g. the transaction did not commit: the extension leaves
+                // this pending, so the caller gets it instead of the result.
+                throw $e;
+            }
             self::logException($e);
         }
     }

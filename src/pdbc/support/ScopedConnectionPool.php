@@ -22,6 +22,8 @@ use Throwable;
  * - maxConnections caps open scoped and isolated connections, counting
  *   connections that are still being opened, so concurrent checkouts cannot
  *   overshoot it. A waiter takes the connection whose release woke it.
+ *   Only a nested isolation (the coroutine already holds a connection) may
+ *   go past the cap, so REQUIRES_NEW under full load cannot deadlock.
  * - beginIsolation()/endIsolation() bind a dedicated connection to the
  *   current scope (REQUIRES_NEW / NOT_SUPPORTED propagation).
  *
@@ -72,9 +74,17 @@ trait ScopedConnectionPool {
     public function beginIsolation(): Connection {
         $cid = $this->currentCoroutineId();
         $key = $cid === null ? 'process' : 'c' . $cid;
-        // Inside a coroutine an isolated connection counts against
-        // maxConnections like any scoped one; the process scope is uncapped.
-        $conn = $cid === null ? ($this->takeIdle() ?? $this->createConnection()) : $this->checkoutConnection();
+        if ($cid === null) {
+            $conn = $this->takeIdle() ?? $this->createConnection();
+        } elseif ($this->holdsConnection($cid)) {
+            // Nested REQUIRES_NEW/NOT_SUPPORTED never waits for a slot: the
+            // caller already holds one, so concurrent callers waiting on
+            // each other would deadlock until maxWaitMs. It still counts
+            // against the cap, so new checkouts wait until it is returned.
+            $conn = $this->takeIdle() ?? $this->openCounted();
+        } else {
+            $conn = $this->checkoutConnection();
+        }
         $this->isolated[$key][] = $conn;
         if ($cid !== null) {
             $this->registerRelease($cid);
@@ -156,21 +166,22 @@ trait ScopedConnectionPool {
      * a new one is opened beside it.
      */
     private function checkoutConnection(): Connection {
-        $conn = $this->takeIdle();
-        if ($conn !== null) {
-            return $conn;
-        }
         $this->awaitSlot();
-        $conn = $this->takeIdle();
-        if ($conn !== null) {
-            return $conn;
-        }
+        return $this->takeIdle() ?? $this->openCounted();
+    }
+
+    /** Open a connection, counted against the cap while it is being opened. */
+    private function openCounted(): Connection {
         $this->pendingConnections++;
         try {
             return $this->createConnection();
         } finally {
             $this->pendingConnections--;
         }
+    }
+
+    private function holdsConnection(int $cid): bool {
+        return isset($this->scopedConnections[$cid]) || !empty($this->isolated['c' . $cid]);
     }
 
     private function registerRelease(int $cid): void {
@@ -263,8 +274,13 @@ trait ScopedConnectionPool {
         return count($this->scopedConnections) + $isolated + $this->pendingConnections;
     }
 
+    /**
+     * A slot is a checked-out connection, idle ones excluded: an idle
+     * connection returned by a nested isolation must not let a new request
+     * in while that isolation's caller still holds its own slot.
+     */
     private function slotAvailable(int $max): bool {
-        return !empty($this->idleConnections) || $this->activeConnectionCount() < $max;
+        return $this->activeConnectionCount() < $max;
     }
 
     private function awaitSlot(): void {
