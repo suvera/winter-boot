@@ -13,7 +13,8 @@ class IdleCheckRegistry {
     private array $callbacks = [];
     private array $initialized = [];
     private bool $timerEnabled = false;
-    private int $timerId;
+    private bool $timerDisabled = false;
+    private ?int $timerId = null;
 
     public function __construct() {
         $this->timerEnabled = extension_loaded('swoole');
@@ -35,7 +36,7 @@ class IdleCheckRegistry {
             return;
         }
 
-        if (isset($this->initialized[getmypid()])) {
+        if ($this->timerDisabled || isset($this->initialized[getmypid()])) {
             return;
         }
 
@@ -67,10 +68,26 @@ class IdleCheckRegistry {
         if (!$this->timerEnabled) {
             return;
         }
-        if ($this->timerId) {
+        if ($this->timerId !== null) {
             Timer::clear($this->timerId);
+            $this->timerId = null;
             unset($this->initialized[getmypid()]);
         }
+    }
+
+    /**
+     * Stops the idle-check timer and keeps it from starting again; callbacks
+     * are still registered. For processes without a server (tests, scripts):
+     * a pending Swoole timer keeps the event loop, and so the process, alive
+     * after the script ends.
+     */
+    public function disableTimer(): void {
+        $this->clear();
+        $this->timerDisabled = true;
+    }
+
+    public function isTimerActive(): bool {
+        return $this->timerId !== null;
     }
 
     public static function clearAll(): void {

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Removed
+- Native extension: `deferred()` / `defered()` are removed (extension 0.2.0). Their Zend Observer hook left `EG(current_observed_frame)` pointing into freed coroutine stacks whenever a Swoole coroutine yielded (Swoole only carries observer state across switches with `swoole.enable_fiber_mock=1`), crashing PHP at shutdown. Use `try`/`finally` for cleanup. The extension now registers no observer handlers.
+
+### Fixed
+- Testing: added `IdleCheckRegistry::disableTimer()` so a test bootstrap that builds an application context without starting the server can stop the datasource idle-check timer; otherwise the pending Swoole timer keeps the process alive after the last test (see the user-docs testing page).
+
 ## 2.1.1
 
 ### Fixed

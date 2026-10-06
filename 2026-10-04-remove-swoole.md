@@ -120,9 +120,11 @@ request, but they are never used to run requests in parallel.
   and it ends when that request or job finishes. Swoole-specific providers are deleted.
 - Each worker keeps a small **process-local** pool. The current request checks out a
   connection and returns it when the request ends.
-- Connection release is registered with `deferred()` **in the dispatch frame**.
-  `deferred()` runs callbacks when the PHP function that registered them exits. It does
-  not run at the end of a PHP request, which never comes in a long-lived worker.
+- Connection release happens in a `try`/`finally` **in the dispatch frame** (the
+  dispatcher, async job runner and scheduler each own one), so it runs on return and on
+  exceptions. It must not wait for the end of a PHP request, which never comes in a
+  long-lived worker. (The native `deferred()` previously planned for this was removed:
+  its Zend Observer hook crashed under Swoole coroutines.)
 - Config meaning:
   - `connection.maxConnections` becomes a **per-worker** cap. Size the database so that
     `workers × maxConnections ≤ db max_connections`.
@@ -154,10 +156,9 @@ request, but they are never used to run requests in parallel.
 - **Every native path has a pure-PHP version**, so the framework runs without the
   extension (tests, dev machines).
 - **No C code is written before the benchmark gate** shows where the cost actually is.
-- `deferred()` semantics stay unchanged. The extension currently has no Fiber
-  handling. Add tests for `deferred()` and AOP (`zend_execute_ex` override) when a
-  Fiber suspends, resumes, or is destroyed while suspended, because user code may still
-  use Fibers.
+- The extension currently has no Fiber handling. Add tests for AOP (`zend_execute_ex`
+  override) when a Fiber suspends, resumes, or is destroyed while suspended, because
+  user code may still use Fibers.
 
 ### 4.6 HTTP hardening (now framework code)
 
@@ -230,7 +231,7 @@ How the framework uses it:
 one Fiber blocks the whole process, which is why Section 4.2 doesn't use Fibers for
 request concurrency. A `finally` block inside a suspended Fiber runs only when the Fiber
 is resumed or garbage-collected. Cleanup must not depend on a suspended Fiber, and this
-case belongs in the `deferred()` tests (Section 4.5).
+case belongs in the connection-release tests (Section 4.5).
 
 ### 4.8 Replacing shared memory (`ShmTable` / `WinterTable`)
 
@@ -604,7 +605,7 @@ the release order in Section 5.
 | Worker kill and restart smoke test | Step 2 |
 | Benchmark gate | Step 4, before porting the remaining subsystems |
 | KV, queue, async, scheduled, and HTTP-client smoke tests | Step 5, per slice |
-| `deferred()` and AOP behavior with Fibers | Step 5 (native extension slice) |
+| AOP behavior with Fibers | Step 5 (native extension slice) |
 | No Swoole references in `src/` (Section 3 grep) | Step 6 |
 | Module suites green on core `3.0.0`, module smoke tests | Step 5 (slice 8) |
 | Doctrine: no entity/EM carry-over between requests | Step 5 (slice 8) |
