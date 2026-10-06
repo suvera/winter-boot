@@ -19,8 +19,9 @@ use Throwable;
  *   rolled back); a connection that cannot be reset is discarded.
  * - Failures fail closed: a coroutine never falls back to the shared
  *   connection, which would interleave statements of concurrent requests.
- * - maxConnections caps open scoped connections, counting connections that
- *   are still being opened, so concurrent checkouts cannot overshoot it.
+ * - maxConnections caps open scoped and isolated connections, counting
+ *   connections that are still being opened, so concurrent checkouts cannot
+ *   overshoot it. A waiter takes the connection whose release woke it.
  * - beginIsolation()/endIsolation() bind a dedicated connection to the
  *   current scope (REQUIRES_NEW / NOT_SUPPORTED propagation).
  *
@@ -71,7 +72,9 @@ trait ScopedConnectionPool {
     public function beginIsolation(): Connection {
         $cid = $this->currentCoroutineId();
         $key = $cid === null ? 'process' : 'c' . $cid;
-        $conn = $this->takeIdle() ?? $this->createConnection();
+        // Inside a coroutine an isolated connection counts against
+        // maxConnections like any scoped one; the process scope is uncapped.
+        $conn = $cid === null ? ($this->takeIdle() ?? $this->createConnection()) : $this->checkoutConnection();
         $this->isolated[$key][] = $conn;
         if ($cid !== null) {
             $this->registerRelease($cid);
@@ -90,6 +93,7 @@ trait ScopedConnectionPool {
             unset($this->isolated[$key]);
         }
         $this->recycle($conn);
+        $this->signalRelease();
     }
 
     public function checkIdleConnection(): void {
@@ -140,19 +144,33 @@ trait ScopedConnectionPool {
             unset($this->scopedConnections[$cid]);
         }
 
-        $conn = $this->takeIdle();
-        if ($conn === null) {
-            $this->awaitSlot();
-            $this->pendingConnections++;
-            try {
-                $conn = $this->createConnection();
-            } finally {
-                $this->pendingConnections--;
-            }
-        }
+        $conn = $this->checkoutConnection();
         $this->scopedConnections[$cid] = $conn;
         $this->registerRelease($cid);
         return $conn;
+    }
+
+    /**
+     * Reuse an idle connection, or open a new one once the cap allows it.
+     * A connection released while waiting is taken, never left idle while
+     * a new one is opened beside it.
+     */
+    private function checkoutConnection(): Connection {
+        $conn = $this->takeIdle();
+        if ($conn !== null) {
+            return $conn;
+        }
+        $this->awaitSlot();
+        $conn = $this->takeIdle();
+        if ($conn !== null) {
+            return $conn;
+        }
+        $this->pendingConnections++;
+        try {
+            return $this->createConnection();
+        } finally {
+            $this->pendingConnections--;
+        }
     }
 
     private function registerRelease(int $cid): void {
@@ -236,7 +254,17 @@ trait ScopedConnectionPool {
     }
 
     private function activeConnectionCount(): int {
-        return count($this->scopedConnections) + $this->pendingConnections;
+        $isolated = 0;
+        foreach ($this->isolated as $key => $stack) {
+            if ($key !== 'process') {
+                $isolated += count($stack);
+            }
+        }
+        return count($this->scopedConnections) + $isolated + $this->pendingConnections;
+    }
+
+    private function slotAvailable(int $max): bool {
+        return !empty($this->idleConnections) || $this->activeConnectionCount() < $max;
     }
 
     private function awaitSlot(): void {
@@ -245,12 +273,16 @@ trait ScopedConnectionPool {
             return;
         }
         $deadline = microtime(true) + $this->effectiveMaxWaitMs() / 1000;
-        while (empty($this->idleConnections) && $this->activeConnectionCount() >= $max) {
+        while (!$this->slotAvailable($max)) {
             $remainingMs = (int)(($deadline - microtime(true)) * 1000);
             if ($remainingMs <= 0 || !$this->waitForRelease($remainingMs)) {
+                // A release may have landed without a signal reaching us.
+                if ($this->slotAvailable($max)) {
+                    return;
+                }
                 throw new PoolExhaustedException(
                     $this->config->getName(),
-                    count($this->scopedConnections),
+                    $this->activeConnectionCount(),
                     $max
                 );
             }

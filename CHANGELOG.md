@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.1.1 — 2026-10-05
+## 2.1.1
 
 ### Fixed
 - Transactions: transaction state is now per coroutine, so concurrent requests no longer join or complete each other's transactions.
@@ -35,11 +35,20 @@
 - Async: a full in-memory async queue is logged as a dropped job instead of reported as enqueued.
 - `RequestMappingRegistry::delete()` now removes the route from lookups.
 - `Debug::exceptionBacktrace()` keeps the first stack frame.
+- Native AOP: sibling beans that inherit the same advised method are all intercepted (the last bean built no longer silently disables the others' aspects).
+- Native AOP: advised calls report the bean class, not the declaring parent, so inherited methods find their interceptor and `#[Async]` jobs resolve the right bean.
+- PDBC: a coroutine woken by a released connection now takes it instead of opening another, so `maxConnections` is no longer exceeded.
+- PDBC: `REQUIRES_NEW`/`NOT_SUPPORTED` connections count against `maxConnections`, and ending them wakes waiting coroutines.
+- Transactions: `REQUIRES_NEW`/`NOT_SUPPORTED` on a custom DataSource without `IsolatedConnectionProvider` run on the shared connection again (with a warning) instead of throwing.
+- RestTemplate: `HEAD` requests over cURL no longer wait for a body until the timeout.
+- RestTemplate: a custom error handler that returns now gets the raw string body instead of a JSON-decode failure.
+- `RequestMappingRegistry::delete()` of a concrete path no longer also removes the template route it matches.
 
 ### Security
 - Actuator `configprops` and `env` mask values whose keys look secret (password, token, key, secret, ...).
 - Cache aspects no longer log cache keys or cached values.
 - KV/queue clients no longer log raw responses.
+- Sessions: `destroy()` after `regenerateId()` also deletes the pre-rotation session row, so the old id cannot stay logged in.
 
 ### Added
 - `RequestSession::regenerateId()` to rotate the session id on login.

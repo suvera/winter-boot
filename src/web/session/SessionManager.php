@@ -79,6 +79,11 @@ class SessionManager {
         if ($s->isDestroyed()) {
             $store->open('', $o->name);
             try {
+                // Ids rotated away earlier in this request must die too, or
+                // a holder of the pre-rotation id keeps a live session.
+                foreach ($s->getPreviousIds() as $oldId) {
+                    $store->destroy($oldId);
+                }
                 $store->destroy($s->getId());
             } finally {
                 $store->close();

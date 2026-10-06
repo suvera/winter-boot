@@ -358,7 +358,10 @@ typedef struct _wb_advice {
 	zend_function *func;
 	zend_class_entry *scope;
 	zend_string *method_name;
-	zend_class_entry *bean_ce;
+	/* Every bean class advised on this op_array. An inherited method shares
+	 * its parent's op_array, so sibling beans register into one entry. */
+	zend_class_entry **bean_ces;
+	uint32_t bean_count;
 } wb_advice;
 
 static void (*wb_orig_execute_ex)(zend_execute_data *ex);
@@ -387,6 +390,7 @@ static void wb_advice_map_free(void)
 		wb_advice *ad;
 		ZEND_HASH_FOREACH_PTR(ht, ad) {
 			zend_string_release(ad->method_name);
+			efree(ad->bean_ces);
 			efree(ad);
 		} ZEND_HASH_FOREACH_END();
 	}
@@ -498,20 +502,59 @@ PHP_FUNCTION(winter_boot_advise)
 		zend_hash_init(map, 64, NULL, NULL, 0);
 		wb_advice_map_set(map);
 	}
-	ad = (wb_advice *) emalloc(sizeof(wb_advice));
-	ad->func = func;
-	ad->scope = func->common.scope;
-	ad->method_name = zend_string_copy(func->common.function_name);
-	ad->bean_ce = ce;
-	{
-		wb_advice *old = (wb_advice *) zend_hash_index_find_ptr(
-			map, (zend_ulong)(uintptr_t) func);
-		if (old != NULL) {
-			zend_string_release(old->method_name);
-			efree(old);
-		}
+	ad = (wb_advice *) zend_hash_index_find_ptr(map, (zend_ulong)(uintptr_t) func);
+	if (ad != NULL && (ad->func != func || ad->scope != func->common.scope
+		|| !zend_string_equals(ad->method_name, func->common.function_name))) {
+		/* Stale entry for a recycled address: start over. */
+		zend_string_release(ad->method_name);
+		efree(ad->bean_ces);
+		efree(ad);
+		zend_hash_index_del(map, (zend_ulong)(uintptr_t) func);
+		ad = NULL;
+	}
+	if (ad == NULL) {
+		ad = (wb_advice *) emalloc(sizeof(wb_advice));
+		ad->func = func;
+		ad->scope = func->common.scope;
+		ad->method_name = zend_string_copy(func->common.function_name);
+		ad->bean_ces = NULL;
+		ad->bean_count = 0;
 		zend_hash_index_update_ptr(map, (zend_ulong)(uintptr_t) func, ad);
 	}
+	{
+		/* Idempotent: re-advising the same bean class adds nothing. */
+		uint32_t i;
+		for (i = 0; i < ad->bean_count; i++) {
+			if (ad->bean_ces[i] == ce) {
+				return;
+			}
+		}
+		ad->bean_ces = (zend_class_entry **) erealloc(
+			ad->bean_ces, sizeof(zend_class_entry *) * (ad->bean_count + 1));
+		ad->bean_ces[ad->bean_count++] = ce;
+	}
+}
+
+/* The advised bean class a call belongs to: an exact match first, then the
+ * first registered ancestor of the runtime class, or NULL when the class is
+ * outside every advised bean family. */
+static zend_class_entry *wb_advice_bean_for(wb_advice *ad, zend_class_entry *runtime_ce)
+{
+	uint32_t i;
+	if (runtime_ce == NULL) {
+		return NULL;
+	}
+	for (i = 0; i < ad->bean_count; i++) {
+		if (ad->bean_ces[i] == runtime_ce) {
+			return runtime_ce;
+		}
+	}
+	for (i = 0; i < ad->bean_count; i++) {
+		if (instanceof_function(runtime_ce, ad->bean_ces[i])) {
+			return ad->bean_ces[i];
+		}
+	}
+	return NULL;
 }
 
 PHP_FUNCTION(winter_boot_is_advised)
@@ -1296,7 +1339,7 @@ static void wb_close_skipped_frame(zend_execute_data *ex)
 /* Full interception of one advised call. Ownership: every zval taken here is
  * released on every path; the only references that escape are the engine's
  * own (return slot, EG(exception)) via the proven transfer idiom. */
-static void wb_intercept(zend_execute_data *ex, wb_advice *ad)
+static void wb_intercept(zend_execute_data *ex, wb_advice *ad, zend_class_entry *bean_ce)
 {
 	zval params[4], retval, exctx, interceptor, args;
 	zval *zv;
@@ -1314,7 +1357,11 @@ static void wb_intercept(zend_execute_data *ex, wb_advice *ad)
 		 * proxy's static-$this Error). */
 		ZVAL_NULL(&params[0]);
 	}
-	if (ad->scope != NULL && ad->scope->name != NULL) {
+	/* The bean class, not the declaring one: interceptors and async jobs
+	 * are keyed by the bean (an inherited method declares on its parent). */
+	if (bean_ce != NULL && bean_ce->name != NULL) {
+		ZVAL_STR_COPY(&params[1], bean_ce->name);
+	} else if (ad->scope != NULL && ad->scope->name != NULL) {
 		ZVAL_STR_COPY(&params[1], ad->scope->name);
 	} else {
 		ZVAL_EMPTY_STRING(&params[1]);
@@ -1462,6 +1509,7 @@ static void wb_aop_execute_ex(zend_execute_data *ex)
 {
 	HashTable *map = wb_advice_map();
 	wb_advice *ad = NULL;
+	zend_class_entry *bean_ce = NULL;
 
 	if (map != NULL && ex != NULL && ex->func != NULL
 		&& ZEND_USER_CODE(ex->func->type)) {
@@ -1472,18 +1520,24 @@ static void wb_aop_execute_ex(zend_execute_data *ex)
 			|| !zend_string_equals(ad->method_name, ex->func->common.function_name))) {
 			/* Recycled address or stale entry: never advise the wrong method. */
 			ad = NULL;
-		} else if (ad != NULL && Z_TYPE(ex->This) == IS_OBJECT
-			&& !instanceof_function(Z_OBJCE(ex->This), ad->bean_ce)) {
+		} else if (ad != NULL && Z_TYPE(ex->This) == IS_OBJECT) {
 			/* Inherited op_array shared with the parent: only the advised
-			 * bean family intercepts (see plan). */
-			ad = NULL;
+			 * bean families intercept (see plan). */
+			bean_ce = wb_advice_bean_for(ad, Z_OBJCE(ex->This));
+			if (bean_ce == NULL) {
+				ad = NULL;
+			}
+		} else if (ad != NULL) {
+			/* Static call: name the called bean when it is one; otherwise
+			 * the declaring class, as before. */
+			bean_ce = wb_advice_bean_for(ad, Z_CE(ex->This));
 		}
 	}
 	if (ad == NULL) {
 		wb_orig_execute_ex(ex);
 		return;
 	}
-	wb_intercept(ex, ad);
+	wb_intercept(ex, ad, bean_ce);
 }
 
 static PHP_GINIT_FUNCTION(winter_boot)

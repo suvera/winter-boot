@@ -134,4 +134,68 @@ class CoroutineDbPoolTest {
             throw new \Exception('expected checked-out connection to stay open across idle check');
         }
     }
+
+    public function testWaiterTakesReleasedConnectionInsteadOfOpeningAnother(): void {
+        $ds = new PdoDataSource($this->sqliteConfig(1, 3000));
+        $conns = [];
+        run(function () use ($ds, &$conns): void {
+            $hold = new Channel(1);
+            Coroutine::create(function () use ($ds, $hold, &$conns): void {
+                $conns['a'] = $ds->getConnection();
+                $hold->pop();
+            });
+            Coroutine::create(function () use ($ds, &$conns): void {
+                $conns['b'] = $ds->getConnection();
+            });
+            $hold->push(true);
+        });
+        if (!isset($conns['a'], $conns['b'])) {
+            throw new \Exception('expected both coroutines to check out a connection');
+        }
+        if ($conns['a'] !== $conns['b']) {
+            throw new \Exception('expected the waiter to reuse the released connection (cap 1)');
+        }
+    }
+
+    public function testIsolationCountsAgainstCapAndSignalsOnEnd(): void {
+        $ds = new PdoDataSource($this->sqliteConfig(1, 3000));
+        $conns = [];
+        run(function () use ($ds, &$conns): void {
+            $hold = new Channel(1);
+            $done = new Channel(1);
+            Coroutine::create(function () use ($ds, $hold, $done, &$conns): void {
+                $conns['iso'] = $ds->beginIsolation();
+                $hold->pop();
+                $ds->endIsolation();
+                $done->pop();
+            });
+            Coroutine::create(function () use ($ds, &$conns): void {
+                $conns['b'] = $ds->getConnection();
+            });
+            $hold->push(true);
+            $done->push(true);
+        });
+        if (!isset($conns['iso'], $conns['b'])) {
+            throw new \Exception('expected the waiter to get a connection once isolation ended');
+        }
+        if ($conns['iso'] !== $conns['b']) {
+            throw new \Exception('expected the isolated connection to count against the cap and be handed over');
+        }
+    }
+
+    public function testIsolationRespectsCap(): void {
+        $ds = new PdoDataSource($this->sqliteConfig(1, 0));
+        $exhausted = null;
+        run(function () use ($ds, &$exhausted): void {
+            $ds->getConnection();
+            try {
+                $ds->beginIsolation();
+            } catch (PoolExhaustedException $e) {
+                $exhausted = $e;
+            }
+        });
+        if (!$exhausted instanceof PoolExhaustedException) {
+            throw new \Exception('expected isolation beyond maxConnections to fail closed');
+        }
+    }
 }

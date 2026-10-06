@@ -161,7 +161,13 @@ class DefaultRestClientTransport implements RestClientTransport {
 
         $responseHeaders = [];
         curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+        if (strtoupper($method) === 'HEAD') {
+            // A HEAD response announces a Content-Length it never sends;
+            // without NOBODY cURL waits for that body until the timeout.
+            curl_setopt($ch, CURLOPT_NOBODY, true);
+        } else {
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+        }
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headerLines);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, (int)ceil($timeout > 0 ? $timeout : RestTemplate::DEFAULT_TIMEOUT));

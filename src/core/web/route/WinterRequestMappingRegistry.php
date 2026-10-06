@@ -281,15 +281,21 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
         // Declared templates compare in raw form: "users/{id}" -> "users/id".
         $declared = (string)preg_replace('/\{([^}:]+)(:[^}]*)?\}/', '$1', $path);
         $targets = [];
+        $matched = [];
         foreach (self::$byId as $id => $mapping) {
             foreach ($mapping->getUriPaths() as $uriPath) {
                 $normalized = trim($uriPath->getNormalized(), '/');
-                $regex = '/^' . $uriPath->getRegex() . '$/';
-                if ($normalized === $path || trim($uriPath->getRaw(), '/') === $declared
-                    || preg_match($regex, $path)) {
+                if ($normalized === $path || trim($uriPath->getRaw(), '/') === $declared) {
                     $targets[$id] = $mapping;
+                } elseif (preg_match('/^' . $uriPath->getRegex() . '$/', $path)) {
+                    $matched[$id] = $mapping;
                 }
             }
+        }
+        // Pattern matches are only a fallback: deleting the concrete
+        // "users/me" must not also drop the "users/{id}" template route.
+        if (empty($targets)) {
+            $targets = $matched;
         }
         if (empty($targets)) {
             return;

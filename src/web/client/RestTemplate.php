@@ -277,9 +277,9 @@ class RestTemplate {
 
         if ($status >= 400) {
             $this->handleError($method, $targetUrl, $status, $responseHeaders, $responseBody);
-            if (!$this->throwOnError && $this->errorHandler === null) {
-                return self::toEntity($status, $responseHeaders, $responseBody);
-            }
+            // Reached only when the response was not turned into an
+            // exception: the caller gets the raw string body, never a decode.
+            return self::toEntity($status, $responseHeaders, $responseBody);
         }
 
         return self::toEntity($status, $responseHeaders, self::convertBody($responseBody, $responseType));
