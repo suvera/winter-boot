@@ -107,7 +107,8 @@ final class WinterMigrationApplication  extends WinterApplicationRunner implemen
         $osMigrationService = new OpenSearchMigrationService(
             $this->applicationContext,
             $this->sqlBasePath,
-            $this->configDir
+            $this->configDir,
+            $this->propertyCtx
         );
         $osMigrationService->executeMigrations();
     }

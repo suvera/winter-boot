@@ -9,6 +9,7 @@
 - Native extension: its version (`phpversion('winter_boot')`, `php --ri winter_boot`) now comes from the repo-root `VERSION.txt` at `configure` time instead of a hardcoded `PHP_WINTER_BOOT_VERSION`, so it always matches the framework version.
 
 ### Fixed
+- OpenSearch migrations: connections read from module config files (e.g. `opensearch-config.yml`) now resolve `$env.X`, `$ini.key` and `a || b` expressions like module configs at app boot; previously the raw strings were used (literal `$ini.*` credentials, and `"$env.X || false"` read as a truthy `ssl_verification`). An unresolvable reference now fails the migration.
 - Testing: added `IdleCheckRegistry::disableTimer()` so a test bootstrap that builds an application context without starting the server can stop the datasource idle-check timer; otherwise the pending Swoole timer keeps the process alive after the last test (see the user-docs testing page).
 
 ## 2.1.1
