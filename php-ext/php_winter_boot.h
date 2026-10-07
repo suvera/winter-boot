@@ -4,7 +4,10 @@
 extern zend_module_entry winter_boot_module_entry;
 #define phpext_winter_boot_ptr &winter_boot_module_entry
 
-#define PHP_WINTER_BOOT_VERSION "0.2.0"
+/* Defined by config.m4 from the repo-root VERSION.txt (via config.h). */
+#ifndef PHP_WINTER_BOOT_VERSION
+# error "PHP_WINTER_BOOT_VERSION is undefined: build with phpize/configure so config.h is generated"
+#endif
 
 #ifdef PHP_WIN32
 # define PHP_WINTER_BOOT_API __declspec(dllexport)

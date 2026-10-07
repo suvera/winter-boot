@@ -60,9 +60,11 @@ Never land a user-visible framework change with docs missing.
 
 1. Bump `VERSION.txt` at the repo root to `X.Y.Z` (exact bytes, no trailing newline).
    The startup banner reads this file via `WinterApplicationRunner::getBootVersion()` —
-   NOT the git tag. A stale file prints a stale version.
+   NOT the git tag. A stale file prints a stale version. The native extension's
+   version (`php-ext/config.m4` → `PHP_WINTER_BOOT_VERSION`) is read from the same file.
 2. Confirm `VERSION.txt` ships everywhere: packed in `build/sqlmigrator/box.json`
    (`files` list), mirrored via `COPY VERSION.txt /VERSION.txt` in
-   `build/docker/Dockerfile`, and included in Composer dists (no `.gitattributes`
+   `build/docker/Dockerfile` (plus `COPY VERSION.txt /tmp/VERSION.txt` for the
+   extension build), and included in Composer dists (no `.gitattributes`
    exclusion).
 3. Docs synced per above; `CHANGELOG.md` entry added.

@@ -34,7 +34,9 @@ RUN set -eux; \
 # Winter Boot native extension (repo's php-ext/): native AOP interception and
 # template evaluation. Pure Zend API, no extra shared-library deps.
 # Enabled alongside swoole.
+# config.m4 reads the extension version from ../VERSION.txt.
 COPY php-ext /tmp/php-ext
+COPY VERSION.txt /tmp/VERSION.txt
 RUN set -eux; \
     cd /tmp/php-ext; \
     phpize; \
@@ -43,7 +45,7 @@ RUN set -eux; \
     make install; \
     docker-php-ext-enable winter_boot; \
     php --ri winter_boot; \
-    rm -rf /tmp/php-ext
+    rm -rf /tmp/php-ext /tmp/VERSION.txt
 
 FROM php:8.5-cli-alpine
 

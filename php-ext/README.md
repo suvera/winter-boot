@@ -98,6 +98,10 @@ against the `str_replace()` oracle.
 ## Build & installation
 
 Prerequisites: PHP 8.5+ with development headers (`phpize`, `php-config`).
+Build from a full Winter Boot checkout: `configure` reads the extension
+version from the repo-root `VERSION.txt` (`../VERSION.txt`) and fails if it is
+missing or malformed, so `phpversion('winter_boot')` always matches the framework
+version.
 
 ```sh
 cd php-ext
