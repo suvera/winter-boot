@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Security
+- Native extension: `winter_boot_expand_template()` now caps each *growing* substitution pass at 16 MiB and throws an `Error` instead of allocating past it. Chained pairs (a placeholder expanding to many copies of a later placeholder) grew the result geometrically from tiny input, so a small set of AOP `#{...}`/`${...}` values could exhaust memory and abort the request. Same-length and shrinking passes are never capped, and the size is checked before the multiply so it can no longer integer-overflow into an under-allocated buffer. AOP name/key expansion that hits the cap now surfaces as `AopException` with the target class, like inline-code errors.
+
 ### Removed
 - Native extension: `deferred()` / `defered()` are removed. Their Zend Observer hook left `EG(current_observed_frame)` pointing into freed coroutine stacks whenever a Swoole coroutine yielded (Swoole only carries observer state across switches with `swoole.enable_fiber_mock=1`), crashing PHP at shutdown. Use `try`/`finally` for cleanup. The extension now registers no observer handlers.
 

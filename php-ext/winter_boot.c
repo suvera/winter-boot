@@ -587,11 +587,17 @@ PHP_FUNCTION(winter_boot_exec_inline)
 	}
 }
 
+/* Per-pass output cap for winter_boot_expand_template(): chained pairs grow
+ * the result geometrically from tiny input (a single-request OOM), so a pass
+ * past this bound fails closed. Dwarfs any real component/bean name. */
+#define WB_EXPAND_MAX_RESULT ((size_t) (16 * 1024 * 1024))
+
 /* Single-literal replace-all used by winter_boot_expand_template().
- * Advances past inserted text (no rescan), mirroring one str_replace()
- * pass for a single search element. */
+ * Advances past inserted text (no rescan), one str_replace() pass per search.
+ * Returns NULL (allocating nothing) when the result would exceed max_len. */
 static zend_string *wb_replace_all(
-	zend_string *subject, zend_string *search, zend_string *replace)
+	zend_string *subject, zend_string *search, zend_string *replace,
+	size_t max_len)
 {
 	const char *s = ZSTR_VAL(subject);
 	size_t s_len = ZSTR_LEN(subject);
@@ -624,7 +630,16 @@ static zend_string *wb_replace_all(
 	{
 		size_t new_len;
 		if (r_len >= p_len) {
-			new_len = s_len + count * (r_len - p_len);
+			size_t growth_per = r_len - p_len;
+			/* Only a growing pass can breach the cap; bound it before the
+			 * multiply (division first, so count*growth_per cannot wrap).
+			 * A same-length pass adds nothing and is always allowed. */
+			if (growth_per != 0
+				&& (s_len > max_len
+					|| count > (max_len - s_len) / growth_per)) {
+				return NULL;
+			}
+			new_len = s_len + count * growth_per;
 		} else {
 			new_len = s_len - count * (p_len - r_len);
 		}
@@ -743,7 +758,25 @@ PHP_FUNCTION(winter_boot_expand_template)
 		{
 			uint32_t k;
 			for (k = 0; k < n; k++) {
-				zend_string *next = wb_replace_all(result, searches[k], replaces[k]);
+				zend_string *next = wb_replace_all(result, searches[k],
+					replaces[k], WB_EXPAND_MAX_RESULT);
+				if (next == NULL) {
+					/* Cap exceeded: fail closed. Release this pair and
+					 * every pair not yet consumed, the current result,
+					 * the pair arrays, then throw. */
+					uint32_t j;
+					for (j = k; j < n; j++) {
+						zend_string_release(searches[j]);
+						zend_string_release(replaces[j]);
+					}
+					efree(searches);
+					efree(replaces);
+					zend_string_release(result);
+					zend_throw_error(NULL,
+						"winter_boot_expand_template(): expansion exceeds %zu bytes",
+						WB_EXPAND_MAX_RESULT);
+					RETURN_THROWS();
+				}
 				zend_string_release(result);
 				zend_string_release(searches[k]);
 				zend_string_release(replaces[k]);
