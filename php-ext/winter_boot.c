@@ -22,6 +22,7 @@
 #include "Zend/zend_observer.h"
 #include "Zend/zend_exceptions.h"
 #include "Zend/zend_interfaces.h"
+#include "Zend/zend_closures.h"
 
 ZEND_DECLARE_MODULE_GLOBALS(winter_boot);
 
@@ -766,8 +767,10 @@ static bool wb_match_mask(zval *v, uint32_t mask)
 {
 	switch (Z_TYPE_P(v)) {
 		case IS_NULL: return (mask & MAY_BE_NULL) != 0;
-		case IS_FALSE: return (mask & (MAY_BE_FALSE | MAY_BE_BOOL)) != 0;
-		case IS_TRUE: return (mask & (MAY_BE_TRUE | MAY_BE_BOOL)) != 0;
+		/* MAY_BE_BOOL is MAY_BE_FALSE|MAY_BE_TRUE: test the exact bit, or
+		 * string|false would accept true. */
+		case IS_FALSE: return (mask & MAY_BE_FALSE) != 0;
+		case IS_TRUE: return (mask & MAY_BE_TRUE) != 0;
 		case IS_LONG: return (mask & MAY_BE_LONG) != 0;
 		case IS_DOUBLE: return (mask & MAY_BE_DOUBLE) != 0;
 		case IS_STRING: return (mask & MAY_BE_STRING) != 0;
@@ -799,7 +802,7 @@ static zend_class_entry *wb_lookup_no_autoload(const char *name, size_t len)
 	return ce;
 }
 
-static bool wb_match_named(zval *v, const char *name, size_t len, zend_function *func)
+static bool wb_match_named(zval *v, const char *name, size_t len, zend_function *func, zend_class_entry *called)
 {
 	zend_class_entry *ce;
 	if (Z_TYPE_P(v) == IS_REFERENCE) {
@@ -817,9 +820,7 @@ static bool wb_match_named(zval *v, const char *name, size_t len, zend_function 
 	} else if (wb_name_is(name, len, "parent")) {
 		ce = (func->common.scope != NULL) ? func->common.scope->parent : NULL;
 	} else if (wb_name_is(name, len, "static")) {
-		/* Approximation: the defining scope, not the late-static callee.
-		 * Documented; satisfies every non-contrived shape. */
-		ce = func->common.scope;
+		ce = (called != NULL) ? called : func->common.scope;
 	} else {
 		ce = wb_lookup_no_autoload(name, len);
 	}
@@ -829,61 +830,71 @@ static bool wb_match_named(zval *v, const char *name, size_t len, zend_function 
 	return instanceof_function(Z_OBJCE_P(v), ce);
 }
 
-static bool wb_match_one(zval *v, const zend_type *t, zend_function *func);
-
-static bool wb_match_type(zval *v, zend_type t, zend_function *func)
+/* Builtin part of a type: the pure mask, plus the pseudo-types that live in
+ * it as bits (callable, static) and int->float widening, which is allowed in
+ * both coercive and strict mode. */
+static bool wb_match_builtin(zval *v, uint32_t mask, zend_function *func, zend_class_entry *called)
 {
-	if (Z_TYPE_P(v) == IS_NULL && ZEND_TYPE_ALLOW_NULL(t)) {
+	if (mask == 0) {
+		return false;
+	}
+	if (wb_match_mask(v, mask)) {
 		return true;
 	}
-	if (ZEND_TYPE_HAS_LIST(t)) {
-		zend_type_list *list = ZEND_TYPE_LIST(t);
-		if (ZEND_TYPE_IS_INTERSECTION(t)) {
-			const zend_type *member = NULL;
-			ZEND_TYPE_LIST_FOREACH(list, member) {
-				if (!wb_match_one(v, member, func)) {
+	if (Z_TYPE_P(v) == IS_LONG && (mask & MAY_BE_DOUBLE) != 0) {
+		return true;
+	}
+	if ((mask & MAY_BE_CALLABLE) != 0 && zend_is_callable(v, 0, NULL)) {
+		return true;
+	}
+	if ((mask & MAY_BE_STATIC) != 0) {
+		zend_class_entry *ce = (called != NULL) ? called : func->common.scope;
+		return ce != NULL && Z_TYPE_P(v) == IS_OBJECT && instanceof_function(Z_OBJCE_P(v), ce);
+	}
+	return false;
+}
+
+/* A type matches when ANY of its parts does: the builtin mask, the single
+ * class name, or the type list. A union list matches when any member does
+ * (a DNF member is itself an intersection list, so this recurses); an
+ * intersection list only when every member does. */
+static bool wb_match_type(zval *v, const zend_type *t, zend_function *func, zend_class_entry *called)
+{
+	if (Z_TYPE_P(v) == IS_REFERENCE) {
+		v = Z_REFVAL_P(v);
+	}
+	if (wb_match_builtin(v, ZEND_TYPE_PURE_MASK(*t), func, called)) {
+		return true;
+	}
+	if (ZEND_TYPE_HAS_LIST(*t)) {
+		const zend_type *member = NULL;
+		if (ZEND_TYPE_IS_INTERSECTION(*t)) {
+			ZEND_TYPE_LIST_FOREACH(ZEND_TYPE_LIST(*t), member) {
+				if (!wb_match_type(v, member, func, called)) {
 					return false;
 				}
 			} ZEND_TYPE_LIST_FOREACH_END();
 			return true;
 		}
-		{
-			const zend_type *member = NULL;
-			ZEND_TYPE_LIST_FOREACH(list, member) {
-				if (wb_match_one(v, member, func)) {
-					return true;
-				}
-			} ZEND_TYPE_LIST_FOREACH_END();
-		}
+		ZEND_TYPE_LIST_FOREACH(ZEND_TYPE_LIST(*t), member) {
+			if (wb_match_type(v, member, func, called)) {
+				return true;
+			}
+		} ZEND_TYPE_LIST_FOREACH_END();
 		return false;
-	}
-	return wb_match_one(v, &t, func);
-}
-
-static bool wb_match_one(zval *v, const zend_type *t, zend_function *func)
-{
-	uint32_t mask = ZEND_TYPE_PURE_MASK(*t);
-	if (mask != 0 && !wb_match_mask(v, mask)) {
-		/* int->float widening is allowed in both coercive and strict mode. */
-		if (!(Z_TYPE_P(v) == IS_LONG && (mask & MAY_BE_DOUBLE) != 0)) {
-			return false;
-		}
 	}
 	if (ZEND_TYPE_HAS_NAME(*t)) {
 		zend_string *name = ZEND_TYPE_NAME(*t);
-		if (!wb_match_named(v, ZSTR_VAL(name), ZSTR_LEN(name), func)) {
-			return false;
-		}
-	} else if (ZEND_TYPE_HAS_LITERAL_NAME(*t)) {
-		const char *name = ZEND_TYPE_LITERAL_NAME(*t);
-		if (!wb_match_named(v, name, strlen(name), func)) {
-			return false;
-		}
+		return wb_match_named(v, ZSTR_VAL(name), ZSTR_LEN(name), func, called);
 	}
-	return true;
+	if (ZEND_TYPE_HAS_LITERAL_NAME(*t)) {
+		const char *name = ZEND_TYPE_LITERAL_NAME(*t);
+		return wb_match_named(v, name, strlen(name), func, called);
+	}
+	return false;
 }
 
-static void wb_verify_skip_value(zend_function *func, zval *v)
+static void wb_verify_skip_value(zend_function *func, zend_class_entry *called, zval *v)
 {
 	zend_arg_info *ret;
 	zend_type t;
@@ -916,7 +927,7 @@ static void wb_verify_skip_value(zend_function *func, zval *v)
 		}
 		return;
 	}
-	if (!wb_match_type(v, t, func)) {
+	if (!wb_match_type(v, &t, func, called)) {
 		zend_throw_error(zend_ce_type_error,
 			"Return value of %s::%s() failed strict return-type verification, %s given",
 			cls, mth, zend_zval_value_name(v));
@@ -1006,23 +1017,47 @@ static void wb_build_arg_array(zend_execute_data *ex, zval *out)
 	}
 }
 
-/* Balance the Zend Observer BEGIN the VM issued before our override ran.
+/* Leave a frame whose body never ran (skip value, begin() threw, protocol
+ * violation). The callee owns this work, not the caller: for a frame entered
+ * through an overridden zend_execute_ex the VM marks it ZEND_CALL_TOP, and
+ * its caller (DO_FCALL / zend_call_function) only releases $this and pops
+ * the frame. So this mirrors the TOP branch of zend_leave_helper.
  *
- * A frame that never executes never reaches ZEND_RETURN (the only
- * non-unwind site that fires OBSERVER_END) and is never unwound either —
- * the VM just frees it after we return. Without this call
- * EG(current_observed_frame) dangles at the freed frame; a second skipped
- * call links through reused stack memory and the shutdown walk spins or
- * crashes. This extension registers no observer itself; the balance
- * matters when another one does (OpenTelemetry, Xdebug, profilers). The
- * inline guard makes this a no-op unless our frame is still the observed
- * top (on the proceed path the body's own RETURN already popped it, so
- * only non-proceed paths call this). */
-static void wb_close_skipped_frame(zend_execute_data *ex)
+ * - With an exception pending the return slot is set UNDEF, as the engine's
+ *   own uncaught-exception path does: the caller's HANDLE_EXCEPTION destroys
+ *   the DO_FCALL result slot, which otherwise still holds a stale temporary.
+ * - The Zend Observer BEGIN the VM issued before our override ran is
+ *   balanced (a skipped frame never reaches ZEND_RETURN). This extension
+ *   registers no observer itself; it matters when another one does
+ *   (OpenTelemetry, Xdebug, profilers). The END is a no-op unless our frame
+ *   is still the observed top.
+ * - Argument CVs, extra positional args and extra named params are released,
+ *   and EG(current_execute_data) is restored to the caller; leaving it on
+ *   this frame sends the caller's next exception to a dead frame.
+ */
+static void wb_leave_skipped_frame(zend_execute_data *ex)
 {
-	/* Same convention as the VM's own post-call END: no value when an
-	 * exception is in flight. */
+	uint32_t call_info;
+
+	if (EG(exception) != NULL && ex->return_value != NULL) {
+		ZVAL_UNDEF(ex->return_value);
+	}
 	zend_observer_fcall_end(ex, EG(exception) ? NULL : ex->return_value);
+
+	EG(current_execute_data) = ex->prev_execute_data;
+	zend_free_compiled_variables(ex);
+	/* Re-read: destructors run by the line above may change the flags. */
+	call_info = ZEND_CALL_INFO(ex);
+	if (call_info & ZEND_CALL_HAS_SYMBOL_TABLE) {
+		zend_clean_and_cache_symbol_table(ex->symbol_table);
+	}
+	zend_vm_stack_free_extra_args_ex(call_info, ex);
+	if (call_info & ZEND_CALL_HAS_EXTRA_NAMED_PARAMS) {
+		zend_free_extra_named_params(ex->extra_named_params);
+	}
+	if (call_info & ZEND_CALL_CLOSURE) {
+		OBJ_RELEASE(ZEND_CLOSURE_OBJECT(ex->func));
+	}
 }
 
 /* Full interception of one advised call. Ownership: every zval taken here is
@@ -1066,17 +1101,17 @@ static void wb_intercept(zend_execute_data *ex, wb_advice *ad, zend_class_entry 
 	zval_ptr_dtor(&args);
 	if (EG(exception) != NULL) {
 		/* aspectBegin threw: the driver's own frame unwound cleanly, but
-		 * ours never ran — close it before propagating. */
+		 * ours never ran — leave it before propagating. */
 		if (!Z_ISUNDEF(retval)) {
 			zval_ptr_dtor(&retval);
 		}
-		wb_close_skipped_frame(ex);
+		wb_leave_skipped_frame(ex);
 		return;
 	}
 	if (Z_TYPE(retval) != IS_ARRAY) {
 		zend_throw_error(NULL, "winter_boot AOP driver protocol violation: begin() must return an array");
 		zval_ptr_dtor(&retval);
-		wb_close_skipped_frame(ex);
+		wb_leave_skipped_frame(ex);
 		return;
 	}
 	zv = zend_hash_str_find(Z_ARRVAL(retval), "proceed", sizeof("proceed") - 1);
@@ -1086,22 +1121,23 @@ static void wb_intercept(zend_execute_data *ex, wb_advice *ad, zend_class_entry 
 		if (value == NULL) {
 			zend_throw_error(NULL, "winter_boot AOP driver protocol violation: skip needs a value");
 			zval_ptr_dtor(&retval);
-			wb_close_skipped_frame(ex);
+			wb_leave_skipped_frame(ex);
 			return;
 		}
-		wb_verify_skip_value(ad->func, value);
+		wb_verify_skip_value(ad->func,
+			(Z_TYPE(ex->This) == IS_OBJECT) ? Z_OBJCE(ex->This) : Z_CE(ex->This), value);
 		if (EG(exception) == NULL && ex->return_value != NULL) {
 			ZVAL_COPY(ex->return_value, value);
 		}
 		zval_ptr_dtor(&retval);
-		wb_close_skipped_frame(ex);
+		wb_leave_skipped_frame(ex);
 		return;
 	}
 	zv = zend_hash_str_find(Z_ARRVAL(retval), "exCtx", sizeof("exCtx") - 1);
 	if (zv == NULL || Z_TYPE_P(zv) != IS_OBJECT) {
 		zend_throw_error(NULL, "winter_boot AOP driver protocol violation: proceed needs exCtx");
 		zval_ptr_dtor(&retval);
-		wb_close_skipped_frame(ex);
+		wb_leave_skipped_frame(ex);
 		return;
 	}
 	ZVAL_COPY(&exctx, zv);
@@ -1110,7 +1146,7 @@ static void wb_intercept(zend_execute_data *ex, wb_advice *ad, zend_class_entry 
 		zend_throw_error(NULL, "winter_boot AOP driver protocol violation: proceed needs interceptor");
 		zval_ptr_dtor(&exctx);
 		zval_ptr_dtor(&retval);
-		wb_close_skipped_frame(ex);
+		wb_leave_skipped_frame(ex);
 		return;
 	}
 	ZVAL_COPY(&interceptor, zv);
