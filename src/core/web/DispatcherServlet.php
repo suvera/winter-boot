@@ -401,6 +401,17 @@ class DispatcherServlet implements HttpRequestDispatcher {
              * driven here instead — begin() before the body, commit()/failed()
              * around its outcome. stopExecution() skips the body and supplies
              * the response value directly.
+             *
+             * Intentional duplicate of NativeAopDriver::begin()/finish(): the
+             * same protocol, kept inline on purpose. Controllers stay out of
+             * native advice (ClassResourceScanner skips them) because the
+             * extension verifies a stopExecution() value against the declared
+             * return type, and existing endpoints rely on an aspect supplying
+             * e.g. a ResponseEntity regardless of that type. Deliberate
+             * differences: no return-type verification, no #[Async] enqueue
+             * (rejected on controllers), and no "AOP invocation failed" log
+             * (request errors are already logged by the dispatcher).
+             * Any other protocol change must be made in both places.
              */
             $aopRegistry = $this->ctxData->getAopRegistry();
             $aopOwner = $method->getDeclaringClass()->getName();

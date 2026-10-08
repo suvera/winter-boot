@@ -25,6 +25,11 @@ use Throwable;
  * The extension calls begin()/finish() by name; aspect semantics stay
  * entirely in PHP here. This class is pure PHP and never calls the
  * extension itself, so it is safe to load with or without winter_boot.
+ *
+ * DispatcherServlet (step 6.2) intentionally repeats this protocol inline
+ * for #[RestController] endpoints, which are never natively advised; see
+ * the comment there for why and how the two deliberately differ. Keep any
+ * protocol change in sync with it.
  */
 final class NativeAopDriver {
     use Wlf4p;
