@@ -6,6 +6,7 @@ namespace dev\winterframework\core\context;
 
 use dev\winterframework\actuator\stereotype\HealthInformer;
 use dev\winterframework\actuator\stereotype\InfoInformer;
+use dev\winterframework\coroutine\CoroutineScopeProviders;
 use dev\winterframework\exception\BeansDependencyException;
 use dev\winterframework\exception\BeansException;
 use dev\winterframework\exception\ClassNotFoundException;
@@ -37,6 +38,7 @@ use ReflectionNamedType;
 use ReflectionObject;
 use ReflectionParameter;
 use ReflectionUnionType;
+use Swoole\Coroutine;
 use Throwable;
 use TypeError;
 
@@ -52,9 +54,26 @@ final class WinterBeanProviderContext implements BeanProviderContext {
     protected array $beanClassFactory = [];
 
     /**
-     * @var BeanProvider[]
+     * Scope key => beans that scope is resolving (cycle detection is per
+     * coroutine: concurrent requests must not see each other's chains).
+     *
+     * @var array<string, BeanProvider[]>
      */
     private array $beanResolutionOrder = [];
+
+    /**
+     * Bean id => scope key of the coroutine building it. Building a bean can
+     * yield (a DataSource opens a connection), so a concurrent request that
+     * needs the same bean waits for it instead of seeing a false cycle.
+     *
+     * @var array<string, string>
+     */
+    private array $beanBuilders = [];
+
+    /** @var array<string, string> scope key => bean id it is waiting for */
+    private array $beanWaiters = [];
+
+    private const BEAN_WAIT_SECS = 30;
 
     public function __construct(
         protected ApplicationContextData $ctxData,
@@ -316,27 +335,77 @@ final class WinterBeanProviderContext implements BeanProviderContext {
      * @return object|null
      */
     private function getInstance(BeanProvider $beanProvider): ?object {
-        $this->addToCircularDependency($beanProvider);
-
         if ($beanProvider->hasCached()) {
-            $this->removeFromCircularDependency($beanProvider);
             return $beanProvider->getCached();
         }
 
-        $method = $beanProvider->getMethod();
-
-        if ($method !== null) {
-            $bean = $this->buildInstanceByMethod($beanProvider);
-        } else {
-            $bean = $this->buildInstanceForClass($beanProvider);
+        $scope = self::resolutionScope();
+        $this->awaitOtherBuilder($beanProvider, $scope);
+        if ($beanProvider->hasCached()) {
+            return $beanProvider->getCached();
         }
 
-        $this->postConstruct($bean, $beanProvider);
+        $beanId = spl_object_hash($beanProvider);
+        $this->addToCircularDependency($beanProvider, $scope);
+        $this->beanBuilders[$beanId] = $scope;
+        try {
+            $method = $beanProvider->getMethod();
 
-        $beanProvider->setCached($bean);
+            if ($method !== null) {
+                $bean = $this->buildInstanceByMethod($beanProvider);
+            } else {
+                $bean = $this->buildInstanceForClass($beanProvider);
+            }
 
-        $this->removeFromCircularDependency($beanProvider);
+            $this->postConstruct($bean, $beanProvider);
+
+            $beanProvider->setCached($bean);
+        } finally {
+            // Always clear, or a failed build reports a "cycle" forever after.
+            unset($this->beanBuilders[$beanId]);
+            $this->removeFromCircularDependency($beanProvider, $scope);
+        }
         return $bean;
+    }
+
+    /** Scope key of the current coroutine, or 'process' outside one. */
+    private static function resolutionScope(): string {
+        try {
+            return CoroutineScopeProviders::shared()->getScopeId() ?? 'process';
+        } catch (Throwable) {
+            return 'process';
+        }
+    }
+
+    /**
+     * Wait while another coroutine is building this bean. Two coroutines
+     * each waiting for a bean the other is building is a real cycle.
+     */
+    private function awaitOtherBuilder(BeanProvider $beanProvider, string $scope): void {
+        $beanId = spl_object_hash($beanProvider);
+        if ($scope === 'process' || !isset($this->beanBuilders[$beanId])) {
+            return;
+        }
+        $deadline = microtime(true) + self::BEAN_WAIT_SECS;
+        $this->beanWaiters[$scope] = $beanId;
+        try {
+            while (isset($this->beanBuilders[$beanId]) && $this->beanBuilders[$beanId] !== $scope) {
+                $owner = $this->beanBuilders[$beanId];
+                $ownerWaitsFor = $this->beanWaiters[$owner] ?? null;
+                if ($ownerWaitsFor !== null && ($this->beanBuilders[$ownerWaitsFor] ?? null) === $scope) {
+                    throw new BeansDependencyException('The dependencies of some of the beans in the '
+                        . 'application context form a cycle: ' . $beanProvider->toString()
+                        . ' (being created by a concurrent request)');
+                }
+                if (microtime(true) >= $deadline) {
+                    throw new BeansDependencyException('Timed out waiting for bean '
+                        . $beanProvider->toString() . ' being created by a concurrent request');
+                }
+                Coroutine::sleep(0.001);
+            }
+        } finally {
+            unset($this->beanWaiters[$scope]);
+        }
     }
 
     protected function postConstruct(object $bean, BeanProvider $beanProvider): void {
@@ -368,12 +437,12 @@ final class WinterBeanProviderContext implements BeanProviderContext {
     }
 
 
-    private function addToCircularDependency(BeanProvider $beanProvider): void {
+    private function addToCircularDependency(BeanProvider $beanProvider, string $scope): void {
         $beanId = spl_object_hash($beanProvider);
 
-        if (isset($this->beanResolutionOrder[$beanId])) {
+        if (isset($this->beanResolutionOrder[$scope][$beanId])) {
             $msg = "|‾‾‾‾‾‾‾‾‾‾‾|\n";
-            foreach ($this->beanResolutionOrder as $beanProv) {
+            foreach ($this->beanResolutionOrder[$scope] as $beanProv) {
                 $msg .= '  -- ' . $beanProv->toString() . "\n";
             }
             $msg .= "|__________|\n";
@@ -382,12 +451,15 @@ final class WinterBeanProviderContext implements BeanProviderContext {
                     . "in the application context form a cycle: \n\n$msg\n"
             );
         }
-        $this->beanResolutionOrder[$beanId] = $beanProvider;
+        $this->beanResolutionOrder[$scope][$beanId] = $beanProvider;
     }
 
-    private function removeFromCircularDependency(BeanProvider $beanProvider): void {
+    private function removeFromCircularDependency(BeanProvider $beanProvider, string $scope): void {
         $beanId = spl_object_hash($beanProvider);
-        unset($this->beanResolutionOrder[$beanId]);
+        unset($this->beanResolutionOrder[$scope][$beanId]);
+        if (empty($this->beanResolutionOrder[$scope])) {
+            unset($this->beanResolutionOrder[$scope]);
+        }
     }
 
     /**

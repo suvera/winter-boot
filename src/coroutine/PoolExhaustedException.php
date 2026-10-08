@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace dev\winterframework\coroutine;
 
 /**
- * Thrown when a coroutine-scoped delegate pool has reached its configured
- * cap (`doctrine.coroutineMaxDelegates`) and no slot frees up within
- * `doctrine.coroutineMaxWaitMs`.
+ * Thrown when a coroutine-scoped connection pool has reached its configured
+ * cap (`winter.coroutine.db.maxConnections`, or the datasource's
+ * `connection.maxConnections`) and no slot frees up within `maxWaitMs`.
  *
  * This is resource backpressure, not a machinery failure: the caller asked
  * for more concurrent database users than the operator allowed. Either raise
@@ -22,10 +22,10 @@ class PoolExhaustedException extends \RuntimeException {
         private int $maxDelegates
     ) {
         parent::__construct(
-            "Doctrine DB connection pool '" . $poolName . "' exhausted: "
+            "DB connection pool '" . $poolName . "' exhausted: "
                 . $activeDelegates . ' open DB connections (max ' . $maxDelegates . '). '
-                . 'Raise doctrine.coroutineMaxDelegates (and the database max_connections to match) '
-                . 'or reduce concurrent database users.'
+                . 'Raise winter.coroutine.db.maxConnections or the datasource\'s connection.maxConnections '
+                . '(and the database max_connections to match), or reduce concurrent database users.'
         );
     }
 

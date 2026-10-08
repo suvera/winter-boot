@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace dev\winterframework\txn\support;
 
+use dev\winterframework\coroutine\CoroutineScopeProvider;
+use dev\winterframework\coroutine\CoroutineScopeProviders;
 use dev\winterframework\pdbc\ex\SQLException;
 use dev\winterframework\txn\ex\IllegalTransactionStateException;
 use dev\winterframework\txn\ex\NestedTransactionNotSupportedException;
@@ -21,12 +23,59 @@ abstract class AbstractPlatformTransactionManager implements PlatformTransaction
     protected bool $nestedTransactionAllowed = false;
     protected bool $validateExistingTransaction = true;
     protected bool $rollbackOnCommitFailure = false;
-    protected TransactionsHolder $txnStack;
-    // WB-001: statuses suspended by REQUIRES_NEW/NOT_SUPPORTED, resumed on completion.
-    private array $suspendedTransactions = [];
+    /**
+     * Transaction state per coroutine scope (one HTTP request / job).
+     * The manager is a shared singleton, so a single stack would let
+     * concurrent coroutines join or complete each other's transactions.
+     * Key 'process' is used outside coroutines.
+     *
+     * @var array<string, array{stack: TransactionsHolder, suspended: array}>
+     */
+    private array $scopeStates = [];
+
+    private ?CoroutineScopeProvider $scopeProvider = null;
 
     public function __construct() {
-        $this->txnStack = new TransactionsHolder();
+    }
+
+    public function setScopeProvider(CoroutineScopeProvider $scopeProvider): void {
+        $this->scopeProvider = $scopeProvider;
+    }
+
+    private function scopeKey(): string {
+        $provider = $this->scopeProvider ?? CoroutineScopeProviders::shared();
+        try {
+            $id = $provider->getScopeId();
+        } catch (Throwable) {
+            $id = null;
+        }
+        if ($id === null) {
+            return 'process';
+        }
+        if (!isset($this->scopeStates[$id])) {
+            $this->scopeStates[$id] = ['stack' => new TransactionsHolder(), 'suspended' => []];
+            // Scope end drops whatever a crashed or abandoned unit of work left behind.
+            $provider->defer(function () use ($id): void {
+                unset($this->scopeStates[$id]);
+            });
+        }
+        return $id;
+    }
+
+    protected function txnStack(): TransactionsHolder {
+        $key = $this->scopeKey();
+        if (!isset($this->scopeStates[$key])) {
+            $this->scopeStates[$key] = ['stack' => new TransactionsHolder(), 'suspended' => []];
+        }
+        return $this->scopeStates[$key]['stack'];
+    }
+
+    private function &suspendedTransactions(): array {
+        $key = $this->scopeKey();
+        if (!isset($this->scopeStates[$key])) {
+            $this->scopeStates[$key] = ['stack' => new TransactionsHolder(), 'suspended' => []];
+        }
+        return $this->scopeStates[$key]['suspended'];
     }
 
     /**
@@ -59,7 +108,7 @@ abstract class AbstractPlatformTransactionManager implements PlatformTransaction
 
             $txn = $this->doGetTransaction($definition);
             $this->startTransaction($txn);
-            $this->txnStack->push($txn);
+            $this->txnStack()->push($txn);
             return $txn;
         } else {
             // PROPAGATION_NOT_SUPPORTED:
@@ -162,7 +211,7 @@ abstract class AbstractPlatformTransactionManager implements PlatformTransaction
     }
 
     protected function handleExistingTransaction(TransactionDefinition $definition): TransactionStatus {
-        $currentStatus = $this->txnStack->current();
+        $currentStatus = $this->txnStack()->current();
 
         if ($definition->getPropagationBehavior() == TransactionDefinition::PROPAGATION_NEVER) {
             throw new IllegalTransactionStateException(
@@ -170,9 +219,11 @@ abstract class AbstractPlatformTransactionManager implements PlatformTransaction
         }
 
         if ($definition->getPropagationBehavior() == TransactionDefinition::PROPAGATION_NOT_SUPPORTED) {
-            // WB-001: suspend the existing transaction while running non-transactionally.
+            // WB-001: suspend the existing transaction while running non-transactionally,
+            // on a separate connection so the work is not part of it.
+            $this->beginIsolation();
             $noTxn = $this->prepareNoTransaction($definition);
-            $this->suspendTransaction($currentStatus, $noTxn);
+            $this->suspendTransaction($currentStatus, $noTxn, true);
             return $noTxn;
         }
 
@@ -180,10 +231,18 @@ abstract class AbstractPlatformTransactionManager implements PlatformTransaction
             self::LogDebug("Suspending current transaction, creating new transaction with name ["
                 . $definition->getName() . "]");
 
-            $status = $this->doGetTransaction($definition);
-            $this->suspendTransaction($currentStatus, $status);
-            $this->startTransaction($status);
-            $this->txnStack->push($status);
+            // The new transaction needs its own connection: on the shared one
+            // its commit would also commit the suspended outer work.
+            $this->beginIsolation();
+            try {
+                $status = $this->doGetTransaction($definition);
+                $this->suspendTransaction($currentStatus, $status, true);
+                $this->startTransaction($status);
+            } catch (Throwable $e) {
+                $this->endIsolation();
+                throw $e;
+            }
+            $this->txnStack()->push($status);
             return $status;
         }
 
@@ -201,37 +260,54 @@ abstract class AbstractPlatformTransactionManager implements PlatformTransaction
                 $status->createAndHoldSavepoint();
             }
             $this->startTransaction($status);
-            $this->txnStack->push($status);
+            $this->txnStack()->push($status);
             return $status;
         }
 
         // WB-001: participant shares the transaction but never completes it.
         $participant = new ParticipatingTransactionStatus($currentStatus->getTransaction());
-        $this->txnStack->push($participant);
+        $this->txnStack()->push($participant);
         return $participant;
     }
 
     // WB-001: park the current status until the holder status completes.
     private function suspendTransaction(
         TransactionStatus $currentStatus,
-        TransactionStatus $holder
+        TransactionStatus $holder,
+        bool $isolated = false
     ): void {
         $currentStatus->getTransaction()->suspend();
-        $this->txnStack->remove($currentStatus);
-        $this->suspendedTransactions[] = ['suspended' => $currentStatus, 'holder' => $holder];
+        $this->txnStack()->remove($currentStatus);
+        $suspended = &$this->suspendedTransactions();
+        $suspended[] = ['suspended' => $currentStatus, 'holder' => $holder, 'isolated' => $isolated];
     }
 
     // WB-001: resume the status suspended by the completed holder, if any.
     private function resumeSuspendedTransaction(TransactionStatus $holder): void {
-        for ($i = count($this->suspendedTransactions) - 1; $i >= 0; $i--) {
-            if ($this->suspendedTransactions[$i]['holder'] === $holder) {
-                $suspended = $this->suspendedTransactions[$i]['suspended'];
-                array_splice($this->suspendedTransactions, $i, 1);
-                $suspended->getTransaction()->resume();
-                $this->txnStack->push($suspended);
+        $suspendedList = &$this->suspendedTransactions();
+        for ($i = count($suspendedList) - 1; $i >= 0; $i--) {
+            if ($suspendedList[$i]['holder'] === $holder) {
+                $entry = $suspendedList[$i];
+                array_splice($suspendedList, $i, 1);
+                if ($entry['isolated']) {
+                    $this->endIsolation();
+                }
+                $entry['suspended']->getTransaction()->resume();
+                $this->txnStack()->push($entry['suspended']);
                 return;
             }
         }
+    }
+
+    /**
+     * Bind a dedicated connection to the current scope for a suspended
+     * transaction's replacement (REQUIRES_NEW / NOT_SUPPORTED). Managers
+     * whose resource cannot be isolated keep the historic shared behaviour.
+     */
+    protected function beginIsolation(): void {
+    }
+
+    protected function endIsolation(): void {
     }
 
     /**
@@ -248,7 +324,7 @@ abstract class AbstractPlatformTransactionManager implements PlatformTransaction
     }
 
     protected function hasExistingTransaction(): bool {
-        return !$this->txnStack->isEmpty();
+        return !$this->txnStack()->isEmpty();
     }
 
     protected function prepareForCommit(TransactionStatus $status): void {
@@ -263,7 +339,7 @@ abstract class AbstractPlatformTransactionManager implements PlatformTransaction
         if ($status instanceof AbstractTransactionStatus) {
             $status->setCompleted(true);
         }
-        $this->txnStack->remove($status);
+        $this->txnStack()->remove($status);
         $this->resumeSuspendedTransaction($status);
     }
 

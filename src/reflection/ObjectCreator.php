@@ -111,8 +111,17 @@ class ObjectCreator {
         }
 
         foreach ($ref->getProperties() as $refProp) {
+            // Static properties are class-wide state shared by every request
+            // in the worker; request data must never write them.
+            if ($refProp->isStatic()) {
+                continue;
+            }
             $attrs = $refProp->getAttributes(JsonProperty::class);
             $extName = $refProp->getName();
+            // Reset per property: a previous property's #[JsonProperty]
+            // rules must not validate this one.
+            $attr = null;
+            $fqdn = $extName;
 
             if (count($attrs) > 0) {
                 $gotValue = false;

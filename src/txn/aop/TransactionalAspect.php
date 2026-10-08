@@ -6,6 +6,7 @@ namespace dev\winterframework\txn\aop;
 use dev\winterframework\core\aop\AopExecutionContext;
 use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\stereotype\aop\AopContext;
+use dev\winterframework\stereotype\aop\PropagatesCommitFailure;
 use dev\winterframework\stereotype\aop\WinterAspect;
 use dev\winterframework\txn\PlatformTransactionManager;
 use dev\winterframework\txn\stereotype\Transactional;
@@ -15,7 +16,7 @@ use dev\winterframework\util\ExceptionUtils;
 use dev\winterframework\util\log\Wlf4p;
 use Throwable;
 
-class TransactionalAspect implements WinterAspect {
+class TransactionalAspect implements WinterAspect, PropagatesCommitFailure {
     use Wlf4p;
 
     const OPERATION = 'Transactional';
@@ -92,6 +93,11 @@ class TransactionalAspect implements WinterAspect {
 
         /** @var TransactionStatus $txnStatus */
         $txnStatus = $exCtx->getVariable(self::OPERATION);
+        if (empty($txnStatus) || $txnStatus->isCompleted()) {
+            // The failed commit already completed the transaction; a second
+            // rollback would throw and hide the commit failure.
+            return;
+        }
         $txnMgr = $this->getTransactionManager($ctx);
 
         $txnMgr->rollback($txnStatus);
@@ -133,8 +139,26 @@ class TransactionalAspect implements WinterAspect {
             }
         }
 
-        if ($rollBack) {
+        self::completeAfterFailure($txnMgr, $txnStatus, $rollBack);
+    }
+
+    /**
+     * Finish a transaction whose method threw: roll back, or commit when
+     * noRollbackFor matched. Leaving it open would keep the connection in
+     * a transaction (and the status on the stack) after the method ends.
+     */
+    public static function completeAfterFailure(
+        PlatformTransactionManager $txnMgr,
+        TransactionStatus $txnStatus,
+        bool $rollBack
+    ): void {
+        if ($txnStatus->isCompleted()) {
+            return;
+        }
+        if ($rollBack || $txnStatus->isRollbackOnly()) {
             $txnMgr->rollback($txnStatus);
+        } else {
+            $txnMgr->commit($txnStatus);
         }
     }
 

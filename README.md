@@ -94,11 +94,23 @@ Ready to build amazing things with Winter Boot? Follow these simple steps to get
 
 1)  **Prerequisite:** Ensure you have PHP 8.5 (or greater) installed.
 
-2)  **Unleash Asynchronous Power:** For blazing-fast asynchronous functions (`#[Async]`) and scheduled tasks (`#[Scheduled]`), the `swoole` extension is highly recommended.
-    
+2)  **Install the required extensions:** the `swoole` extension (built-in HTTP server, `#[Async]`, `#[Scheduled]`) and the bundled `winter_boot` native extension (required since 2.1.0 — the application stops at boot without it).
+
 ```shell
 pecl install swoole
 ```
+
+Build `winter_boot` from the `php-ext/` directory (needs PHP dev headers with `phpize`, `php-config`):
+
+```shell
+cd php-ext
+phpize
+./configure --enable-winter_boot
+make
+make install
+```
+
+Then enable both in `php.ini` (`extension=swoole.so`, `extension=winter_boot.so`). Full guide with optional per-module extensions: https://suvera.github.io/winter-boot/installation
 
 
 ## Seamless Installation with Composer

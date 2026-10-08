@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace dev\winterframework\io\queue;
 
+use dev\winterframework\util\SerializationUtil;
 use dev\winterframework\type\Queue;
 use dev\winterframework\util\log\Wlf4p;
 use Throwable;
@@ -42,7 +43,7 @@ class SharedQueue implements Queue {
                 if (is_null($data)) {
                     return null;
                 }
-                return unserialize($data);
+                return SerializationUtil::unserialize($data);
             } catch (Throwable $e) {
                 self::logException($e);
                 usleep(200000);

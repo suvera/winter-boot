@@ -286,7 +286,10 @@ abstract class PdoOperations {
             $this->applyOutBindVars($stmt, $outBindVars);
             $ret = $stmt->executeUpdate();
             foreach ($stmt->getGeneratedKeys() as $key => $value) {
-                $key = (substr($key, 0, 2) == 'b_') ? substr($key, 2) : $key;
+                // lastInsertId() lands under integer key 0; strict_types
+                // rejects ints in substr(), so normalise the key first.
+                $key = (string)$key;
+                $key = str_starts_with($key, 'b_') ? substr($key, 2) : $key;
                 $generatedKeys[$key] = $value;
             }
         } catch (Throwable $e) {

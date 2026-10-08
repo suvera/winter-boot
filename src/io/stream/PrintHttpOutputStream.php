@@ -39,15 +39,17 @@ class PrintHttpOutputStream implements HttpOutputStream {
         }
 
         foreach ($cookies as $cookie) {
-            setcookie(
-                $cookie->name,
-                $cookie->value,
-                $cookie->expires,
-                $cookie->path,
-                $cookie->domain,
-                $cookie->secure,
-                $cookie->httponly
-            );
+            $options = [
+                'expires' => $cookie->expires,
+                'path' => $cookie->path,
+                'domain' => $cookie->domain,
+                'secure' => $cookie->secure,
+                'httponly' => $cookie->httponly,
+            ];
+            if ($cookie->samesite !== '') {
+                $options['samesite'] = $cookie->samesite;
+            }
+            setcookie($cookie->name, $cookie->value, $options);
         }
     }
 

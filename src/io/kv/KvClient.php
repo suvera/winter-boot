@@ -158,11 +158,21 @@ class KvClient implements KvTemplate {
                 "KV Store read timed out after {$this->config->getTimeout()}s");
         }
         //echo "RAW: $data\n";
-        $json = json_decode($data, true);
-        if ($json === false || $json[0] === KvResponse::FAILED) {
-            self::logError('KV Command failed ' . $data);
-        }
+        return self::decodeResponse($data);
+    }
 
+    /**
+     * Decode one response frame. Payloads are never logged: they can hold
+     * cached values or queued messages.
+     */
+    public static function decodeResponse(string $data): KvResponse {
+        $json = json_decode($data, true);
+        if (!is_array($json)) {
+            throw new KvException('KV Store returned an undecodable response (' . strlen($data) . ' bytes)');
+        }
+        if (($json[0] ?? null) === KvResponse::FAILED) {
+            self::logError('KV Command failed');
+        }
         return KvResponse::jsonUnSerialize($json);
     }
 

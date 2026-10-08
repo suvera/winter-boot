@@ -1,0 +1,45 @@
+# phpize / configure / make build outputs
+/autom4te.cache/
+/build/
+/modules/
+/include/
+.libs/
+.deps/
+/Makefile
+/Makefile.fragments
+/Makefile.global
+/Makefile.objects
+/acinclude.m4
+/aclocal.m4
+/config.guess
+/config.h
+/config.h.in
+/config.log
+/config.nice
+/config.status
+/config.sub
+/configure
+/configure.ac
+/install-sh
+/libtool
+/ltmain.sh
+/missing
+/mkinstalldirs
+/run-tests.php
+*.dep
+*.la
+*.lo
+*.o
+*.so
+
+# autoconf backup files (config.h.in~, configure~)
+*~
+
+# run-tests.php artifacts
+/tests/*.diff
+/tests/*.exp
+/tests/*.log
+/tests/*.out
+/tests/*.php
+/tests/*.sh
+/tests/*.mem

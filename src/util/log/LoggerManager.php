@@ -9,6 +9,10 @@ use Monolog\Handler\HandlerInterface;
 use Monolog\Logger as MonoLogger;
 
 final class LoggerManager {
+    /**
+     * Intentionally static: logging is configured once per process. With two
+     * application contexts in one process, the last configuration wins.
+     */
     private static LoggerManager $instance;
     private MonoLogger $logger;
 

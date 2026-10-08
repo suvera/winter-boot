@@ -6,6 +6,7 @@ namespace dev\winterframework\util\async;
 use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\io\shm\ShmTable;
 use dev\winterframework\util\log\Wlf4p;
+use OverflowException;
 use Swoole\Atomic;
 
 class AsyncInMemoryQueue implements AsyncQueueStore {
@@ -40,7 +41,11 @@ class AsyncInMemoryQueue implements AsyncQueueStore {
             $record->setId($this->counter->add(1));
         }
 
-        $this->table[$record->getId()] = $record->toArray();
+        if (!$this->table->put($record->getId(), $record->toArray())) {
+            // Full table: say so instead of reporting the job as enqueued.
+            throw new OverflowException('Async queue for worker ' . $this->workerId
+                . ' is full (capacity ' . $this->capacity . ')');
+        }
         return $record->getId();
     }
 

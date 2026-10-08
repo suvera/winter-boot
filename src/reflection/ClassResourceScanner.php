@@ -15,6 +15,7 @@ use dev\winterframework\stereotype\RestController;
 use dev\winterframework\stereotype\aop\AopStereoType;
 use dev\winterframework\stereotype\StereoType;
 use dev\winterframework\stereotype\StereoTyped;
+use dev\winterframework\stereotype\web\RequestMapping;
 use dev\winterframework\task\async\stereotype\Async;
 use dev\winterframework\task\scheduling\stereotype\Scheduled;
 use dev\winterframework\type\AttributeList;
@@ -335,6 +336,16 @@ class ClassResourceScanner {
                 $meth->setParameters($this->scanMethodParameters($methodR));
                 $methList[] = $meth;
 
+                if ($skipProxy) {
+                    $ignored = self::ignoredControllerAdvice($methAttrs);
+                    if ($ignored) {
+                        self::logWarning('Ignoring #[' . implode('], #[', $ignored) . '] on '
+                            . $ref->getName() . '::' . $method->getShortName()
+                            . '(): on a RestController, AOP advice runs on request-mapped'
+                            . ' methods only. Move it to a Service bean.');
+                    }
+                }
+
                 foreach ($methAttrs as $methAttr) {
                     if (!$skipProxy && ($methAttr instanceof AopStereoType
                         || $methAttr instanceof Async
@@ -373,6 +384,29 @@ class ClassResourceScanner {
         }
 
         return $res;
+    }
+
+    /**
+     * AOP attributes that never engage on a RestController method:
+     * controllers get no proxy, and the dispatcher drives advice for
+     * request-mapped endpoints only. (#[Async] is rejected on controllers
+     * at init; #[Scheduled] is found by the scheduler registry and runs.)
+     *
+     * @param object[] $methAttrs
+     * @return string[] short class names of the ignored attributes
+     */
+    public static function ignoredControllerAdvice(array $methAttrs): array {
+        $ignored = [];
+        foreach ($methAttrs as $attr) {
+            if ($attr instanceof RequestMapping) {
+                return [];
+            }
+            if ($attr instanceof AopStereoType) {
+                $parts = explode('\\', $attr::class);
+                $ignored[] = end($parts);
+            }
+        }
+        return $ignored;
     }
 
     private function scanMethodParameters(ReflectionMethod $method): MethodParameters {

@@ -6,6 +6,7 @@ namespace dev\winterframework\web\session;
 
 use dev\winterframework\web\http\HttpRequest;
 use dev\winterframework\web\http\ResponseEntity;
+use dev\winterframework\util\SerializationUtil;
 use SessionHandlerInterface;
 
 /**
@@ -33,7 +34,7 @@ class SessionManager {
     ): RequestSession {
         $id = $req->getCookie($o->name);
         if (!is_string($id) || !preg_match(self::ID_PATTERN, $id)) {
-            return new RequestSession(self::mintId(), [], true);
+            return new RequestSession(self::newId(), [], true);
         }
 
         $username = '';
@@ -44,7 +45,7 @@ class SessionManager {
                 try {
                     $row = $store->readWithIdentity($id);
                 } catch (\Throwable) {
-                    return new RequestSession($id, [], true);
+                    return new RequestSession(self::newId(), [], true);
                 }
                 $raw = $row['data'] ?? '';
                 $username = (string)($row['username'] ?? '');
@@ -56,13 +57,15 @@ class SessionManager {
             $store->close();
         }
 
+        // Unknown, expired or corrupt: never adopt the client's id, or an
+        // attacker could plant a known id before the victim logs in.
         if (!is_string($raw) || $raw === '') {
-            return new RequestSession($id, [], true);
+            return new RequestSession(self::newId(), [], true);
         }
 
         $data = self::decode($raw);
         if (!is_array($data)) {
-            return new RequestSession($id, [], true);
+            return new RequestSession(self::newId(), [], true);
         }
         return new RequestSession($id, $data, false, $username, $sessionType);
     }
@@ -76,16 +79,24 @@ class SessionManager {
         if ($s->isDestroyed()) {
             $store->open('', $o->name);
             try {
+                // Ids rotated away earlier in this request must die too, or
+                // a holder of the pre-rotation id keeps a live session.
+                foreach ($s->getPreviousIds() as $oldId) {
+                    $store->destroy($oldId);
+                }
                 $store->destroy($s->getId());
             } finally {
                 $store->close();
             }
-            $res->withCookie($o->name, '', time() - 3600, $o->path, $o->domain, $o->secure, $o->httponly);
+            $res->withCookie($o->name, '', time() - 3600, $o->path, $o->domain, $o->secure, $o->httponly, $o->samesite);
             return;
         }
 
         $store->open('', $o->name);
         try {
+            foreach ($s->getPreviousIds() as $oldId) {
+                $store->destroy($oldId);
+            }
             if ($store instanceof SessionIdentityStore) {
                 $store->writeWithIdentity(
                     $s->getId(),
@@ -100,10 +111,10 @@ class SessionManager {
             $store->close();
         }
         $expires = $o->expirySecs > 0 ? time() + $o->expirySecs : 0;
-        $res->withCookie($o->name, $s->getId(), $expires, $o->path, $o->domain, $o->secure, $o->httponly);
+        $res->withCookie($o->name, $s->getId(), $expires, $o->path, $o->domain, $o->secure, $o->httponly, $o->samesite);
     }
 
-    private static function mintId(): string {
+    public static function newId(): string {
         return bin2hex(random_bytes(16));
     }
 
@@ -113,7 +124,7 @@ class SessionManager {
         // suppress strictly inside this call. Stored payloads originate
         // server-side from serialize() in commit(), never from the client.
         try {
-            return @unserialize($raw);
+            return SerializationUtil::unserialize($raw, true);
         } catch (\Throwable) {
             return false;
         }

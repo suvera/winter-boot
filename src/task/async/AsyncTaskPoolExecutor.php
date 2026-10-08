@@ -29,6 +29,16 @@ class AsyncTaskPoolExecutor implements TaskPoolExecutor {
     #[Value('${winter.task.async.argsSize}')]
     private int $argsSize = self::ARG_SIZE;
 
+    /**
+     * Max jobs one async worker runs at once (0 = unlimited, the 2.x
+     * behaviour). Jobs beyond it stay queued until a running one finishes.
+     */
+    #[Value('${winter.task.async.maxConcurrency}', 0)]
+    private int $maxConcurrency = 0;
+
+    /** @var array<int, int> worker id => running jobs */
+    private array $running = [];
+
     #[Autowired]
     private AsyncQueueStoreManager $queueManager;
 
@@ -53,13 +63,19 @@ class AsyncTaskPoolExecutor implements TaskPoolExecutor {
         }
         $store = $this->queueManager->getQueueStore($workerId);
 
-        $id = $store->enqueue(AsyncQueueRecord::fromArray(0, [
-            'className' => $className,
-            'methodName' => $methodName,
-            'timestamp' => time(),
-            'arguments' => $argValue,
-            'workerId' => $workerId,
-        ]));
+        try {
+            $id = $store->enqueue(AsyncQueueRecord::fromArray(0, [
+                'className' => $className,
+                'methodName' => $methodName,
+                'timestamp' => time(),
+                'arguments' => $argValue,
+                'workerId' => $workerId,
+            ]));
+        } catch (OverflowException $e) {
+            // Dropped, but loudly; the caller's request is not failed.
+            self::logError("Async call $className::$methodName dropped: " . $e->getMessage());
+            return;
+        }
 
         self::logInfo("Async call id '$id' enqueued to worker-$workerId");
     }
@@ -68,7 +84,8 @@ class AsyncTaskPoolExecutor implements TaskPoolExecutor {
         $store = $this->queueManager->getQueueStore($workerId);
         $appCtx = $this->appCtx;
 
-        while ($record = $store->dequeue()) {
+        while ($this->hasCapacity($workerId) && ($record = $store->dequeue())) {
+            $this->running[$workerId] = ($this->running[$workerId] ?? 0) + 1;
             go(function () use ($store, $record, $appCtx, $workerId) {
                 self::logInfo("Processing Async call '" . $record->getId() . "' on async-worker-$workerId");
                 $className = $record->getClassName();
@@ -91,9 +108,23 @@ class AsyncTaskPoolExecutor implements TaskPoolExecutor {
                     }
                 } catch (Throwable $e) {
                     self::logException($e);
+                } finally {
+                    $this->running[$workerId]--;
                 }
             });
         }
+    }
+
+    public function hasCapacity(int $workerId): bool {
+        return $this->maxConcurrency <= 0 || ($this->running[$workerId] ?? 0) < $this->maxConcurrency;
+    }
+
+    public function getMaxConcurrency(): int {
+        return $this->maxConcurrency;
+    }
+
+    public function setMaxConcurrency(int $maxConcurrency): void {
+        $this->maxConcurrency = max(0, $maxConcurrency);
     }
 
     public function getPoolSize(): int {

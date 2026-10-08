@@ -12,8 +12,9 @@ use Throwable;
 
 /**
  * Holds one lazily-built delegate per coroutine scope, plus a single
- * process-wide fallback used outside coroutines (and when the scoping
- * machinery itself fails — machinery failures degrade to logs, never 500s).
+ * process-wide delegate used outside coroutines. Failures inside a scope
+ * fail closed: a coroutine is never handed the process-wide delegate,
+ * because sharing it would interleave concurrent units of work.
  *
  * Safety properties:
  * - Cleanup is registered with the scope's `defer()` exactly once per scope,
@@ -83,11 +84,9 @@ final class CoroutineScopedPool {
      * missing scopes; only rethrows when even the fallback cannot be built)
      */
     public function current(): object {
-        try {
-            $scopeId = $this->scopes->getScopeId();
-        } catch (Throwable $e) {
-            return $this->useFallback('scope-resolution-failed', $e);
-        }
+        // Throws when the scope cannot be resolved: guessing "no scope"
+        // would hand a coroutine the shared delegate.
+        $scopeId = $this->scopes->getScopeId();
 
         if ($scopeId === null) {
             return $this->fallbackDelegate();
@@ -123,14 +122,13 @@ final class CoroutineScopedPool {
                 . ' in ' . $this->poolName
             );
             return $delegate;
-        } catch (PoolExhaustedException $e) {
-            // Resource backpressure is operator policy, not a machinery
-            // failure: it must stay loud, never degrade into a shared
-            // fallback connection (that would reintroduce the interleaving
-            // bug the pool exists to prevent).
-            throw $e;
         } catch (Throwable $e) {
-            return $this->useFallback('create-failed', $e);
+            // Pool exhaustion and create failures stay loud; degrading to the
+            // shared delegate would reintroduce the interleaving bug the pool
+            // exists to prevent.
+            $this->fallbacks++;
+            $this->emit('create-failed', ['scope' => $scopeId, 'error' => $e::class]);
+            throw $e;
         }
     }
 
@@ -168,6 +166,7 @@ final class CoroutineScopedPool {
         return $out;
     }
 
+    /** Scoped create failures (kept for compatibility: nothing falls back since 2.1.1). */
     public function getFallbackCount(): int {
         return $this->fallbacks;
     }
@@ -197,13 +196,6 @@ final class CoroutineScopedPool {
         return $delegate;
     }
 
-    /** @return T */
-    private function useFallback(string $reason, Throwable $e): object {
-        $this->fallbacks++;
-        $this->emit('fallback', ['reason' => $reason]);
-        self::logException($e, __CLASS__ . ' scope failure, using process fallback');
-        return $this->fallbackDelegate();
-    }
 
     private function forget(string $scopeId, string $reason): void {
         $entry = $this->scoped[$scopeId] ?? null;

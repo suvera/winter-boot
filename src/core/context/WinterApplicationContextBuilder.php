@@ -282,12 +282,6 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         );
 
         $this->beanProvider->registerInternalBean(
-            new SimpleKeyGenerator(),
-            KeyGenerator::class,
-            false
-        );
-
-        $this->beanProvider->registerInternalBean(
             new DefaultLockManager(),
             LockManager::class,
             false

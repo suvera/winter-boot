@@ -30,6 +30,21 @@ caching, async, modules).
 - Never log secrets, raw bodies, headers, or query values (see `DispatcherServlet`
   conventions: `sanitizeUriForError()`, no-raw-body logging).
 - Never commit, push, or tag unless explicitly asked. Leave work uncommitted for review.
+- Per-request state belongs to the coroutine scope, never to a singleton field or a
+  static: key it by `CoroutineScopeProvider::getScopeId()` and drop it in `defer()`
+  (see `AbstractPlatformTransactionManager::txnStack()`).
+- Pools fail closed: a coroutine never falls back to a shared/process connection, and
+  a connection is reset (`ResettableConnection::resetForReuse()`) before it is reused.
+  PDO/OCI pooling lives once in `pdbc/support/ScopedConnectionPool`.
+- Data read back from stores is decoded with `SerializationUtil::unserialize()`, never
+  a bare `unserialize()`.
+- Caches, labels and lookup tables keyed by request data need a size cap (see
+  `WinterRequestMappingRegistry::MAX_CACHED_PATHS`); metric labels use route templates.
+- Keep pure logic in small static helpers (e.g. `DispatcherServlet::stripContextPath()`)
+  so tests can cover it without booting the server.
+- Proving "fails before the fix": run the new tests against a clean checkout of `HEAD`
+  with a **copied** `vendor/` (a symlinked `vendor/` autoloads the working tree's `src/`).
+- `CHANGELOG.md`: one line per change, grouped under Fixed / Security / Added / Changed.
 
 ## Docs Sync (mandatory)
 
@@ -45,9 +60,11 @@ Never land a user-visible framework change with docs missing.
 
 1. Bump `VERSION.txt` at the repo root to `X.Y.Z` (exact bytes, no trailing newline).
    The startup banner reads this file via `WinterApplicationRunner::getBootVersion()` —
-   NOT the git tag. A stale file prints a stale version.
+   NOT the git tag. A stale file prints a stale version. The native extension's
+   version (`php-ext/config.m4` → `PHP_WINTER_BOOT_VERSION`) is read from the same file.
 2. Confirm `VERSION.txt` ships everywhere: packed in `build/sqlmigrator/box.json`
    (`files` list), mirrored via `COPY VERSION.txt /VERSION.txt` in
-   `build/docker/Dockerfile`, and included in Composer dists (no `.gitattributes`
+   `build/docker/Dockerfile` (plus `COPY VERSION.txt /tmp/VERSION.txt` for the
+   extension build), and included in Composer dists (no `.gitattributes`
    exclusion).
 3. Docs synced per above; `CHANGELOG.md` entry added.

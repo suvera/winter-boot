@@ -7,11 +7,13 @@ use Throwable;
 
 class Debug {
     public static function getBacktrace(): string {
-        return self::buildBacktrace(debug_backtrace());
+        $traces = debug_backtrace();
+        // Frame 0 is this helper itself.
+        unset($traces[0]);
+        return self::buildBacktrace($traces);
     }
 
     private static function buildBacktrace(array $traces, string $message = ''): string {
-        unset($traces[0]);
 
         $str = $message . "Call Stack:" . PHP_EOL;
         $i = 1;

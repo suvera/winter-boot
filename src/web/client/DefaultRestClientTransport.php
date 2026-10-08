@@ -46,6 +46,14 @@ class DefaultRestClientTransport implements RestClientTransport {
                 'Invalid request url: ' . RestTemplate::sanitizeUrl($url)
             );
         }
+        // Only http(s): file://, gopher://, php:// ... would turn a URL taken
+        // from input into local file reads or SSRF against internal services.
+        $scheme = strtolower((string)($parts['scheme'] ?? ''));
+        if ($scheme !== 'http' && $scheme !== 'https') {
+            throw new RestClientException(
+                'Unsupported url scheme (only http/https): ' . RestTemplate::sanitizeUrl($url)
+            );
+        }
         foreach ($headers as $name => $value) {
             self::assertNoCrlf((string)$name, (string)$value);
         }
@@ -153,7 +161,13 @@ class DefaultRestClientTransport implements RestClientTransport {
 
         $responseHeaders = [];
         curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+        if (strtoupper($method) === 'HEAD') {
+            // A HEAD response announces a Content-Length it never sends;
+            // without NOBODY cURL waits for that body until the timeout.
+            curl_setopt($ch, CURLOPT_NOBODY, true);
+        } else {
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+        }
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headerLines);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, (int)ceil($timeout > 0 ? $timeout : RestTemplate::DEFAULT_TIMEOUT));
@@ -162,6 +176,7 @@ class DefaultRestClientTransport implements RestClientTransport {
             CURLOPT_CONNECTTIMEOUT,
             (int)ceil($connectTimeout > 0 ? $connectTimeout : RestTemplate::DEFAULT_CONNECT_TIMEOUT)
         );
+        curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $this->sslVerification);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $this->sslVerification ? 2 : 0);
         curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($ch, string $line) use (&$responseHeaders): int {

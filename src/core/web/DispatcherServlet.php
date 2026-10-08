@@ -17,6 +17,7 @@ use dev\winterframework\exception\NullPointerException;
 use dev\winterframework\exception\WinterException;
 use dev\winterframework\io\metrics\prometheus\PrometheusMetricRegistry;
 use dev\winterframework\reflection\ObjectCreator;
+use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\stereotype\web\RequestBody;
 use dev\winterframework\stereotype\web\RequestParam;
 use dev\winterframework\util\BeanFinderTrait;
@@ -139,13 +140,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
         // Arrival trace: logged instantly, before routing or rendering.
         $this->logRequestReceived($request);
 
-        $uri = $request->getUri();
-        $uri = trim($uri, '/');
-
-        if (strlen($serverPath) && str_starts_with($uri, $serverPath)) {
-            $uri = substr($uri, strlen($serverPath));
-            $uri = trim($uri, '/');
-        }
+        $uri = self::stripContextPath(trim($request->getUri(), '/'), $serverPath);
 
         $matchedRoute = $this->mappingRegistry->find($uri, $request->getMethod());
 
@@ -375,20 +370,16 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 }
             }
 
-            foreach ($method->getParameters() as $param) {
-                if (isset($args[$param->getName()])) {
-                    continue;
-                }
-                if (!$param->isOptional()) {
-                    $this->handleError(
-                        $request,
-                        $response,
-                        HttpStatus::$BAD_REQUEST,
-                        new WinterException('Bad Request: Missing parameter ' . $param->getName()),
-                        $startTime
-                    );
-                    return;
-                }
+            $missing = self::missingParameters($method, $args);
+            if (!empty($missing)) {
+                $this->handleError(
+                    $request,
+                    $response,
+                    HttpStatus::$BAD_REQUEST,
+                    new WinterException('Bad Request: Missing parameter ' . $missing[0]),
+                    $startTime
+                );
+                return;
             }
 
             /**
@@ -396,7 +387,8 @@ class DispatcherServlet implements HttpRequestDispatcher {
              */
             if ($controller instanceof ControllerInterceptor) {
                 if (!$controller->preHandle($request, $response, $method->getDelegate())) {
-                    $renderer->renderAndExit($response, $request);
+                    $this->finishVetoed($interceptor, $renderer, $request, $response);
+                    $this->logRequestCompleted($request, $response, $startTime);
                     return;
                 }
             }
@@ -409,6 +401,17 @@ class DispatcherServlet implements HttpRequestDispatcher {
              * driven here instead — begin() before the body, commit()/failed()
              * around its outcome. stopExecution() skips the body and supplies
              * the response value directly.
+             *
+             * Intentional duplicate of NativeAopDriver::begin()/finish(): the
+             * same protocol, kept inline on purpose. Controllers stay out of
+             * native advice (ClassResourceScanner skips them) because the
+             * extension verifies a stopExecution() value against the declared
+             * return type, and existing endpoints rely on an aspect supplying
+             * e.g. a ResponseEntity regardless of that type. Deliberate
+             * differences: no return-type verification, no #[Async] enqueue
+             * (rejected on controllers), and no "AOP invocation failed" log
+             * (request errors are already logged by the dispatcher).
+             * Any other protocol change must be made in both places.
              */
             $aopRegistry = $this->ctxData->getAopRegistry();
             $aopOwner = $method->getDeclaringClass()->getName();
@@ -417,7 +420,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 ? $aopRegistry->get($aopOwner, $aopName)
                 : null;
             $aopExCtx = $aopInterceptor !== null
-                ? new AopExecutionContext($controller, $args)
+                ? new AopExecutionContext($controller, self::positionalArguments($method, $args))
                 : null;
 
             // Native path: winter_boot_advise() already intercepts this
@@ -456,6 +459,9 @@ class DispatcherServlet implements HttpRequestDispatcher {
                     } catch (Throwable $e) {
                         $aopExCtx->setException($e);
                         $aopExCtx->setCommitFailed();
+                        if ($aopExCtx->getPropagatedCommitFailure() === $e) {
+                            throw $e;
+                        }
                         self::logException($e);
                     }
                 }
@@ -488,7 +494,9 @@ class DispatcherServlet implements HttpRequestDispatcher {
         } finally {
             // Single observation point: stop() records on every call, so
             // the timer must stop exactly once, on all paths alike.
-            $timer->stop(['path' => $request->getUri(), 'method' => $request->getMethod()]);
+            // Route template, not the raw URI: path values would create an
+            // unbounded number of metric series.
+            $timer->stop(['path' => self::routeLabel($route), 'method' => $request->getMethod()]);
         }
     }
 
@@ -637,6 +645,105 @@ class DispatcherServlet implements HttpRequestDispatcher {
     }
 
     /**
+     * Removes the configured context path from a trimmed URI, only on a
+     * segment boundary ("api" strips "api/users", not "apiary/x").
+     */
+    public static function stripContextPath(string $uri, string $contextPath): string {
+        if ($contextPath === '') {
+            return $uri;
+        }
+        if ($uri === $contextPath) {
+            return '';
+        }
+        if (str_starts_with($uri, $contextPath . '/')) {
+            return trim(substr($uri, strlen($contextPath)), '/');
+        }
+        return $uri;
+    }
+
+    /**
+     * Required parameters with no bound argument. A bound null counts as
+     * present (array_key_exists, not isset).
+     *
+     * @return string[]
+     */
+    public static function missingParameters(\ReflectionFunctionAbstract|RefMethod $method, array $args): array {
+        $missing = [];
+        foreach ($method->getParameters() as $param) {
+            if (array_key_exists($param->getName(), $args) || $param->isOptional()) {
+                continue;
+            }
+            $missing[] = $param->getName();
+        }
+        return $missing;
+    }
+
+    /**
+     * Name-keyed endpoint arguments re-ordered by parameter position, the
+     * shape every other AOP entry point hands to aspects (`#{param}`
+     * templates and key generators read arguments by position). An omitted
+     * optional parameter takes its declared default.
+     *
+     * @return array<int, mixed>
+     */
+    public static function positionalArguments(\ReflectionFunctionAbstract|RefMethod $method, array $args): array {
+        $out = [];
+        foreach ($method->getParameters() as $param) {
+            $name = $param->getName();
+            if (array_key_exists($name, $args)) {
+                $out[$param->getPosition()] = $args[$name];
+            } else if ($param->isDefaultValueAvailable()) {
+                $out[$param->getPosition()] = $param->getDefaultValue();
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Metric label for a matched route: its declared path template.
+     */
+    public static function routeLabel(MatchedRequestMapping $route): string {
+        $paths = [];
+        foreach ($route->getMapping()->getUriPaths() as $uriPath) {
+            $paths[] = '/' . trim($uriPath->getRaw(), '/');
+        }
+        return implode('|', $paths);
+    }
+
+    /**
+     * Whether an app-level interceptor pattern applies to a URI. Tested on
+     * the raw URI and on the normalised form routing uses (repeated slashes
+     * collapsed), so "//admin/x" cannot reach an "admin/x" route while
+     * skipping an "^/admin" interceptor.
+     */
+    public static function interceptorMatches(string $regexPath, string $uri): bool {
+        $pattern = '/' . $regexPath . '/';
+        if (preg_match($pattern, $uri)) {
+            return true;
+        }
+        $normalised = '/' . trim((string)preg_replace('#/+#', '/', $uri), '/');
+        return $normalised !== $uri && preg_match($pattern, $normalised) === 1;
+    }
+
+    /**
+     * Completes a request vetoed by a ControllerInterceptor: renders the
+     * response as-is and still runs afterCompletion() hooks.
+     */
+    protected function finishVetoed(
+        InterceptorRegistry $registry,
+        ResponseRenderer $renderer,
+        HttpRequest $request,
+        ResponseEntity $response
+    ): void {
+        $renderer->render($response, $request);
+        try {
+            $this->afterCompletion($registry, $request, $response);
+        } catch (Throwable $e) {
+            self::logException($e);
+        }
+    }
+
+    /**
      * Strips control characters and truncates a request URI before it is
      * echoed into 404 messages and logs, blocking log injection and
      * reflected content via the error body.
@@ -730,7 +837,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
     ): bool {
         $uri = $request->getUri();
         foreach ($registry->getInterceptors() as $regexPath => $interceptors) {
-            if (!preg_match('/' . $regexPath . '/', $uri)) {
+            if (!self::interceptorMatches($regexPath, $uri)) {
                 continue;
             }
             foreach ($interceptors as $interceptor) {
@@ -759,7 +866,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
         $uri = $request->getUri();
         foreach ($registry->getInterceptors() as $regexPath => $interceptors) {
 
-            if (!preg_match('/' . $regexPath . '/', $uri)) {
+            if (!self::interceptorMatches($regexPath, $uri)) {
                 continue;
             }
             foreach ($interceptors as $interceptor) {
@@ -788,7 +895,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
         $uri = $request->getUri();
         foreach ($registry->getInterceptors() as $regexPath => $interceptors) {
 
-            if (!preg_match('/' . $regexPath . '/', $uri)) {
+            if (!self::interceptorMatches($regexPath, $uri)) {
                 continue;
             }
             foreach ($interceptors as $interceptor) {

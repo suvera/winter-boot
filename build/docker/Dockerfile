@@ -31,10 +31,12 @@ RUN set -eux; \
     test -n "$runDeps"; \
     echo "$runDeps" > /tmp/runtime-pkgs.txt
 
-# Winter Boot native extension (repo's php-ext/): deferred() callbacks plus
-# future native capabilities. Pure Zend API, no extra shared-library deps.
-# Enabled alongside swoole — the deferred()/defered() names do not clash.
+# Winter Boot native extension (repo's php-ext/): native AOP interception and
+# template evaluation. Pure Zend API, no extra shared-library deps.
+# Enabled alongside swoole.
+# config.m4 reads the extension version from ../VERSION.txt.
 COPY php-ext /tmp/php-ext
+COPY VERSION.txt /tmp/VERSION.txt
 RUN set -eux; \
     cd /tmp/php-ext; \
     phpize; \
@@ -43,7 +45,7 @@ RUN set -eux; \
     make install; \
     docker-php-ext-enable winter_boot; \
     php --ri winter_boot; \
-    rm -rf /tmp/php-ext
+    rm -rf /tmp/php-ext /tmp/VERSION.txt
 
 FROM php:8.5-cli-alpine
 
@@ -73,4 +75,4 @@ RUN set -eux; \
     php --ri swoole > /dev/null; \
     php --ri winter_boot > /dev/null; \
     php -r 'if (ini_get("variables_order") !== "EGPCS") { fwrite(STDERR, "variables_order wrong\n"); exit(1); } if (error_reporting() !== (E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED)) { fwrite(STDERR, "error_reporting wrong\n"); exit(1); }'; \
-    php -r 'function winterBootSmoke() { deferred(function () { echo "winter_boot deferred() ok\n"; }); } winterBootSmoke();'
+    php -r 'if (!function_exists("winter_boot_advise")) { fwrite(STDERR, "winter_boot functions missing\n"); exit(1); } echo "winter_boot ok\n";'

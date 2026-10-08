@@ -33,7 +33,8 @@ class SwooleOutputStream implements HttpOutputStream {
                 $cookie->path,
                 $cookie->domain,
                 $cookie->secure,
-                $cookie->httponly
+                $cookie->httponly,
+                $cookie->samesite
             );
         }
     }

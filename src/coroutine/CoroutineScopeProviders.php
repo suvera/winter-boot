@@ -10,6 +10,10 @@ namespace dev\winterframework\coroutine;
  */
 final class CoroutineScopeProviders {
 
+    /**
+     * Intentionally static: the provider is stateless; the Swoole one keys
+     * every scope by coroutine id, so sharing it never shares request state.
+     */
     private static ?CoroutineScopeProvider $instance = null;
 
     public static function create(): CoroutineScopeProvider {

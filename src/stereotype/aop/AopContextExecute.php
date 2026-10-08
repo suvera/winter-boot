@@ -62,10 +62,17 @@ trait AopContextExecute {
             }
         }
 
-        if (function_exists('winter_boot_expand_template')) {
+        try {
+            // Native substitution (bounded against runaway expansion); the
+            // winter_boot extension is mandatory since 2.1.0, so there is no
+            // PHP fallback to drift from it.
             return winter_boot_expand_template($value, $pairs);
+        } catch (Throwable $e) {
+            throw new AopException(
+                sprintf("Error expanding AOP name in target [%s]: %s, [NAME]: %s", $target::class, $e->getMessage(), $value),
+                $e->getCode(),
+                $e
+            );
         }
-
-        return str_replace(array_keys($pairs), array_values($pairs), $value);
     }
 }

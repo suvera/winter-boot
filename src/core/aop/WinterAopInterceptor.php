@@ -13,6 +13,7 @@ use dev\winterframework\reflection\MethodResource;
 use dev\winterframework\reflection\ReflectionUtil;
 use dev\winterframework\stereotype\aop\AopContext;
 use dev\winterframework\stereotype\aop\AopStereoType;
+use dev\winterframework\stereotype\aop\PropagatesCommitFailure;
 use dev\winterframework\stereotype\aop\WinterAspect;
 use dev\winterframework\util\log\Wlf4p;
 use Throwable;
@@ -112,12 +113,15 @@ class WinterAopInterceptor implements AopInterceptor {
 
     private function aspectBeginFailed(int $idx, AopExecutionContext $exCtx, Throwable $e): void {
         for ($i = $idx; $i >= 0; $i--) {
+            if ($exCtx->isSkippedAspect($i)) {
+                continue;
+            }
             try {
-                $this->aspects[$idx]->beginFailed($this->aopContexts[$i], $exCtx, $e);
-            } catch (Throwable $e) {
-                self::logException($e, 'Aspect beginFailed handler call failed, for Type "'
-                    . get_class($this->aopContexts[$idx]->getStereoType()) . '" on Method '
-                    . ReflectionUtil::getFqName($this->aopContexts[$idx]->getMethod())
+                $this->aspects[$i]->beginFailed($this->aopContexts[$i], $exCtx, $e);
+            } catch (Throwable $handlerEx) {
+                self::logException($handlerEx, 'Aspect beginFailed handler call failed, for Type "'
+                    . get_class($this->aopContexts[$i]->getStereoType()) . '" on Method '
+                    . ReflectionUtil::getFqName($this->aopContexts[$i]->getMethod())
                     . '. ');
             }
         }
@@ -134,8 +138,8 @@ class WinterAopInterceptor implements AopInterceptor {
 
             try {
                 $this->aspects[$idx]->failed($aopCtx, $exCtx, $e);
-            } catch (Throwable $e) {
-                self::logException($e, 'Aspect fail handler call failed, for Type "'
+            } catch (Throwable $handlerEx) {
+                self::logException($handlerEx, 'Aspect fail handler call failed, for Type "'
                     . get_class($aopCtx->getStereoType()) . '" on Method '
                     . ReflectionUtil::getFqName($aopCtx->getMethod())
                     . '. ');
@@ -144,7 +148,15 @@ class WinterAopInterceptor implements AopInterceptor {
         $this->curState = self::FAILED;
     }
 
+    /**
+     * Commit every aspect. A failing aspect gets commitFailed() and the
+     * remaining aspects still commit (e.g. locks are still released). The
+     * first failure of a PropagatesCommitFailure aspect (a transaction that
+     * did not commit) is then rethrown so the caller never sees a normal
+     * return; other commit failures are logged and swallowed.
+     */
     public function aspectCommit(AopExecutionContext $exCtx, mixed $result): void {
+        $propagate = null;
         foreach ($this->aspects as $i => $aspect) {
 
             if ($exCtx->isSkippedAspect($i)) {
@@ -163,9 +175,17 @@ class WinterAopInterceptor implements AopInterceptor {
                     $result,
                     $e
                 );
+                if ($propagate === null && $aspect instanceof PropagatesCommitFailure) {
+                    $propagate = $e;
+                }
             }
         }
         $this->curState = self::COMMIT;
+
+        if ($propagate !== null) {
+            $exCtx->setPropagatedCommitFailure($propagate);
+            throw $propagate;
+        }
     }
 
     private function aspectCommitFailed(
@@ -174,7 +194,14 @@ class WinterAopInterceptor implements AopInterceptor {
         mixed $result,
         Throwable $e
     ): void {
-        $this->aspects[$idx]->commitFailed($this->aopContexts[$idx], $exCtx, $result, $e);
+        try {
+            $this->aspects[$idx]->commitFailed($this->aopContexts[$idx], $exCtx, $result, $e);
+        } catch (Throwable $handlerError) {
+            // Keep committing the remaining aspects; the original failure
+            // is the one that matters.
+            self::logException($handlerError, 'Aspect commitFailed handler call failed on Method '
+                . ReflectionUtil::getFqName($this->aopContexts[$idx]->getMethod()) . '. ');
+        }
     }
 
 }

@@ -1,10 +1,7 @@
 /*
  * winter_boot extension — native capabilities for PHP.
  *
- * Capabilities: deferred()/defered() registers callable callbacks against
- * the owning PHP function's execution scope via the Zend Observer API and
- * runs them LIFO when that scope exits (normal return, early return, or
- * exception unwinding); native AOP method interception via
+ * Capabilities: native AOP method interception via
  * winter_boot_advise()/winter_boot_is_advised(); `#{...}` template-code
  * evaluation via winter_boot_exec_inline() (with a compilation cache); and
  * single-call template substitution via winter_boot_expand_template().
@@ -25,319 +22,11 @@
 #include "Zend/zend_observer.h"
 #include "Zend/zend_exceptions.h"
 #include "Zend/zend_interfaces.h"
+#include "Zend/zend_closures.h"
 
 ZEND_DECLARE_MODULE_GLOBALS(winter_boot);
 
-/* One callback registered by deferred(). Stacked LIFO via `next`. */
-typedef struct _wb_defer_entry {
-	zval cb;
-	struct _wb_defer_entry *next;
-} wb_defer_entry;
-
-/* All pending callbacks for one owning zend_execute_data frame. */
-typedef struct _wb_defer_frame {
-	zend_execute_data *ex;
-	wb_defer_entry *head;
-	size_t count;
-	struct _wb_defer_frame *next;
-} wb_defer_frame;
-
-static wb_defer_frame *wb_frames(void)
-{
-	return (wb_defer_frame *) WB_G(frames);
-}
-
-static void wb_frames_set(wb_defer_frame *head)
-{
-	WB_G(frames) = (void *) head;
-}
-
-/* Detach (and return) the frame owning `ex`, or NULL. Detaching before
- * running callbacks guarantees exactly-once execution even if a callback
- * throws, bails out, or registers further deferred callbacks. */
-static wb_defer_frame *wb_frame_detach(zend_execute_data *ex)
-{
-	wb_defer_frame **link;
-	wb_defer_frame *head = wb_frames();
-
-	link = &head;
-	while (*link != NULL) {
-		if ((*link)->ex == ex) {
-			wb_defer_frame *found = *link;
-			*link = found->next;
-			wb_frames_set(head);
-			found->next = NULL;
-			return found;
-		}
-		link = &(*link)->next;
-	}
-	return NULL;
-}
-
-static wb_defer_frame *wb_frame_find_or_create(zend_execute_data *ex)
-{
-	wb_defer_frame *f = wb_frames();
-	while (f != NULL) {
-		if (f->ex == ex) {
-			return f;
-		}
-		f = f->next;
-	}
-	f = (wb_defer_frame *) emalloc(sizeof(wb_defer_frame));
-	f->ex = ex;
-	f->head = NULL;
-	f->count = 0;
-	f->next = wb_frames();
-	wb_frames_set(f);
-	return f;
-}
-
-/* Free a whole frame list without executing anything. Used at request
- * shutdown for scopes that never exited (fatal error paths). */
-static void wb_frames_free_all(void)
-{
-	wb_defer_frame *f = wb_frames();
-	wb_frames_set(NULL);
-	while (f != NULL) {
-		wb_defer_frame *next_f = f->next;
-		wb_defer_entry *e = f->head;
-		while (e != NULL) {
-			wb_defer_entry *next_e = e->next;
-			zval_ptr_dtor(&e->cb);
-			efree(e);
-			e = next_e;
-		}
-		efree(f);
-		f = next_f;
-	}
-}
-
-static void wb_run_frame(wb_defer_frame *f)
-{
-	zend_object *orig = EG(exception);
-	zend_object *orig_prev = EG(prev_exception);
-	const zend_op *opline_before = EG(opline_before_exception);
-	zend_object *last_pe = NULL;
-	zend_object **cb_ex = NULL;
-	size_t cb_len = 0;
-	wb_defer_entry *e;
-
-	if (orig != NULL) {
-		GC_ADDREF(orig);
-	}
-	if (orig_prev != NULL) {
-		GC_ADDREF(orig_prev);
-	}
-	if (orig != NULL || orig_prev != NULL) {
-		zend_clear_exception();
-	}
-
-	if (f->count > 0) {
-		cb_ex = (zend_object **) emalloc(sizeof(zend_object *) * f->count);
-	}
-
-	e = f->head;
-	while (e != NULL) {
-		wb_defer_entry *next = e->next;
-		zval retval_tmp;
-		zend_fcall_info fci;
-		zend_fcall_info_cache fcc;
-		char *error = NULL;
-
-		ZVAL_UNDEF(&retval_tmp);
-		memset(&fci, 0, sizeof(fci));
-		fci.size = sizeof(fci);
-		memset(&fcc, 0, sizeof(fcc));
-
-		if (zend_fcall_info_init(&e->cb, 0, &fci, &fcc, NULL, &error) == SUCCESS) {
-			fci.retval = &retval_tmp;
-			fci.params = NULL;
-			fci.param_count = 0;
-			zend_call_function(&fci, &fcc);
-			if (!Z_ISUNDEF(retval_tmp)) {
-				zval_ptr_dtor(&retval_tmp);
-			}
-		} else {
-			zend_throw_error(NULL, "deferred(): callback is no longer callable");
-		}
-		if (error != NULL) {
-			efree(error);
-		}
-
-		if (EG(exception) != NULL) {
-			zend_object *thrown = EG(exception);
-			zend_object *thrown_pe = EG(prev_exception);
-			GC_ADDREF(thrown);
-			if (thrown_pe != NULL) {
-				GC_ADDREF(thrown_pe);
-			}
-			zend_clear_exception();
-			if (cb_len < f->count) {
-				cb_ex[cb_len++] = thrown;
-			} else {
-				OBJ_RELEASE(thrown);
-			}
-			if (thrown_pe != NULL) {
-				if (last_pe != NULL) {
-					OBJ_RELEASE(last_pe);
-				}
-				last_pe = thrown_pe;
-			}
-		}
-
-		zval_ptr_dtor(&e->cb);
-		efree(e);
-		e = next;
-	}
-	efree(f);
-
-	/* Rebuild one active exception, preserving everything via the
-	 * `previous` chain: original exception innermost, then each deferred
-	 * failure in execution order, so the last failure executed (earliest
-	 * registered) is outermost. This mirrors `finally` semantics where a
-	 * cleanup failure supersedes — but never silently drops — the
-	 * original, and no remaining callback is ever skipped. */
-	{
-		zend_object *chain = orig;
-		size_t i;
-
-		for (i = 0; i < cb_len; i++) {
-			if (chain != NULL) {
-				/* set_previous() appends `chain` to the tail of
-				 * cb_ex[i]'s `previous` chain and consumes our
-				 * reference to `chain` on every return path. */
-				zend_exception_set_previous(cb_ex[i], chain);
-			}
-			chain = cb_ex[i];
-		}
-		if (cb_ex != NULL) {
-			efree(cb_ex);
-		}
-
-		if (chain != NULL) {
-			EG(exception) = chain;
-			if (last_pe != NULL) {
-				EG(prev_exception) = last_pe;
-				if (orig_prev != NULL) {
-					OBJ_RELEASE(orig_prev);
-				}
-			} else {
-				EG(prev_exception) = orig_prev;
-			}
-		} else {
-			EG(exception) = NULL;
-			EG(prev_exception) = orig_prev;
-		}
-		/* zend_clear_exception() above clobbered the unwinder's op
-		 * bookmark; restore it so the caller's catch tables resolve. */
-		EG(opline_before_exception) = opline_before;
-	}
-}
-
-/* Observer end handler: runs (and frees) the deferred-callback stack of the
- * exiting scope. `retval` is left untouched — deferred callbacks cannot
- * alter the owner's return value. */
-static void wb_observer_end(zend_execute_data *execute_data, zval *retval)
-{
-	wb_defer_frame *f;
-
-	(void) retval;
-
-	if (execute_data == NULL) {
-		return;
-	}
-	f = wb_frame_detach(execute_data);
-	if (f == NULL) {
-		return;
-	}
-	wb_run_frame(f);
-}
-
-/* Observer init: observe every user-code call so any scope that later calls
- * deferred() already carries our end handler. Internal functions can never
- * own a deferred-callback scope (deferred() rejects them as owners), so they
- * are skipped. */
-static zend_observer_fcall_handlers wb_observer_init(zend_execute_data *execute_data)
-{
-	zend_observer_fcall_handlers handlers = {NULL, NULL};
-
-	if (execute_data != NULL && execute_data->func != NULL
-		&& ZEND_USER_CODE(execute_data->func->type)) {
-		handlers.end = wb_observer_end;
-	}
-	return handlers;
-}
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_deferred, 0, 0, 1)
-	ZEND_ARG_CALLABLE_INFO(0, callback, 0)
-ZEND_END_ARG_INFO()
-
-/* Shared implementation behind deferred() and its defered() alias, so both
- * names run byte-identical logic. `func_name` is only used for error
- * messages so failures name the spelling the caller actually used. */
-static void wb_deferred_impl(INTERNAL_FUNCTION_PARAMETERS, const char *func_name)
-{
-	zval *cb;
-	zend_execute_data *owner;
-	zend_string *callable_name = NULL;
-	bool is_callable;
-	wb_defer_frame *f;
-	wb_defer_entry *entry;
-
-	ZEND_PARSE_PARAMETERS_START(1, 1)
-		Z_PARAM_ZVAL(cb)
-	ZEND_PARSE_PARAMETERS_END();
-
-	is_callable = zend_is_callable(cb, 0, &callable_name);
-	if (callable_name != NULL) {
-		zend_string_release(callable_name);
-	}
-	if (!is_callable) {
-		zend_type_error("%s(): argument #1 ($callback) must be a valid callable", func_name);
-		RETURN_THROWS();
-	}
-
-	/* Bind to the nearest enclosing *user* scope. Skipping internal
-	 * frames keeps deferred()/defered() usable through dispatchers such
-	 * as call_user_func(); the first user frame is still "the current PHP
-	 * function" from the caller's point of view. */
-	owner = execute_data->prev_execute_data;
-	while (owner != NULL && owner->func != NULL && !ZEND_USER_CODE(owner->func->type)) {
-		owner = owner->prev_execute_data;
-	}
-
-	if (owner == NULL || owner->func == NULL || !ZEND_USER_CODE(owner->func->type)) {
-		zend_throw_error(NULL, "%s(): must be called inside a PHP function; global scope is not supported", func_name);
-		RETURN_THROWS();
-	}
-	if (owner->func->common.function_name == NULL) {
-		zend_throw_error(NULL, "%s(): cannot be used in global/file scope; call it inside a function", func_name);
-		RETURN_THROWS();
-	}
-	if ((owner->func->common.fn_flags & ZEND_ACC_GENERATOR) != 0) {
-		zend_throw_error(NULL, "%s(): is not supported inside generator functions (yield suspends scope exit); use try/finally instead", func_name);
-		RETURN_THROWS();
-	}
-
-	f = wb_frame_find_or_create(owner);
-	entry = (wb_defer_entry *) emalloc(sizeof(wb_defer_entry));
-	ZVAL_COPY(&entry->cb, cb);
-	entry->next = f->head;
-	f->head = entry;
-	f->count++;
-}
-
-PHP_FUNCTION(deferred)
-{
-	wb_deferred_impl(INTERNAL_FUNCTION_PARAM_PASSTHRU, "deferred");
-}
-
-PHP_FUNCTION(defered)
-{
-	wb_deferred_impl(INTERNAL_FUNCTION_PARAM_PASSTHRU, "defered");
-}
-
-/* ---- native AOP interception (second capability) ----
+/* ---- native AOP interception ----
  *
  * The framework registers advised class methods once at boot; a
  * zend_execute_ex override then replays the exact proxy driver protocol in C
@@ -358,7 +47,10 @@ typedef struct _wb_advice {
 	zend_function *func;
 	zend_class_entry *scope;
 	zend_string *method_name;
-	zend_class_entry *bean_ce;
+	/* Every bean class advised on this op_array. An inherited method shares
+	 * its parent's op_array, so sibling beans register into one entry. */
+	zend_class_entry **bean_ces;
+	uint32_t bean_count;
 } wb_advice;
 
 static void (*wb_orig_execute_ex)(zend_execute_data *ex);
@@ -387,6 +79,7 @@ static void wb_advice_map_free(void)
 		wb_advice *ad;
 		ZEND_HASH_FOREACH_PTR(ht, ad) {
 			zend_string_release(ad->method_name);
+			efree(ad->bean_ces);
 			efree(ad);
 		} ZEND_HASH_FOREACH_END();
 	}
@@ -498,20 +191,59 @@ PHP_FUNCTION(winter_boot_advise)
 		zend_hash_init(map, 64, NULL, NULL, 0);
 		wb_advice_map_set(map);
 	}
-	ad = (wb_advice *) emalloc(sizeof(wb_advice));
-	ad->func = func;
-	ad->scope = func->common.scope;
-	ad->method_name = zend_string_copy(func->common.function_name);
-	ad->bean_ce = ce;
-	{
-		wb_advice *old = (wb_advice *) zend_hash_index_find_ptr(
-			map, (zend_ulong)(uintptr_t) func);
-		if (old != NULL) {
-			zend_string_release(old->method_name);
-			efree(old);
-		}
+	ad = (wb_advice *) zend_hash_index_find_ptr(map, (zend_ulong)(uintptr_t) func);
+	if (ad != NULL && (ad->func != func || ad->scope != func->common.scope
+		|| !zend_string_equals(ad->method_name, func->common.function_name))) {
+		/* Stale entry for a recycled address: start over. */
+		zend_string_release(ad->method_name);
+		efree(ad->bean_ces);
+		efree(ad);
+		zend_hash_index_del(map, (zend_ulong)(uintptr_t) func);
+		ad = NULL;
+	}
+	if (ad == NULL) {
+		ad = (wb_advice *) emalloc(sizeof(wb_advice));
+		ad->func = func;
+		ad->scope = func->common.scope;
+		ad->method_name = zend_string_copy(func->common.function_name);
+		ad->bean_ces = NULL;
+		ad->bean_count = 0;
 		zend_hash_index_update_ptr(map, (zend_ulong)(uintptr_t) func, ad);
 	}
+	{
+		/* Idempotent: re-advising the same bean class adds nothing. */
+		uint32_t i;
+		for (i = 0; i < ad->bean_count; i++) {
+			if (ad->bean_ces[i] == ce) {
+				return;
+			}
+		}
+		ad->bean_ces = (zend_class_entry **) erealloc(
+			ad->bean_ces, sizeof(zend_class_entry *) * (ad->bean_count + 1));
+		ad->bean_ces[ad->bean_count++] = ce;
+	}
+}
+
+/* The advised bean class a call belongs to: an exact match first, then the
+ * first registered ancestor of the runtime class, or NULL when the class is
+ * outside every advised bean family. */
+static zend_class_entry *wb_advice_bean_for(wb_advice *ad, zend_class_entry *runtime_ce)
+{
+	uint32_t i;
+	if (runtime_ce == NULL) {
+		return NULL;
+	}
+	for (i = 0; i < ad->bean_count; i++) {
+		if (ad->bean_ces[i] == runtime_ce) {
+			return runtime_ce;
+		}
+	}
+	for (i = 0; i < ad->bean_count; i++) {
+		if (instanceof_function(runtime_ce, ad->bean_ces[i])) {
+			return ad->bean_ces[i];
+		}
+	}
+	return NULL;
 }
 
 PHP_FUNCTION(winter_boot_is_advised)
@@ -855,11 +587,17 @@ PHP_FUNCTION(winter_boot_exec_inline)
 	}
 }
 
+/* Per-pass output cap for winter_boot_expand_template(): chained pairs grow
+ * the result geometrically from tiny input (a single-request OOM), so a pass
+ * past this bound fails closed. Dwarfs any real component/bean name. */
+#define WB_EXPAND_MAX_RESULT ((size_t) (16 * 1024 * 1024))
+
 /* Single-literal replace-all used by winter_boot_expand_template().
- * Advances past inserted text (no rescan), mirroring one str_replace()
- * pass for a single search element. */
+ * Advances past inserted text (no rescan), one str_replace() pass per search.
+ * Returns NULL (allocating nothing) when the result would exceed max_len. */
 static zend_string *wb_replace_all(
-	zend_string *subject, zend_string *search, zend_string *replace)
+	zend_string *subject, zend_string *search, zend_string *replace,
+	size_t max_len)
 {
 	const char *s = ZSTR_VAL(subject);
 	size_t s_len = ZSTR_LEN(subject);
@@ -892,7 +630,16 @@ static zend_string *wb_replace_all(
 	{
 		size_t new_len;
 		if (r_len >= p_len) {
-			new_len = s_len + count * (r_len - p_len);
+			size_t growth_per = r_len - p_len;
+			/* Only a growing pass can breach the cap; bound it before the
+			 * multiply (division first, so count*growth_per cannot wrap).
+			 * A same-length pass adds nothing and is always allowed. */
+			if (growth_per != 0
+				&& (s_len > max_len
+					|| count > (max_len - s_len) / growth_per)) {
+				return NULL;
+			}
+			new_len = s_len + count * growth_per;
 		} else {
 			new_len = s_len - count * (p_len - r_len);
 		}
@@ -1011,7 +758,25 @@ PHP_FUNCTION(winter_boot_expand_template)
 		{
 			uint32_t k;
 			for (k = 0; k < n; k++) {
-				zend_string *next = wb_replace_all(result, searches[k], replaces[k]);
+				zend_string *next = wb_replace_all(result, searches[k],
+					replaces[k], WB_EXPAND_MAX_RESULT);
+				if (next == NULL) {
+					/* Cap exceeded: fail closed. Release this pair and
+					 * every pair not yet consumed, the current result,
+					 * the pair arrays, then throw. */
+					uint32_t j;
+					for (j = k; j < n; j++) {
+						zend_string_release(searches[j]);
+						zend_string_release(replaces[j]);
+					}
+					efree(searches);
+					efree(replaces);
+					zend_string_release(result);
+					zend_throw_error(NULL,
+						"winter_boot_expand_template(): expansion exceeds %zu bytes",
+						WB_EXPAND_MAX_RESULT);
+					RETURN_THROWS();
+				}
 				zend_string_release(result);
 				zend_string_release(searches[k]);
 				zend_string_release(replaces[k]);
@@ -1035,8 +800,10 @@ static bool wb_match_mask(zval *v, uint32_t mask)
 {
 	switch (Z_TYPE_P(v)) {
 		case IS_NULL: return (mask & MAY_BE_NULL) != 0;
-		case IS_FALSE: return (mask & (MAY_BE_FALSE | MAY_BE_BOOL)) != 0;
-		case IS_TRUE: return (mask & (MAY_BE_TRUE | MAY_BE_BOOL)) != 0;
+		/* MAY_BE_BOOL is MAY_BE_FALSE|MAY_BE_TRUE: test the exact bit, or
+		 * string|false would accept true. */
+		case IS_FALSE: return (mask & MAY_BE_FALSE) != 0;
+		case IS_TRUE: return (mask & MAY_BE_TRUE) != 0;
 		case IS_LONG: return (mask & MAY_BE_LONG) != 0;
 		case IS_DOUBLE: return (mask & MAY_BE_DOUBLE) != 0;
 		case IS_STRING: return (mask & MAY_BE_STRING) != 0;
@@ -1068,7 +835,7 @@ static zend_class_entry *wb_lookup_no_autoload(const char *name, size_t len)
 	return ce;
 }
 
-static bool wb_match_named(zval *v, const char *name, size_t len, zend_function *func)
+static bool wb_match_named(zval *v, const char *name, size_t len, zend_function *func, zend_class_entry *called)
 {
 	zend_class_entry *ce;
 	if (Z_TYPE_P(v) == IS_REFERENCE) {
@@ -1086,9 +853,7 @@ static bool wb_match_named(zval *v, const char *name, size_t len, zend_function 
 	} else if (wb_name_is(name, len, "parent")) {
 		ce = (func->common.scope != NULL) ? func->common.scope->parent : NULL;
 	} else if (wb_name_is(name, len, "static")) {
-		/* Approximation: the defining scope, not the late-static callee.
-		 * Documented; satisfies every non-contrived shape. */
-		ce = func->common.scope;
+		ce = (called != NULL) ? called : func->common.scope;
 	} else {
 		ce = wb_lookup_no_autoload(name, len);
 	}
@@ -1098,61 +863,71 @@ static bool wb_match_named(zval *v, const char *name, size_t len, zend_function 
 	return instanceof_function(Z_OBJCE_P(v), ce);
 }
 
-static bool wb_match_one(zval *v, const zend_type *t, zend_function *func);
-
-static bool wb_match_type(zval *v, zend_type t, zend_function *func)
+/* Builtin part of a type: the pure mask, plus the pseudo-types that live in
+ * it as bits (callable, static) and int->float widening, which is allowed in
+ * both coercive and strict mode. */
+static bool wb_match_builtin(zval *v, uint32_t mask, zend_function *func, zend_class_entry *called)
 {
-	if (Z_TYPE_P(v) == IS_NULL && ZEND_TYPE_ALLOW_NULL(t)) {
+	if (mask == 0) {
+		return false;
+	}
+	if (wb_match_mask(v, mask)) {
 		return true;
 	}
-	if (ZEND_TYPE_HAS_LIST(t)) {
-		zend_type_list *list = ZEND_TYPE_LIST(t);
-		if (ZEND_TYPE_IS_INTERSECTION(t)) {
-			const zend_type *member = NULL;
-			ZEND_TYPE_LIST_FOREACH(list, member) {
-				if (!wb_match_one(v, member, func)) {
+	if (Z_TYPE_P(v) == IS_LONG && (mask & MAY_BE_DOUBLE) != 0) {
+		return true;
+	}
+	if ((mask & MAY_BE_CALLABLE) != 0 && zend_is_callable(v, 0, NULL)) {
+		return true;
+	}
+	if ((mask & MAY_BE_STATIC) != 0) {
+		zend_class_entry *ce = (called != NULL) ? called : func->common.scope;
+		return ce != NULL && Z_TYPE_P(v) == IS_OBJECT && instanceof_function(Z_OBJCE_P(v), ce);
+	}
+	return false;
+}
+
+/* A type matches when ANY of its parts does: the builtin mask, the single
+ * class name, or the type list. A union list matches when any member does
+ * (a DNF member is itself an intersection list, so this recurses); an
+ * intersection list only when every member does. */
+static bool wb_match_type(zval *v, const zend_type *t, zend_function *func, zend_class_entry *called)
+{
+	if (Z_TYPE_P(v) == IS_REFERENCE) {
+		v = Z_REFVAL_P(v);
+	}
+	if (wb_match_builtin(v, ZEND_TYPE_PURE_MASK(*t), func, called)) {
+		return true;
+	}
+	if (ZEND_TYPE_HAS_LIST(*t)) {
+		const zend_type *member = NULL;
+		if (ZEND_TYPE_IS_INTERSECTION(*t)) {
+			ZEND_TYPE_LIST_FOREACH(ZEND_TYPE_LIST(*t), member) {
+				if (!wb_match_type(v, member, func, called)) {
 					return false;
 				}
 			} ZEND_TYPE_LIST_FOREACH_END();
 			return true;
 		}
-		{
-			const zend_type *member = NULL;
-			ZEND_TYPE_LIST_FOREACH(list, member) {
-				if (wb_match_one(v, member, func)) {
-					return true;
-				}
-			} ZEND_TYPE_LIST_FOREACH_END();
-		}
+		ZEND_TYPE_LIST_FOREACH(ZEND_TYPE_LIST(*t), member) {
+			if (wb_match_type(v, member, func, called)) {
+				return true;
+			}
+		} ZEND_TYPE_LIST_FOREACH_END();
 		return false;
-	}
-	return wb_match_one(v, &t, func);
-}
-
-static bool wb_match_one(zval *v, const zend_type *t, zend_function *func)
-{
-	uint32_t mask = ZEND_TYPE_PURE_MASK(*t);
-	if (mask != 0 && !wb_match_mask(v, mask)) {
-		/* int->float widening is allowed in both coercive and strict mode. */
-		if (!(Z_TYPE_P(v) == IS_LONG && (mask & MAY_BE_DOUBLE) != 0)) {
-			return false;
-		}
 	}
 	if (ZEND_TYPE_HAS_NAME(*t)) {
 		zend_string *name = ZEND_TYPE_NAME(*t);
-		if (!wb_match_named(v, ZSTR_VAL(name), ZSTR_LEN(name), func)) {
-			return false;
-		}
-	} else if (ZEND_TYPE_HAS_LITERAL_NAME(*t)) {
-		const char *name = ZEND_TYPE_LITERAL_NAME(*t);
-		if (!wb_match_named(v, name, strlen(name), func)) {
-			return false;
-		}
+		return wb_match_named(v, ZSTR_VAL(name), ZSTR_LEN(name), func, called);
 	}
-	return true;
+	if (ZEND_TYPE_HAS_LITERAL_NAME(*t)) {
+		const char *name = ZEND_TYPE_LITERAL_NAME(*t);
+		return wb_match_named(v, name, strlen(name), func, called);
+	}
+	return false;
 }
 
-static void wb_verify_skip_value(zend_function *func, zval *v)
+static void wb_verify_skip_value(zend_function *func, zend_class_entry *called, zval *v)
 {
 	zend_arg_info *ret;
 	zend_type t;
@@ -1185,7 +960,7 @@ static void wb_verify_skip_value(zend_function *func, zval *v)
 		}
 		return;
 	}
-	if (!wb_match_type(v, t, func)) {
+	if (!wb_match_type(v, &t, func, called)) {
 		zend_throw_error(zend_ce_type_error,
 			"Return value of %s::%s() failed strict return-type verification, %s given",
 			cls, mth, zend_zval_value_name(v));
@@ -1275,28 +1050,53 @@ static void wb_build_arg_array(zend_execute_data *ex, zval *out)
 	}
 }
 
-/* Balance the Zend Observer BEGIN the VM issued before our override ran.
+/* Leave a frame whose body never ran (skip value, begin() threw, protocol
+ * violation). The callee owns this work, not the caller: for a frame entered
+ * through an overridden zend_execute_ex the VM marks it ZEND_CALL_TOP, and
+ * its caller (DO_FCALL / zend_call_function) only releases $this and pops
+ * the frame. So this mirrors the TOP branch of zend_leave_helper.
  *
- * A frame that never executes never reaches ZEND_RETURN (the only
- * non-unwind site that fires OBSERVER_END) and is never unwound either —
- * the VM just frees it after we return. Without this call
- * EG(current_observed_frame) dangles at the freed frame; a second skipped
- * call links through reused stack memory and the shutdown walk spins or
- * crashes. The inline guard makes this a no-op unless our frame is still
- * the observed top (on the proceed path the body's own RETURN already
- * popped it, so only non-proceed paths call this). Our own end handler
- * tolerates the call: a skipped scope owns no defer frame. */
-static void wb_close_skipped_frame(zend_execute_data *ex)
+ * - With an exception pending the return slot is set UNDEF, as the engine's
+ *   own uncaught-exception path does: the caller's HANDLE_EXCEPTION destroys
+ *   the DO_FCALL result slot, which otherwise still holds a stale temporary.
+ * - The Zend Observer BEGIN the VM issued before our override ran is
+ *   balanced (a skipped frame never reaches ZEND_RETURN). This extension
+ *   registers no observer itself; it matters when another one does
+ *   (OpenTelemetry, Xdebug, profilers). The END is a no-op unless our frame
+ *   is still the observed top.
+ * - Argument CVs, extra positional args and extra named params are released,
+ *   and EG(current_execute_data) is restored to the caller; leaving it on
+ *   this frame sends the caller's next exception to a dead frame.
+ */
+static void wb_leave_skipped_frame(zend_execute_data *ex)
 {
-	/* Same convention as the VM's own post-call END: no value when an
-	 * exception is in flight. */
+	uint32_t call_info;
+
+	if (EG(exception) != NULL && ex->return_value != NULL) {
+		ZVAL_UNDEF(ex->return_value);
+	}
 	zend_observer_fcall_end(ex, EG(exception) ? NULL : ex->return_value);
+
+	EG(current_execute_data) = ex->prev_execute_data;
+	zend_free_compiled_variables(ex);
+	/* Re-read: destructors run by the line above may change the flags. */
+	call_info = ZEND_CALL_INFO(ex);
+	if (call_info & ZEND_CALL_HAS_SYMBOL_TABLE) {
+		zend_clean_and_cache_symbol_table(ex->symbol_table);
+	}
+	zend_vm_stack_free_extra_args_ex(call_info, ex);
+	if (call_info & ZEND_CALL_HAS_EXTRA_NAMED_PARAMS) {
+		zend_free_extra_named_params(ex->extra_named_params);
+	}
+	if (call_info & ZEND_CALL_CLOSURE) {
+		OBJ_RELEASE(ZEND_CLOSURE_OBJECT(ex->func));
+	}
 }
 
 /* Full interception of one advised call. Ownership: every zval taken here is
  * released on every path; the only references that escape are the engine's
  * own (return slot, EG(exception)) via the proven transfer idiom. */
-static void wb_intercept(zend_execute_data *ex, wb_advice *ad)
+static void wb_intercept(zend_execute_data *ex, wb_advice *ad, zend_class_entry *bean_ce)
 {
 	zval params[4], retval, exctx, interceptor, args;
 	zval *zv;
@@ -1314,7 +1114,11 @@ static void wb_intercept(zend_execute_data *ex, wb_advice *ad)
 		 * proxy's static-$this Error). */
 		ZVAL_NULL(&params[0]);
 	}
-	if (ad->scope != NULL && ad->scope->name != NULL) {
+	/* The bean class, not the declaring one: interceptors and async jobs
+	 * are keyed by the bean (an inherited method declares on its parent). */
+	if (bean_ce != NULL && bean_ce->name != NULL) {
+		ZVAL_STR_COPY(&params[1], bean_ce->name);
+	} else if (ad->scope != NULL && ad->scope->name != NULL) {
 		ZVAL_STR_COPY(&params[1], ad->scope->name);
 	} else {
 		ZVAL_EMPTY_STRING(&params[1]);
@@ -1330,17 +1134,17 @@ static void wb_intercept(zend_execute_data *ex, wb_advice *ad)
 	zval_ptr_dtor(&args);
 	if (EG(exception) != NULL) {
 		/* aspectBegin threw: the driver's own frame unwound cleanly, but
-		 * ours never ran — close it before propagating. */
+		 * ours never ran — leave it before propagating. */
 		if (!Z_ISUNDEF(retval)) {
 			zval_ptr_dtor(&retval);
 		}
-		wb_close_skipped_frame(ex);
+		wb_leave_skipped_frame(ex);
 		return;
 	}
 	if (Z_TYPE(retval) != IS_ARRAY) {
 		zend_throw_error(NULL, "winter_boot AOP driver protocol violation: begin() must return an array");
 		zval_ptr_dtor(&retval);
-		wb_close_skipped_frame(ex);
+		wb_leave_skipped_frame(ex);
 		return;
 	}
 	zv = zend_hash_str_find(Z_ARRVAL(retval), "proceed", sizeof("proceed") - 1);
@@ -1350,22 +1154,23 @@ static void wb_intercept(zend_execute_data *ex, wb_advice *ad)
 		if (value == NULL) {
 			zend_throw_error(NULL, "winter_boot AOP driver protocol violation: skip needs a value");
 			zval_ptr_dtor(&retval);
-			wb_close_skipped_frame(ex);
+			wb_leave_skipped_frame(ex);
 			return;
 		}
-		wb_verify_skip_value(ad->func, value);
+		wb_verify_skip_value(ad->func,
+			(Z_TYPE(ex->This) == IS_OBJECT) ? Z_OBJCE(ex->This) : Z_CE(ex->This), value);
 		if (EG(exception) == NULL && ex->return_value != NULL) {
 			ZVAL_COPY(ex->return_value, value);
 		}
 		zval_ptr_dtor(&retval);
-		wb_close_skipped_frame(ex);
+		wb_leave_skipped_frame(ex);
 		return;
 	}
 	zv = zend_hash_str_find(Z_ARRVAL(retval), "exCtx", sizeof("exCtx") - 1);
 	if (zv == NULL || Z_TYPE_P(zv) != IS_OBJECT) {
 		zend_throw_error(NULL, "winter_boot AOP driver protocol violation: proceed needs exCtx");
 		zval_ptr_dtor(&retval);
-		wb_close_skipped_frame(ex);
+		wb_leave_skipped_frame(ex);
 		return;
 	}
 	ZVAL_COPY(&exctx, zv);
@@ -1374,7 +1179,7 @@ static void wb_intercept(zend_execute_data *ex, wb_advice *ad)
 		zend_throw_error(NULL, "winter_boot AOP driver protocol violation: proceed needs interceptor");
 		zval_ptr_dtor(&exctx);
 		zval_ptr_dtor(&retval);
-		wb_close_skipped_frame(ex);
+		wb_leave_skipped_frame(ex);
 		return;
 	}
 	ZVAL_COPY(&interceptor, zv);
@@ -1462,6 +1267,7 @@ static void wb_aop_execute_ex(zend_execute_data *ex)
 {
 	HashTable *map = wb_advice_map();
 	wb_advice *ad = NULL;
+	zend_class_entry *bean_ce = NULL;
 
 	if (map != NULL && ex != NULL && ex->func != NULL
 		&& ZEND_USER_CODE(ex->func->type)) {
@@ -1472,18 +1278,24 @@ static void wb_aop_execute_ex(zend_execute_data *ex)
 			|| !zend_string_equals(ad->method_name, ex->func->common.function_name))) {
 			/* Recycled address or stale entry: never advise the wrong method. */
 			ad = NULL;
-		} else if (ad != NULL && Z_TYPE(ex->This) == IS_OBJECT
-			&& !instanceof_function(Z_OBJCE(ex->This), ad->bean_ce)) {
+		} else if (ad != NULL && Z_TYPE(ex->This) == IS_OBJECT) {
 			/* Inherited op_array shared with the parent: only the advised
-			 * bean family intercepts (see plan). */
-			ad = NULL;
+			 * bean families intercept (see plan). */
+			bean_ce = wb_advice_bean_for(ad, Z_OBJCE(ex->This));
+			if (bean_ce == NULL) {
+				ad = NULL;
+			}
+		} else if (ad != NULL) {
+			/* Static call: name the called bean when it is one; otherwise
+			 * the declaring class, as before. */
+			bean_ce = wb_advice_bean_for(ad, Z_CE(ex->This));
 		}
 	}
 	if (ad == NULL) {
 		wb_orig_execute_ex(ex);
 		return;
 	}
-	wb_intercept(ex, ad);
+	wb_intercept(ex, ad, bean_ce);
 }
 
 static PHP_GINIT_FUNCTION(winter_boot)
@@ -1491,14 +1303,12 @@ static PHP_GINIT_FUNCTION(winter_boot)
 #if defined(COMPILE_DL_WINTER_BOOT) && defined(ZTS)
 	ZEND_TSRMLS_CACHE_UPDATE();
 #endif
-	winter_boot_globals->frames = NULL;
 	winter_boot_globals->advice_map = NULL;
 	winter_boot_globals->code_cache = NULL;
 }
 
 static PHP_MINIT_FUNCTION(winter_boot)
 {
-	zend_observer_fcall_register(wb_observer_init);
 	wb_orig_execute_ex = zend_execute_ex;
 	zend_execute_ex = wb_aop_execute_ex;
 	return SUCCESS;
@@ -1512,7 +1322,6 @@ static PHP_MSHUTDOWN_FUNCTION(winter_boot)
 
 static PHP_RINIT_FUNCTION(winter_boot)
 {
-	wb_frames_set(NULL);
 	wb_advice_map_set(NULL);
 	wb_code_cache_set(NULL);
 	return SUCCESS;
@@ -1520,10 +1329,6 @@ static PHP_RINIT_FUNCTION(winter_boot)
 
 static PHP_RSHUTDOWN_FUNCTION(winter_boot)
 {
-	/* Scopes that never exited (fatal error paths) are freed without
-	 * executing: after a fatal there is no safe engine state left to
-	 * run user callbacks in. */
-	wb_frames_free_all();
 	/* Advice entries hold no owned engine references, so freeing the map
 	 * is safe at any shutdown point. */
 	wb_advice_map_free();
@@ -1538,8 +1343,6 @@ static PHP_MINFO_FUNCTION(winter_boot)
 	php_info_print_table_start();
 	php_info_print_table_header(2, "winter_boot support", "enabled");
 	php_info_print_table_row(2, "Version", PHP_WINTER_BOOT_VERSION);
-	php_info_print_table_row(2, "deferred() semantics", "LIFO on owning-function exit; runs on return and exception unwind");
-	php_info_print_table_row(2, "defered()", "alias of deferred()");
 	php_info_print_table_row(2, "native AOP", "zend_execute_ex interception; register via winter_boot_advise()");
 	php_info_print_table_row(2, "inline code", "winter_boot_exec_inline() with compilation cache");
 	php_info_print_table_row(2, "template expansion", "winter_boot_expand_template() sequential substitution");
@@ -1547,8 +1350,6 @@ static PHP_MINFO_FUNCTION(winter_boot)
 }
 
 static const zend_function_entry winter_boot_functions[] = {
-	PHP_FE(deferred, arginfo_deferred)
-	PHP_FE(defered, arginfo_deferred)
 	PHP_FE(winter_boot_advise, arginfo_winter_boot_advise)
 	PHP_FE(winter_boot_is_advised, arginfo_winter_boot_is_advised)
 	PHP_FE(winter_boot_exec_inline, arginfo_winter_boot_exec_inline)

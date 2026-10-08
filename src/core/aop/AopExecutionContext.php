@@ -24,6 +24,7 @@ class AopExecutionContext {
     private int $currentStatus = self::QUEUED;
     private int $executionStatus = self::EXECUTION_OK;
     private ?Throwable $exception = null;
+    private ?Throwable $propagatedCommitFailure = null;
 
     public function __construct(
         private object $object,
@@ -141,6 +142,18 @@ class AopExecutionContext {
 
     public function setException(Throwable $exception): void {
         $this->exception = $exception;
+    }
+
+    /**
+     * The commit failure that must be rethrown to the caller of the advised
+     * method (raised by a PropagatesCommitFailure aspect), if any.
+     */
+    public function getPropagatedCommitFailure(): ?Throwable {
+        return $this->propagatedCommitFailure;
+    }
+
+    public function setPropagatedCommitFailure(Throwable $exception): void {
+        $this->propagatedCommitFailure = $exception;
     }
 
     public function getExecutionStatus(): int {

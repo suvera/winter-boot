@@ -8,6 +8,8 @@ use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\exception\OpenSearchMigrationException;
 use dev\winterframework\io\file\DirectoryScanner;
 use dev\winterframework\util\log\Wlf4p;
+use dev\winterframework\core\context\PropertyContext;
+use dev\winterframework\core\context\WinterPropertyContext;
 use dev\winterframework\util\yaml\YamlParser;
 
 /**
@@ -87,10 +89,17 @@ class OpenSearchMigrationService {
     private array $osConfigs = [];
     private int $skippedCount = 0;
 
+    /**
+     * @param PropertyContext|null $propertyCtx resolves `$env.X`, `$ini.key`
+     *   and `a || b` expressions in the scanned yml files, exactly like
+     *   ConfigFileLoader does for module config files at app boot. Without
+     *   it the files are used raw (legacy behaviour).
+     */
     public function __construct(
         private ApplicationContext $appCtx,
         private string $osBasePath,
-        private string $configDir
+        private string $configDir,
+        private ?PropertyContext $propertyCtx = null
     ) {
         $this->osBasePath = rtrim($osBasePath, '/');
     }
@@ -162,6 +171,19 @@ class OpenSearchMigrationService {
     }
 
     /**
+     * Same property resolution module config files get at app boot
+     * (ConfigFileLoader::retrieveConfiguration), so opensearch-config.yml
+     * means the same thing to the migrator as to the application.
+     */
+    private function resolveProperties(array $data): array {
+        if ($this->propertyCtx instanceof WinterPropertyContext
+            || ($this->propertyCtx !== null && method_exists($this->propertyCtx, 'resolveProperties'))) {
+            return $this->propertyCtx->resolveProperties($data);
+        }
+        return $data;
+    }
+
+    /**
      * @return array<int, array> OpenSearch connection entries found in config dir yml files.
      */
     private function scanConfigDirForOpenSearchConfigs(): array {
@@ -187,6 +209,9 @@ class OpenSearchMigrationService {
             if (!is_array($data) || !isset($data['opensearch']) || !is_array($data['opensearch'])) {
                 continue;
             }
+            // Outside the try on purpose: an unresolvable reference (missing
+            // secret) must fail the migration, not silently drop the connection.
+            $data['opensearch'] = $this->resolveProperties($data['opensearch']);
 
             foreach ($data['opensearch'] as $os) {
                 if (is_array($os) && isset($os['name'])) {

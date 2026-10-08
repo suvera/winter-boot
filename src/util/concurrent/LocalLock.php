@@ -37,7 +37,7 @@ class LocalLock implements Lock {
             if ($locked) {
                 return true;
             }
-            usleep(100);
+            usleep(1000);
             if (System::currentTimeMillis() > $waitUntil) {
                 break;
             }
@@ -45,66 +45,40 @@ class LocalLock implements Lock {
         return false;
     }
 
+    /**
+     * flock() on a handle this instance owns. Locks belong to the open file
+     * description, so a second LocalLock (another coroutine in the same
+     * worker, or another process) cannot acquire it, and the kernel drops
+     * the lock when the holder dies, so there is no stale-PID cleanup race.
+     */
     private function doLock(): bool {
-        $my_pid = getmypid();
-        $fileObj = null;
-
-        if ($this->fileInfo->isFile()) {
-            /** @noinspection PhpRedundantOptionalArgumentInspection */
-            $fileObj = $this->fileInfo->openFile('r');
-            if ($fileObj) {
-                $line = $fileObj->fgets();
-                list($pid, $time) = explode(':', $line);
-
-                if ($my_pid == $pid) {
-                    return true;
-                }
-
-                if (file_exists("/proc/$pid")) {
-                    self::logDebug('Could not acquire lock as other PID '
-                        . $pid
-                        . ' already acquired and updated at '
-                        . $time
-                        . ' for lock ' . $this->getName());
-                    return false;
-                } else {
-                    unlink($this->fileInfo->getRealPath());
-                }
-            } else {
-                self::logError('Could not open lock file for reading '
-                    . $this->fileInfo->getRealPath());
-                return false;
-            }
-        }
-
         try {
-            $fileObj = $this->fileInfo->openFile('x');
+            $fileObj = $this->fileInfo->openFile('c+');
         } catch (Throwable $e) {
             self::logException($e);
             return false;
         }
-        if (!$fileObj) {
+
+        if (!$fileObj->flock(LOCK_EX | LOCK_NB)) {
             return false;
         }
-
-        $locked = $fileObj->flock(LOCK_EX | LOCK_NB);
-
-        if ($locked) {
-            $fileObj->fwrite($my_pid . ':' . time());
-            $this->fileObj = $fileObj;
-        }
-
-        return $locked;
+        $fileObj->ftruncate(0);
+        $fileObj->fwrite(getmypid() . ':' . time());
+        $fileObj->fflush();
+        $this->fileObj = $fileObj;
+        return true;
     }
 
     public function isLocked(): bool {
-        return ($this->fileObj != null) && ($this->fileInfo->isFile());
+        return $this->fileObj !== null;
     }
 
     public function unlock(): void {
         if ($this->fileObj) {
+            $this->fileObj->ftruncate(0);
             $this->fileObj->flock(LOCK_UN);
-            unlink($this->fileInfo->getRealPath());
+            // The file stays: unlinking it would let a waiter lock a
+            // different inode than the next opener.
             $this->fileObj = null;
         }
     }

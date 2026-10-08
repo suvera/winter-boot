@@ -15,30 +15,6 @@ declare(strict_types=1);
 
 if (!extension_loaded('winter_boot')) {
     /**
-     * Register a cleanup callback against the current PHP function's scope.
-     * Callbacks run in LIFO order when the owning function exits — on
-     * normal return, early return, or exception unwinding — exactly once.
-     *
-     * @param callable $callback cleanup to run at scope exit
-     * @throws \Error when called outside a function body or inside a generator
-     * @throws \TypeError for a non-callable argument
-     */
-    function deferred(callable $callback): void {
-        throw new \LogicException('winter_boot extension is not loaded');
-    }
-
-    /**
-     * Alias of deferred() (common misspelling), byte-identical behavior.
-     *
-     * @param callable $callback cleanup to run at scope exit
-     * @throws \Error when called outside a function body or inside a generator
-     * @throws \TypeError for a non-callable argument
-     */
-    function defered(callable $callback): void {
-        throw new \LogicException('winter_boot extension is not loaded');
-    }
-
-    /**
      * Register a class method for native AOP interception.
      *
      * @param class-string $class bean class owning the method

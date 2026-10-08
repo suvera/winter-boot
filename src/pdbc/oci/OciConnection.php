@@ -11,12 +11,13 @@ use dev\winterframework\pdbc\ResultSet;
 use dev\winterframework\pdbc\Statement;
 use dev\winterframework\pdbc\support\AbstractConnection;
 use dev\winterframework\pdbc\support\DatabaseMetaData;
+use dev\winterframework\pdbc\support\ResettableConnection;
 use dev\winterframework\txn\Savepoint;
 use PDO;
 use RuntimeException;
 use Throwable;
 
-class OciConnection extends AbstractConnection {
+class OciConnection extends AbstractConnection implements ResettableConnection {
     private mixed $oci = null;
     private array $savePoints = [];
     private array $clientInfo = [];
@@ -133,6 +134,23 @@ class OciConnection extends AbstractConnection {
 
     public function isClosed(): bool {
         return is_null($this->oci);
+    }
+
+    public function resetForReuse(): bool {
+        if ($this->oci === null) {
+            return false;
+        }
+        try {
+            if ($this->txnCounter > 0) {
+                oci_rollback($this->oci);
+            }
+            $this->txnCounter = 0;
+            $this->commitMode = OCI_COMMIT_ON_SUCCESS;
+            return true;
+        } catch (Throwable $e) {
+            self::logException($e, 'Could not reset pooled connection, discarding it. ');
+            return false;
+        }
     }
 
     public function getDriverType(): string {

@@ -55,7 +55,7 @@ class DefaultActuatorController implements ActuatorController {
     public function getConfigProps(): ResponseEntity {
         $resp = ResponseEntity::ok()->withContentType(MediaType::APPLICATION_JSON);
 
-        $result = $this->ctxData->getPropertyContext()->getAll();
+        $result = ActuatorEndPoints::maskSensitive($this->ctxData->getPropertyContext()->getAll());
 
         $resp->setBody($result);
         return $resp;
@@ -64,7 +64,7 @@ class DefaultActuatorController implements ActuatorController {
     public function getEnv(): ResponseEntity {
         $resp = ResponseEntity::ok()->withContentType(MediaType::APPLICATION_JSON);
 
-        $result = System::getEnv();
+        $result = ActuatorEndPoints::maskSensitive(System::getEnv());
 
         $resp->setBody($result);
         return $resp;

@@ -56,6 +56,27 @@ class ActuatorEndPoints {
         ],
     ];
 
+    private const SENSITIVE_KEY = '/pass(word|wd)?|secret|token|credential|api[-_.]?key|private[-_.]?key|access[-_.]?key|auth|dsn|cookie|session/i';
+    public const MASK = '******';
+
+    /**
+     * Replace values whose key looks secret (password, token, api key, ...)
+     * at any depth, so configprops/env never print credentials.
+     */
+    public static function maskSensitive(array $values): array {
+        $out = [];
+        foreach ($values as $key => $value) {
+            if (is_string($key) && preg_match(self::SENSITIVE_KEY, $key)) {
+                $out[$key] = self::MASK;
+            } elseif (is_array($value)) {
+                $out[$key] = self::maskSensitive($value);
+            } else {
+                $out[$key] = $value;
+            }
+        }
+        return $out;
+    }
+
     public static function getFormattedEndPoints(): array {
         return Arrays::flattenByKey(self::$endPoints);
     }

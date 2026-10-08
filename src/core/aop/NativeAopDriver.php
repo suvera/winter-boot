@@ -17,17 +17,31 @@ use Throwable;
  *  - begin() runs aspectBegin(); stopExecution() short-circuits the body
  *    (proceed=false + result), otherwise the body runs (proceed=true).
  *  - finish() runs aspectFailed() on body exceptions or aspectCommit() on
- *    return values, with the same log-and-swallow commit semantics.
+ *    return values. Commit failures are logged and swallowed, except those
+ *    of PropagatesCommitFailure aspects (transactions), which are rethrown.
  *  - async methods enqueue under their real name and return null, exactly
  *    like the generated enqueue stub.
  *
  * The extension calls begin()/finish() by name; aspect semantics stay
  * entirely in PHP here. This class is pure PHP and never calls the
  * extension itself, so it is safe to load with or without winter_boot.
+ *
+ * DispatcherServlet (step 6.2) intentionally repeats this protocol inline
+ * for #[RestController] endpoints, which are never natively advised; see
+ * the comment there for why and how the two deliberately differ. Keep any
+ * protocol change in sync with it.
  */
 final class NativeAopDriver {
     use Wlf4p;
 
+    /*
+     * Intentionally static: the extension calls begin()/finish() by name, so
+     * the wiring set by boot() must be reachable without an instance. One
+     * context per process; a second boot() replaces the first (tests re-boot
+     * per case). $bypassOnce is set right before one worker call and consumed
+     * by that call's begin() before it can yield, then cleared in a finally,
+     * so it never carries state between requests or coroutines.
+     */
     private static ?AopInterceptorRegistry $registry = null;
     private static ?ApplicationContext $appCtx = null;
     private static bool $nativeActive = false;
@@ -137,6 +151,11 @@ final class NativeAopDriver {
             $exCtx->setException($e);
             $exCtx->setCommitFailed();
 
+            if ($exCtx->getPropagatedCommitFailure() === $e) {
+                // e.g. the transaction did not commit: the extension leaves
+                // this pending, so the caller gets it instead of the result.
+                throw $e;
+            }
             self::logException($e);
         }
     }
