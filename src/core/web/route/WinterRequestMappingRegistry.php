@@ -25,6 +25,15 @@ final class WinterRequestMappingRegistry implements RequestMappingRegistry {
      */
     public const MAX_CACHED_PATHS = 1024;
 
+    /*
+     * Intentionally static: routes are process-wide, built once at boot and
+     * identical for every request (Swoole workers run one context each).
+     * Nothing per-request lives here; $cachedPaths only caches lookups and
+     * is capped. Known limitation: a second registry in the same process
+     * reuses the first one's routes (see the constructor), so building two
+     * application contexts in one process is not supported.
+     */
+
     /**
      * @var RequestMapping[]
      */

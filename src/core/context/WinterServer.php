@@ -46,6 +46,7 @@ class WinterServer {
     private mixed $address;
     private mixed $port;
     protected static bool $processSignalsRegistered = false;
+    /** Intentionally static: one server per process; holds no request state. */
     protected static ?self $instance = null;
     protected static bool $started = false;
     protected WinterServerAdmin $adminHandler;

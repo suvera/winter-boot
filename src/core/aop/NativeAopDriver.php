@@ -34,6 +34,14 @@ use Throwable;
 final class NativeAopDriver {
     use Wlf4p;
 
+    /*
+     * Intentionally static: the extension calls begin()/finish() by name, so
+     * the wiring set by boot() must be reachable without an instance. One
+     * context per process; a second boot() replaces the first (tests re-boot
+     * per case). $bypassOnce is set right before one worker call and consumed
+     * by that call's begin() before it can yield, then cleared in a finally,
+     * so it never carries state between requests or coroutines.
+     */
     private static ?AopInterceptorRegistry $registry = null;
     private static ?ApplicationContext $appCtx = null;
     private static bool $nativeActive = false;

@@ -11,6 +11,11 @@ use dev\winterframework\stereotype\ppa\Table;
 use dev\winterframework\stereotype\ppa\TableGenerator;
 
 class EntityRegistry {
+    /**
+     * Intentionally static: entity metadata is derived only from class
+     * attributes and keyed by class name, so it is the same for every
+     * context and request in the process. Holds no per-request state.
+     */
     protected static array $register = [];
 
     public static function getEntity(string $entityName): Entity {
