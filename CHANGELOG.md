@@ -10,6 +10,9 @@
 
 ### Fixed
 - OpenSearch migrations: connections read from module config files (e.g. `opensearch-config.yml`) now resolve `$env.X`, `$ini.key` and `a || b` expressions like module configs at app boot; previously the raw strings were used (literal `$ini.*` credentials, and `"$env.X || false"` read as a truthy `ssl_verification`). An unresolvable reference now fails the migration.
+- AOP: `#{param}` templates on controller endpoints (e.g. `#[Lockable(name: "order-#{id}")]`) now resolve the argument; aspects on endpoints received name-keyed arguments and read them by position, so every request shared one lock / cache key. Endpoint aspects now get arguments in declaration order, like every other AOP call; this changes the `@Cacheable` keys of controller endpoints once.
+- AOP: when an aspect's `begin()` fails, the aspects already begun each get `beginFailed()` with their own context and the original exception; previously the failing aspect was called once per context and a throwing handler replaced the exception for the rest. A throwing `failed()` handler no longer replaces the exception for later aspects either.
+- AOP: an AOP attribute on a `#[RestController]` method that is not a request-mapped endpoint now logs a startup warning; such advice never runs because controllers are not proxied.
 - Testing: added `IdleCheckRegistry::disableTimer()` so a test bootstrap that builds an application context without starting the server can stop the datasource idle-check timer; otherwise the pending Swoole timer keeps the process alive after the last test (see the user-docs testing page).
 
 ## 2.1.1

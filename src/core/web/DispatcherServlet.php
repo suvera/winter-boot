@@ -409,7 +409,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 ? $aopRegistry->get($aopOwner, $aopName)
                 : null;
             $aopExCtx = $aopInterceptor !== null
-                ? new AopExecutionContext($controller, $args)
+                ? new AopExecutionContext($controller, self::positionalArguments($method, $args))
                 : null;
 
             // Native path: winter_boot_advise() already intercepts this
@@ -665,6 +665,27 @@ class DispatcherServlet implements HttpRequestDispatcher {
             $missing[] = $param->getName();
         }
         return $missing;
+    }
+
+    /**
+     * Name-keyed endpoint arguments re-ordered by parameter position, the
+     * shape every other AOP entry point hands to aspects (`#{param}`
+     * templates and key generators read arguments by position). An omitted
+     * optional parameter takes its declared default.
+     *
+     * @return array<int, mixed>
+     */
+    public static function positionalArguments(\ReflectionFunctionAbstract|RefMethod $method, array $args): array {
+        $out = [];
+        foreach ($method->getParameters() as $param) {
+            $name = $param->getName();
+            if (array_key_exists($name, $args)) {
+                $out[$param->getPosition()] = $args[$name];
+            } else if ($param->isDefaultValueAvailable()) {
+                $out[$param->getPosition()] = $param->getDefaultValue();
+            }
+        }
+        return $out;
     }
 
     /**

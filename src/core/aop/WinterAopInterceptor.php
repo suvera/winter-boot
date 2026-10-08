@@ -113,12 +113,15 @@ class WinterAopInterceptor implements AopInterceptor {
 
     private function aspectBeginFailed(int $idx, AopExecutionContext $exCtx, Throwable $e): void {
         for ($i = $idx; $i >= 0; $i--) {
+            if ($exCtx->isSkippedAspect($i)) {
+                continue;
+            }
             try {
-                $this->aspects[$idx]->beginFailed($this->aopContexts[$i], $exCtx, $e);
-            } catch (Throwable $e) {
-                self::logException($e, 'Aspect beginFailed handler call failed, for Type "'
-                    . get_class($this->aopContexts[$idx]->getStereoType()) . '" on Method '
-                    . ReflectionUtil::getFqName($this->aopContexts[$idx]->getMethod())
+                $this->aspects[$i]->beginFailed($this->aopContexts[$i], $exCtx, $e);
+            } catch (Throwable $handlerEx) {
+                self::logException($handlerEx, 'Aspect beginFailed handler call failed, for Type "'
+                    . get_class($this->aopContexts[$i]->getStereoType()) . '" on Method '
+                    . ReflectionUtil::getFqName($this->aopContexts[$i]->getMethod())
                     . '. ');
             }
         }
@@ -135,8 +138,8 @@ class WinterAopInterceptor implements AopInterceptor {
 
             try {
                 $this->aspects[$idx]->failed($aopCtx, $exCtx, $e);
-            } catch (Throwable $e) {
-                self::logException($e, 'Aspect fail handler call failed, for Type "'
+            } catch (Throwable $handlerEx) {
+                self::logException($handlerEx, 'Aspect fail handler call failed, for Type "'
                     . get_class($aopCtx->getStereoType()) . '" on Method '
                     . ReflectionUtil::getFqName($aopCtx->getMethod())
                     . '. ');
