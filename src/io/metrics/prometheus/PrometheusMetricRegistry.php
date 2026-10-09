@@ -113,6 +113,9 @@ class PrometheusMetricRegistry {
     }
 
     public function observe(string $name, float $value, array $labels = []): void {
+        if (!isset($this->registry)) {
+            $this->getRegistry();
+        }
         if (!isset($this->metrics[$name])) {
             return;
         }
@@ -120,6 +123,9 @@ class PrometheusMetricRegistry {
     }
 
     public function incr(string $name, array $labels = []): void {
+        if (!isset($this->registry)) {
+            $this->getRegistry();
+        }
         if (!isset($this->metrics[$name])) {
             return;
         }
@@ -127,6 +133,9 @@ class PrometheusMetricRegistry {
     }
 
     public function incrBy(string $name, int|float $value, array $labels = []): void {
+        if (!isset($this->registry)) {
+            $this->getRegistry();
+        }
         if (!isset($this->metrics[$name])) {
             return;
         }
@@ -134,6 +143,9 @@ class PrometheusMetricRegistry {
     }
 
     public function decr(string $name, array $labels = []): void {
+        if (!isset($this->registry)) {
+            $this->getRegistry();
+        }
         if (!isset($this->metrics[$name])) {
             return;
         }
@@ -141,6 +153,9 @@ class PrometheusMetricRegistry {
     }
 
     public function decrBy(string $name, int|float $value, array $labels = []): void {
+        if (!isset($this->registry)) {
+            $this->getRegistry();
+        }
         if (!isset($this->metrics[$name])) {
             return;
         }
@@ -148,6 +163,9 @@ class PrometheusMetricRegistry {
     }
 
     public function startTimer(string $name): Timer {
+        if (!isset($this->registry)) {
+            $this->getRegistry();
+        }
         return new Timer($name, $this);
     }
 

@@ -4,12 +4,14 @@ declare(strict_types=1);
 namespace dev\winterframework\io\file;
 
 use dev\winterframework\type\TypeAssert;
+use dev\winterframework\util\log\Wlf4p;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RecursiveRegexIterator;
 use RegexIterator;
 
 class DirectoryScanner {
+    use Wlf4p;
 
     public static function scanFileInDirectories(
         array $dirs, string $filePath
@@ -68,6 +70,13 @@ class DirectoryScanner {
     ): array {
 
         $namespace = trim($namespace, '\\');
+
+        // An empty source folder is not kept by git, so a missing one is
+        // skipped instead of aborting startup.
+        if (!is_dir($baseDir)) {
+            self::logWarning("Skipping scan of namespace '$namespace': directory '$baseDir' does not exist");
+            return [];
+        }
 
         $files = [];
         $dir = new RecursiveDirectoryIterator($baseDir);

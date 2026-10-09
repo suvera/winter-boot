@@ -22,6 +22,8 @@ use dev\winterframework\io\queue\QueueSharedTemplate;
 use dev\winterframework\io\timer\IdleCheckRegistry;
 use dev\winterframework\reflection\ClassResource;
 use dev\winterframework\stereotype\cli\DaemonThread;
+use dev\winterframework\stereotype\OnWorkerStart;
+use dev\winterframework\stereotype\OnWorkerStop;
 use dev\winterframework\stereotype\task\EnableAsync;
 use dev\winterframework\stereotype\task\EnableScheduling;
 use dev\winterframework\task\async\AsyncQueueStoreManager;
@@ -35,6 +37,7 @@ use Swoole\Http\Request;
 use Swoole\Http\Response;
 use Swoole\HTTP\Server;
 use Swoole\Process;
+use Throwable;
 use function Ramsey\Uuid\v4;
 
 class WinterWebSwooleApplication extends WinterApplicationRunner implements WinterApplication {
@@ -137,6 +140,8 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
             }
         });
 
+        $this->registerWorkerLifecycle($wServer);
+
         $this->buildKvStore($wServer);
         $this->buildQueueStore($wServer);
         $this->beginModules();
@@ -144,6 +149,62 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         $this->onApplicationReady();
 
         $wServer->start();
+    }
+
+    /**
+     * Runs #[OnWorkerStart] / #[OnWorkerStop] beans inside each HTTP and
+     * task worker, after the framework's own worker setup. A failing start
+     * hook fails the worker (Swoole restarts it); a failing stop hook is
+     * logged so the remaining hooks still run.
+     */
+    protected function registerWorkerLifecycle(WinterServer $wServer): void {
+        $startClasses = $this->classesByAttribute(OnWorkerStart::class);
+        $stopClasses = $this->classesByAttribute(OnWorkerStop::class);
+
+        $beanOf = fn(string $cls): object => $this->applicationContext->beanByClass($cls);
+
+        if ($startClasses) {
+            $wServer->addEventCallback('workerStart', function (Server $server, int $workerId) use ($startClasses, $beanOf) {
+                self::runWorkerHooks($startClasses, $beanOf, $workerId, false);
+            });
+        }
+        if ($stopClasses) {
+            $wServer->addEventCallback('workerStop', function (Server $server, int $workerId) use ($stopClasses, $beanOf) {
+                self::runWorkerHooks($stopClasses, $beanOf, $workerId, true);
+            });
+        }
+    }
+
+    /**
+     * @param string[] $classes #[OnWorkerStart] or #[OnWorkerStop] bean classes, in order
+     * @param callable(string): object $beanOf bean lookup
+     */
+    public static function runWorkerHooks(array $classes, callable $beanOf, int $workerId, bool $stop): void {
+        foreach ($classes as $cls) {
+            if (!$stop) {
+                /** @var WorkerStartEvent $bean */
+                $bean = $beanOf($cls);
+                $bean->onWorkerStart($workerId);
+                continue;
+            }
+            try {
+                /** @var WorkerStopEvent $bean */
+                $bean = $beanOf($cls);
+                $bean->onWorkerStop($workerId);
+            } catch (Throwable $e) {
+                self::logException($e);
+            }
+        }
+    }
+
+    /** @return string[] unique class names carrying $attribute */
+    private function classesByAttribute(string $attribute): array {
+        $classes = [];
+        foreach ($this->resources->getClassesByAttribute($attribute) as $clsRes) {
+            /** @var ClassResource $clsRes */
+            $classes[$clsRes->getClass()->getName()] = true;
+        }
+        return array_keys($classes);
     }
 
     protected function getServerArgs(): array {
@@ -155,7 +216,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
 
         foreach ($prop->getAll() as $key => $value) {
             if (str_starts_with($key, $pf)) {
-                $args[substr($key, $pfLen)] = $value;
+                $args[substr($key, $pfLen)] = self::coerceServerArg($value);
             }
         }
 
@@ -165,6 +226,24 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         }
 
         return $args;
+    }
+
+    /**
+     * "$env.X" references always resolve to strings; Swoole reads 'false'
+     * as truthy, so integer and boolean strings get their native type.
+     */
+    public static function coerceServerArg(mixed $value): mixed {
+        if (!is_string($value)) {
+            return $value;
+        }
+        if (preg_match('/^-?[0-9]+$/', $value)) {
+            return (int)$value;
+        }
+        return match (strtolower($value)) {
+            'true' => true,
+            'false' => false,
+            default => $value,
+        };
     }
 
     /**

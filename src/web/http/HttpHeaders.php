@@ -68,7 +68,15 @@ final class HttpHeaders {
     const WARNING = "Warning";
     const WWW_AUTHENTICATE = "WWW-Authenticate";
 
+    /**
+     * Values keyed by the name as first given. Lookups are case-insensitive
+     * (RFC 9110 field names): $names maps the lower-cased name to that key,
+     * so 'user-agent', 'User-Agent' and 'USER-AGENT' are one header.
+     */
     private array $headers = [];
+
+    /** @var string[] lower-cased name => key in $headers */
+    private array $names = [];
 
     /**
      * Rejects CR/LF in header names and values to block HTTP response
@@ -84,12 +92,18 @@ final class HttpHeaders {
         }
     }
 
+    private function keyOf(string $headerName): ?string {
+        return $this->names[strtolower($headerName)] ?? null;
+    }
+
     public function merge(HttpHeaders $other): void {
         if ($this === $other) {
             return;
         }
-        if ($other->headers) {
-            $this->headers = array_merge($this->headers, $other->headers);
+        foreach ($other->headers as $name => $values) {
+            $this->remove($name);
+            $this->headers[$name] = $values;
+            $this->names[strtolower($name)] = $name;
         }
     }
 
@@ -97,10 +111,12 @@ final class HttpHeaders {
         TypeAssert::notEmpty('headerName', $headerName);
         self::assertNoCrlf($headerName, $headerValue);
 
-        if (isset($this->headers[$headerName])) {
-            $this->headers[$headerName][] = $headerValue;
+        $key = $this->keyOf($headerName);
+        if ($key !== null) {
+            $this->headers[$key][] = $headerValue;
         } else {
             $this->headers[$headerName] = [$headerValue];
+            $this->names[strtolower($headerName)] = $headerName;
         }
     }
 
@@ -111,40 +127,40 @@ final class HttpHeaders {
     public function set(string $headerName, string $headerValue): void {
         TypeAssert::notEmpty('headerName', $headerName);
         self::assertNoCrlf($headerName, $headerValue);
+        $this->remove($headerName);
         $this->headers[$headerName] = [$headerValue];
+        $this->names[strtolower($headerName)] = $headerName;
     }
 
     public function setIfNot(string $headerName, string $headerValue): void {
         TypeAssert::notEmpty('headerName', $headerName);
         self::assertNoCrlf($headerName, $headerValue);
-        if (isset($this->headers[$headerName])) {
+        if ($this->keyOf($headerName) !== null) {
             return;
         }
         $this->headers[$headerName] = [$headerValue];
+        $this->names[strtolower($headerName)] = $headerName;
     }
 
     public function contains(string $headerName): bool {
-        return isset($this->headers[$headerName]);
+        return $this->keyOf($headerName) !== null;
     }
 
     public function remove(string $headerName): void {
-        if (isset($this->headers[$headerName])) {
-            unset($this->headers[$headerName]);
+        $key = $this->keyOf($headerName);
+        if ($key !== null) {
+            unset($this->headers[$key], $this->names[strtolower($headerName)]);
         }
     }
 
     public function get(string $headerName): ?array {
-        if (isset($this->headers[$headerName])) {
-            return $this->headers[$headerName];
-        }
-        return null;
+        $key = $this->keyOf($headerName);
+        return $key === null ? null : $this->headers[$key];
     }
 
     public function getFirst(string $headerName): ?string {
-        if (isset($this->headers[$headerName])) {
-            return $this->headers[$headerName][0];
-        }
-        return null;
+        $key = $this->keyOf($headerName);
+        return $key === null ? null : $this->headers[$key][0];
     }
 
     public function setContentType(string $headerValue): void {

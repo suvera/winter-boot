@@ -6,6 +6,7 @@ namespace dev\winterframework\core\app;
 
 use dev\winterframework\util\SerializationUtil;
 use Cascade\Cascade;
+use Composer\InstalledVersions;
 use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\core\context\PropertyContext;
 use dev\winterframework\core\context\ShutDownRegistry;
@@ -46,6 +47,7 @@ abstract class WinterApplicationRunner {
     use Wlf4p;
 
     public const VERSION_FILE = 'VERSION.txt';
+    public const PACKAGE_NAME = 'suvera/winter-boot';
 
     protected WinterApplicationContext $applicationContext;
     protected ClassResource $bootApp;
@@ -92,7 +94,26 @@ abstract class WinterApplicationRunner {
     }
 
     public function getBootVersion(): string {
-        return file_get_contents(dirname(dirname(dirname(__DIR__))) . '/' . self::VERSION_FILE);
+        $file = @file_get_contents(dirname(dirname(dirname(__DIR__))) . '/' . self::VERSION_FILE);
+        $installed = null;
+        if (class_exists(InstalledVersions::class) && InstalledVersions::isInstalled(self::PACKAGE_NAME)) {
+            $installed = InstalledVersions::getPrettyVersion(self::PACKAGE_NAME);
+        }
+        return self::resolveBootVersion($installed, is_string($file) ? $file : '');
+    }
+
+    /**
+     * The Composer-installed release tag wins over VERSION.txt: releases up
+     * to 2.1.0 were tagged with a stale file, so the banner showed the wrong
+     * version. Dev installs (dev-master, branch aliases) have no release tag
+     * and fall back to the file.
+     */
+    public static function resolveBootVersion(?string $installed, string $fileVersion): string {
+        if ($installed !== null && preg_match('/^v?([0-9]+\.[0-9]+\.[0-9]+(?:[-+.][0-9A-Za-z.\-]+)?)$/', $installed, $m)) {
+            return $m[1];
+        }
+        $fileVersion = trim($fileVersion);
+        return $fileVersion !== '' ? $fileVersion : 'unknown';
     }
 
     public final function run(string $appClass): void {

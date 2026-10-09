@@ -1,0 +1,12 @@
+propertySources:
+    -   name: env
+        provider: winterBootTests\Support\StubPropertySource
+        dataset: env
+
+server:
+    address: "$env.HOST"
+    port: "$env.PORT"
+    swoole:
+        worker_num: "$env.WORKERS"
+        daemonize: "$env.DAEMON || false"
+        log_file: "$env.LOG_FILE || /tmp/swoole.log"

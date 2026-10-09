@@ -14,7 +14,9 @@ class UriPathPart {
     const REGEX_BOOL = '(true|false)';
 
     const REGEX_VAR = '/^[a-zA-Z_][a-zA-Z_0-9]*$/';
-    const REGEX_NAME = '/^[a-zA-Z_0-9\-]+$/';
+    // Dots allowed for file-like routes (/robots.txt, /snow.js); a part
+    // made only of dots ('.', '..') is a relative path step, never a name.
+    const REGEX_NAME = '/^(?!\.+$)[a-zA-Z_0-9\-\.]+$/';
     const VALUE = 'VAR_REGEX';
 
     private bool $isPathVariable = false;

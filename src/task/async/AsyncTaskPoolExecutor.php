@@ -77,7 +77,7 @@ class AsyncTaskPoolExecutor implements TaskPoolExecutor {
             return;
         }
 
-        self::logInfo("Async call id '$id' enqueued to worker-$workerId");
+        self::logDebug("Async call id '$id' enqueued to worker-$workerId");
     }
 
     public function executeAll(int $workerId) {
@@ -87,7 +87,7 @@ class AsyncTaskPoolExecutor implements TaskPoolExecutor {
         while ($this->hasCapacity($workerId) && ($record = $store->dequeue())) {
             $this->running[$workerId] = ($this->running[$workerId] ?? 0) + 1;
             go(function () use ($store, $record, $appCtx, $workerId) {
-                self::logInfo("Processing Async call '" . $record->getId() . "' on async-worker-$workerId");
+                self::logDebug("Processing Async call '" . $record->getId() . "' on async-worker-$workerId");
                 $className = $record->getClassName();
                 $methodName = $record->getMethodName();
                 $args = json_decode($record->getArguments(), true);

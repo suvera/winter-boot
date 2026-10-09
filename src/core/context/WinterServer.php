@@ -43,8 +43,8 @@ class WinterServer {
      * @var WinterTable[]
      */
     protected array $scheduledTables = [];
-    private mixed $address;
-    private mixed $port;
+    private string $address;
+    private int $port;
     protected static bool $processSignalsRegistered = false;
     /** Intentionally static: one server per process; holds no request state. */
     protected static ?self $instance = null;
@@ -57,14 +57,23 @@ class WinterServer {
         private ApplicationContextData $appCtxData
     ) {
 
-        $prop = $this->appCtxData->getPropertyContext();
-        $this->address = $prop->get('server.address', '127.0.0.1');
-        $this->port = $prop->get('server.port', '8080');
+        [$this->address, $this->port] = self::listenAddress($this->appCtxData->getPropertyContext());
 
         $this->server = new Server($this->address, $this->port);
         $this->pidManager = new ServerPidManager($this->appCtx);
         $this->adminHandler = new WinterServerAdmin($this->appCtx, $this->pidManager);
         self::$instance = $this;
+    }
+
+    /**
+     * server.address / server.port as Swoole's typed arguments: a
+     * "$env.PORT" reference resolves to a string, which Swoole's int $port
+     * rejects under strict_types.
+     *
+     * @return array{0: string, 1: int}
+     */
+    public static function listenAddress(PropertyContext $prop): array {
+        return [$prop->getStr('server.address', '127.0.0.1'), $prop->getInt('server.port', 8080)];
     }
 
     public function addPid(string $id, int $pid, int $psType): void {
