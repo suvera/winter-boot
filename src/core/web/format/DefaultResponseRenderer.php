@@ -23,6 +23,15 @@ use SplFileInfo;
 class DefaultResponseRenderer extends AbstractResponseRenderer implements ResponseRenderer {
     use Wlf4p;
 
+    /**
+     * @param bool $prettyPrintJson winter.web.json.prettyPrint; true keeps
+     *      the historical indented output, false emits compact JSON.
+     */
+    public function __construct(
+        private bool $prettyPrintJson = true
+    ) {
+    }
+
     public function renderAndExit(ResponseEntity $entity, HttpRequest $request): void {
         $this->render($entity, $request);
 
@@ -58,7 +67,7 @@ class DefaultResponseRenderer extends AbstractResponseRenderer implements Respon
     ): void {
 
         $body = $entity->getBody();
-        $prettyPrint = JSON_PRETTY_PRINT;
+        $prettyPrint = $this->prettyPrintJson ? JSON_PRETTY_PRINT : 0;
 
         if ($body instanceof View) {
             if ($checkOnly) {

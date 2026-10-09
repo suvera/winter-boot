@@ -1,15 +1,28 @@
 # Changelog
 
-## Unreleased
+## 2.1.2
 
-### Security
-- Native extension: `winter_boot_expand_template()` now caps each *growing* substitution pass at 16 MiB and throws an `Error` instead of allocating past it. Chained pairs (a placeholder expanding to many copies of a later placeholder) grew the result geometrically from tiny input, so a small set of AOP `#{...}`/`${...}` values could exhaust memory and abort the request. Same-length and shrinking passes are never capped, and the size is checked before the multiply so it can no longer integer-overflow into an under-allocated buffer. AOP name/key expansion that hits the cap now surfaces as `AopException` with the target class, like inline-code errors.
+### Added
+- Worker lifecycle hooks: `#[OnWorkerStart]` / `#[OnWorkerStop]` on a `#[Component]`/`#[Service]` implementing `WorkerStartEvent` / `WorkerStopEvent` run in every HTTP and task worker as it starts or stops.
+- `winter.web.json.prettyPrint` (default `true`): set `false` to render JSON responses compact instead of indented.
 
-### Removed
-- Native extension: `deferred()` / `defered()` are removed. Their Zend Observer hook left `EG(current_observed_frame)` pointing into freed coroutine stacks whenever a Swoole coroutine yielded (Swoole only carries observer state across switches with `swoole.enable_fiber_mock=1`), crashing PHP at shutdown. Use `try`/`finally` for cleanup. The extension now registers no observer handlers.
+### Changed
+- KV and queue store clients: inside a coroutine each call now uses its own non-blocking `Swoole\Coroutine\Client` connection (idle ones are reused) instead of one blocking per-worker socket; the undocumented `$client` magic property and the `connect()`/`recvFrame()` methods are gone.
+
+### Fixed
+- HTTP headers: name lookups are case-insensitive, so `getFirstHeader('user-agent')` finds the `User-Agent` header (and `#[RequestParam(source: 'header')]` binds regardless of case); adding a name that differs only in case appends to the same header.
+- KV and queue store clients: concurrent coroutines in one worker no longer block the worker or read each other's replies from the shared socket.
+- Routes: literal path segments may contain dots (`/robots.txt`, `/assets/snow.min.js`); `.` and `..` segments stay rejected.
+- `server.port` (and `server.address`) set from `$env.X` are converted to the types Swoole needs, so a port from the environment no longer fails startup; `server.swoole.*` values that are integer or `true`/`false` strings get native types.
+- Startup banner: the Winter Boot version now comes from the installed Composer release tag when there is one, falling back to `VERSION.txt`; releases up to 2.1.0 shipped a stale `VERSION.txt` and showed `1.0.0-dev`.
+
+## 2.1.1
 
 ### Changed
 - Native extension: its version (`phpversion('winter_boot')`, `php --ri winter_boot`) now comes from the repo-root `VERSION.txt` at `configure` time instead of a hardcoded `PHP_WINTER_BOOT_VERSION`, so it always matches the framework version.
+
+### Removed
+- Native extension: `deferred()` / `defered()` are removed. Their Zend Observer hook left `EG(current_observed_frame)` pointing into freed coroutine stacks whenever a Swoole coroutine yielded (Swoole only carries observer state across switches with `swoole.enable_fiber_mock=1`), crashing PHP at shutdown. Use `try`/`finally` for cleanup. The extension now registers no observer handlers.
 
 ### Fixed
 - OpenSearch migrations: connections read from module config files (e.g. `opensearch-config.yml`) now resolve `$env.X`, `$ini.key` and `a || b` expressions like module configs at app boot; previously the raw strings were used (literal `$ini.*` credentials, and `"$env.X || false"` read as a truthy `ssl_verification`). An unresolvable reference now fails the migration.
@@ -19,10 +32,6 @@
 - AOP: when an aspect's `begin()` fails, the aspects already begun each get `beginFailed()` with their own context and the original exception; previously the failing aspect was called once per context and a throwing handler replaced the exception for the rest. A throwing `failed()` handler no longer replaces the exception for later aspects either.
 - AOP: an AOP attribute on a `#[RestController]` method that is not a request-mapped endpoint now logs a startup warning; such advice never runs because controllers are not proxied.
 - Testing: added `IdleCheckRegistry::disableTimer()` so a test bootstrap that builds an application context without starting the server can stop the datasource idle-check timer; otherwise the pending Swoole timer keeps the process alive after the last test (see the user-docs testing page).
-
-## 2.1.1
-
-### Fixed
 - Transactions: transaction state is now per coroutine, so concurrent requests no longer join or complete each other's transactions.
 - Transactions: `REQUIRES_NEW` and `NOT_SUPPORTED` now run on a separate connection instead of committing or joining the outer transaction.
 - Transactions: `@Transactional(noRollbackFor: ...)` now commits instead of leaving the transaction open.
@@ -72,6 +81,7 @@
 - Server: workers and the manager stay in the terminal's process group, so Ctrl+C stops every process instead of leaving workers running.
 
 ### Security
+- Native extension: `winter_boot_expand_template()` now caps each *growing* substitution pass at 16 MiB and throws an `Error` instead of allocating past it. Chained pairs (a placeholder expanding to many copies of a later placeholder) grew the result geometrically from tiny input, so a small set of AOP `#{...}`/`${...}` values could exhaust memory and abort the request. Same-length and shrinking passes are never capped, and the size is checked before the multiply so it can no longer integer-overflow into an under-allocated buffer. AOP name/key expansion that hits the cap now surfaces as `AopException` with the target class, like inline-code errors.
 - Actuator `configprops` and `env` mask values whose keys look secret (password, token, key, secret, ...).
 - Cache aspects no longer log cache keys or cached values.
 - KV/queue clients no longer log raw responses.
