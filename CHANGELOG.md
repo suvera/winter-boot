@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.1.4
 
 ### Fixed
 - PDO connections closed by the pool (idle timeout, failed reset) now really disconnect. PHP frees a PDO handle only with its last reference, and a `PDOStatement` left in an uncollected reference cycle kept the database session open after the pool had forgotten it, so long-running workers piled up idle sessions until PostgreSQL refused new clients (`sorry, too many clients already`). `PdoConnection::close()` drops the handle before logging (which can yield under Swoole hooks) and collects pending cycles.
