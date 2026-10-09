@@ -21,6 +21,7 @@ use dev\winterframework\reflection\support\ParameterType;
 use dev\winterframework\stereotype\RestController;
 use dev\winterframework\stereotype\web\RequestMapping;
 use dev\winterframework\stereotype\web\RequestParam;
+use dev\winterframework\web\http\HttpStatus;
 use dev\winterframework\web\http\ResponseEntity;
 use dev\winterframework\web\MediaType;
 use Prometheus\RenderTextFormat;
@@ -86,7 +87,19 @@ class DefaultActuatorController implements ActuatorController {
         }
 
         $resp->setBody($health);
+        $resp->withStatus(self::healthHttpStatus($health->getStatus()));
         return $resp;
+    }
+
+    /**
+     * Probes and load balancers read only the status code: DOWN and
+     * OUT_OF_SERVICE answer 503, everything else 200 (Spring Boot's mapping).
+     */
+    public static function healthHttpStatus(?string $status): HttpStatus {
+        return match ($status) {
+            Status::DOWN, Status::OUT_OF_SERVICE => HttpStatus::$SERVICE_UNAVAILABLE,
+            default => HttpStatus::$OK,
+        };
     }
 
     public function getInfo(): ResponseEntity {

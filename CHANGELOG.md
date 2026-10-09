@@ -4,12 +4,17 @@
 
 ### Added
 - Worker lifecycle hooks: `#[OnWorkerStart]` / `#[OnWorkerStop]` on a `#[Component]`/`#[Service]` implementing `WorkerStartEvent` / `WorkerStopEvent` run in every HTTP and task worker as it starts or stops.
-- `winter.web.json.prettyPrint` (default `true`): set `false` to render JSON responses compact instead of indented.
+- `winter.web.json.prettyPrint` (default `false`): set `true` to render JSON responses indented instead of compact. Responses were always indented before; the default is now compact.
 
 ### Changed
+- Default database pool cap (`winter.coroutine.db.maxConnections` / `connection.maxConnections`) lowered from 50 to 10 per worker, so a few workers stay under PostgreSQL's default `max_connections` of 100.
+- `#[Async]` enqueue/processing messages log at `DEBUG` instead of `INFO`.
 - KV and queue store clients: inside a coroutine each call now uses its own non-blocking `Swoole\Coroutine\Client` connection (idle ones are reused) instead of one blocking per-worker socket; the undocumented `$client` magic property and the `connect()`/`recvFrame()` methods are gone.
 
 ### Fixed
+- Actuator `/health` answers 503 when the aggregated status is `DOWN` or `OUT_OF_SERVICE`, so probes and load balancers that read only the status code see the failure.
+- Prometheus: `incr`/`incrBy`/`decr`/`decrBy`/`observe`/`startTimer` initialise the registry, so `http_request_duration` and app metrics recorded before a worker's first scrape are no longer dropped.
+- Startup no longer aborts when a scanned namespace directory is missing (e.g. an empty folder git did not keep); it is skipped with a warning.
 - HTTP headers: name lookups are case-insensitive, so `getFirstHeader('user-agent')` finds the `User-Agent` header (and `#[RequestParam(source: 'header')]` binds regardless of case); adding a name that differs only in case appends to the same header.
 - KV and queue store clients: concurrent coroutines in one worker no longer block the worker or read each other's replies from the shared socket.
 - Routes: literal path segments may contain dots (`/robots.txt`, `/assets/snow.min.js`); `.` and `..` segments stay rejected.

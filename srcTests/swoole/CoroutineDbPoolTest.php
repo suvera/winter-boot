@@ -25,8 +25,8 @@ class CoroutineDbPoolTest {
 
     public function testPoolConfigDefaults(): void {
         $config = new DataSourceConfig();
-        if ($config->getMaxConnections() !== 50) {
-            throw new \Exception('expected default maxConnections 50');
+        if ($config->getMaxConnections() !== 10) {
+            throw new \Exception('expected default maxConnections 10');
         }
         if ($config->getMaxWaitMs() !== 5000) {
             throw new \Exception('expected default maxWaitMs 5000');

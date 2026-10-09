@@ -264,9 +264,9 @@ final class Fix212Test extends TestCase {
         return $entity->getBody();
     }
 
-    public function testJsonPrettyPrintIsDefault(): void {
+    public function testJsonCanBePretty(): void {
         $this->assertSame(json_encode(['a' => 1, 'b' => [2]], JSON_PRETTY_PRINT),
-            $this->renderedJson(new DefaultResponseRenderer()));
+            $this->renderedJson(new DefaultResponseRenderer(true)));
     }
 
     public function testJsonCanBeCompact(): void {

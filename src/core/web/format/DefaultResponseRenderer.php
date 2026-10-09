@@ -24,11 +24,11 @@ class DefaultResponseRenderer extends AbstractResponseRenderer implements Respon
     use Wlf4p;
 
     /**
-     * @param bool $prettyPrintJson winter.web.json.prettyPrint; true keeps
-     *      the historical indented output, false emits compact JSON.
+     * @param bool $prettyPrintJson winter.web.json.prettyPrint; false (the
+     *      default) emits compact JSON, true indents it.
      */
     public function __construct(
-        private bool $prettyPrintJson = true
+        private bool $prettyPrintJson = false
     ) {
     }
 

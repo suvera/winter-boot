@@ -246,7 +246,7 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
 
         $this->beanProvider->registerInternalBean(
             new DefaultResponseRenderer(
-                $this->propertyContext->getBool('winter.web.json.prettyPrint', true)
+                $this->propertyContext->getBool('winter.web.json.prettyPrint', false)
             ),
             ResponseRenderer::class,
             false

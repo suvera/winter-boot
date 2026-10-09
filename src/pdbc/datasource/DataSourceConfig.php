@@ -41,7 +41,7 @@ class DataSourceConfig {
     protected int $idleTimeout = 600;
 
     #[JsonProperty("connection.maxConnections")]
-    protected int $maxConnections = 50;
+    protected int $maxConnections = 10;
 
     #[JsonProperty("connection.maxWaitMs")]
     protected int $maxWaitMs = 5000;
