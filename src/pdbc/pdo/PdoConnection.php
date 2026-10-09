@@ -88,11 +88,21 @@ class PdoConnection extends AbstractConnection implements ResettableConnection {
      * --------------------------
      * Implemented Methods
      */
+    /**
+     * Closes the database session. PHP has no PDO::close(): the socket goes
+     * away only when the last reference to the PDO object does, and a
+     * PDOStatement left in an uncollected reference cycle keeps it open
+     * long after the pool forgot the connection. So the handle is dropped
+     * first (logging can yield to another coroutine under Swoole hooks) and
+     * pending cycles are collected right away.
+     */
     public function close($safe = false): void {
-        if ($this->pdo) {
-            self::logInfo('PDO Connection Closed -  safe ' . $safe);
+        if ($this->pdo === null) {
+            return;
         }
         $this->pdo = null;
+        gc_collect_cycles();
+        self::logInfo('PDO Connection Closed -  safe ' . $safe);
     }
 
     public function isClosed(): bool {
