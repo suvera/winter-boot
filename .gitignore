@@ -55,6 +55,7 @@ php-ext/*.o
 phing/.phing
 /vendor/
 bin/yaml-lint
+2026-10-10-mcp-tools.md
 
 ### IntelliJ IDEA ###
 .idea

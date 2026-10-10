@@ -187,4 +187,13 @@ class HttpRequest {
     public function getFile(string $name): null|array|HttpUploadedFile {
         return $this->files[$name] ?? null;
     }
+
+    /**
+     * Whether the process ends after this request is answered: true for
+     * classic SAPIs (one request per process), false for long-lived
+     * servers (Swoole) and in-process dispatches.
+     */
+    public function exitsAfterResponse(): bool {
+        return true;
+    }
 }

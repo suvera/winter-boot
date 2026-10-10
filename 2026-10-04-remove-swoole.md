@@ -1,6 +1,10 @@
 # Plan: Remove Swoole from Winter Boot (3.0.0)
 
-**Status:** Draft for review · **Target release:** `3.0.0` · **Baseline:** PHP 8.6
+> **ABANDONED (2026-10-10).** Swoole is not being removed; Winter Boot stays on Swoole.
+> This plan is kept for reference only. Do not use it as the basis for new designs or
+> work (for example, `ShmTable`, coroutines and Swoole streaming remain available).
+
+**Status:** Abandoned · ~~Draft for review~~ · **Target release:** ~~`3.0.0`~~ · **Baseline:** PHP 8.6
 
 ## 1. Summary
 

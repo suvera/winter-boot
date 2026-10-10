@@ -70,4 +70,8 @@ class SwooleRequest extends HttpRequest {
         return $this->response;
     }
 
+    public function exitsAfterResponse(): bool {
+        return false;
+    }
+
 }

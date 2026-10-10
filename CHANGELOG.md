@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.5
+
+### Added
+- MCP tools: `#[McpTool]` on a `#[RestController]` endpoint or a `#[Service]`/`#[Component]` method serves it as a Model Context Protocol tool on `POST <context-path>/mcp` (registered only when a tool exists). Names, input/output schemas and hints are derived from the signature, PHPDoc and HTTP method, and undescribable inputs fail at boot; REST tools run through the normal dispatcher, so interceptors and AOP apply. Optional `winter.mcp.*` keys: `path`, `serverName`, `instructions`, `allowedOrigins`, `maxBodyBytes`.
+
+### Changed
+- `DispatcherServlet::dispatch()` restores the previously bound request/response instead of clearing them, and the "end the process after answering" rule is now `HttpRequest::exitsAfterResponse()` (`false` for Swoole and in-process requests). No change for HTTP traffic.
+
 ## 2.1.4
 
 ### Fixed
