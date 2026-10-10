@@ -14,7 +14,6 @@ use dev\winterframework\util\log\Wlf4p;
 use dev\winterframework\web\http\HttpRequest;
 use dev\winterframework\web\http\HttpStatus;
 use dev\winterframework\web\http\ResponseEntity;
-use dev\winterframework\web\http\SwooleRequest;
 use dev\winterframework\web\MediaType;
 use dev\winterframework\web\view\View;
 use JsonSerializable;
@@ -35,7 +34,7 @@ class DefaultResponseRenderer extends AbstractResponseRenderer implements Respon
     public function renderAndExit(ResponseEntity $entity, HttpRequest $request): void {
         $this->render($entity, $request);
 
-        if (!($request instanceof SwooleRequest)) {
+        if ($request->exitsAfterResponse()) {
             System::exit();
         }
     }

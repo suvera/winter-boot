@@ -14,6 +14,12 @@ use dev\winterframework\core\web\route\RequestMappingRegistry;
 use dev\winterframework\core\web\route\WinterRequestMappingRegistry;
 use dev\winterframework\enums\RequestMethod;
 use dev\winterframework\exception\DuplicatePathException;
+use dev\winterframework\mcp\exception\McpDefinitionException;
+use dev\winterframework\mcp\invoke\DefaultMcpToolInvoker;
+use dev\winterframework\mcp\McpController;
+use dev\winterframework\mcp\McpServer;
+use dev\winterframework\mcp\McpToolRegistry;
+use dev\winterframework\stereotype\mcp\McpTool;
 use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ref\RefMethod;
 use dev\winterframework\reflection\ReflectionUtil;
@@ -41,6 +47,8 @@ class WinterWebContext implements WebContext {
         $this->initDispatcherServlet();
 
         $this->buildActuator();
+
+        $this->buildMcp();
 
         $this->buildSessionDefaults();
 
@@ -104,6 +112,73 @@ class WinterWebContext implements WebContext {
             $mapping->setBeanClass(ActuatorController::class);
             $mapping->init(RefMethod::getInstance($refClass->getMethod($def['handler'])));
 
+            $this->requestMapping->put($mapping);
+        }
+    }
+
+    /**
+     * Serves the application's #[McpTool] methods on POST
+     * <context-path><winter.mcp.path> (default /mcp). Nothing is
+     * registered, and nothing runs, when the application has no tools.
+     * Tool definitions are derived here, so a broken tool fails at boot.
+     */
+    protected function buildMcp(): void {
+        $resources = $this->ctxData->getResources();
+        if (!$resources->hasAttribute(McpTool::class)) {
+            return;
+        }
+        $registry = McpToolRegistry::fromResources($resources);
+        if ($registry->isEmpty()) {
+            return;
+        }
+
+        $propCtx = $this->ctxData->getPropertyContext();
+        $path = '/' . trim((string)$propCtx->get('winter.mcp.path', McpController::DEFAULT_PATH), '/');
+        if ($path === '/') {
+            throw new McpDefinitionException('winter.mcp.path must not be empty');
+        }
+        $contextPath = (string)($propCtx->get('server.context-path', '/') ?? '/');
+        $allowedOrigins = $propCtx->get('winter.mcp.allowedOrigins', []);
+        if (!is_array($allowedOrigins)) {
+            $allowedOrigins = [(string)$allowedOrigins];
+        }
+
+        $serverInfo = [
+            'name' => (string)$propCtx->get('winter.mcp.serverName', $this->appCtx->getApplicationName()),
+            'version' => $this->appCtx->getApplicationVersion(),
+        ];
+
+        $server = new McpServer(
+            $registry,
+            new DefaultMcpToolInvoker($this->appCtx, $this->dispatcherServlet, $contextPath),
+            $serverInfo,
+            (string)$propCtx->get('winter.mcp.instructions', ''),
+            $this->appCtx,
+        );
+        $controller = new McpController(
+            $server,
+            array_values(array_filter($allowedOrigins, 'is_string')),
+            (int)$propCtx->get('winter.mcp.maxBodyBytes', McpController::DEFAULT_MAX_BODY_BYTES),
+        );
+
+        $this->ctxData->getBeanProvider()->registerInternalBean(
+            $controller,
+            McpController::class,
+            false
+        );
+        $this->ctxData->getBeanProvider()->registerInternalBean(
+            $registry,
+            McpToolRegistry::class,
+            false
+        );
+
+        $refClass = RefKlass::getInstance(McpController::class);
+        foreach (['post' => [RequestMethod::POST], 'notAllowed' => [RequestMethod::GET, RequestMethod::DELETE]]
+                 as $handler => $methods) {
+            $mapping = new RequestMapping(path: $path, method: $methods);
+            $mapping->setBeanClass(McpController::class);
+            $mapping->init(RefMethod::getInstance($refClass->getMethod($handler)));
+            // put() throws DuplicatePathException when the app already uses the path.
             $this->requestMapping->put($mapping);
         }
     }

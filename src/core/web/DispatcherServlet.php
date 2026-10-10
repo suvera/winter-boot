@@ -26,7 +26,6 @@ use dev\winterframework\util\log\Wlf4p;
 use dev\winterframework\web\http\HttpRequest;
 use dev\winterframework\web\http\HttpStatus;
 use dev\winterframework\web\http\ResponseEntity;
-use dev\winterframework\web\http\SwooleRequest;
 use dev\winterframework\web\HttpRequestDispatcher;
 use dev\winterframework\web\MediaType;
 use ReflectionNamedType;
@@ -110,13 +109,17 @@ class DispatcherServlet implements HttpRequestDispatcher {
             $response = new ResponseEntity();
         }
 
+        // Restore, don't clear: an in-process dispatch (e.g. an MCP tool
+        // call) runs inside another request, which must stay bound after.
+        $outerRequest = $this->appCtx->getCurrentHttpRequest();
+        $outerResponse = $this->appCtx->getCurrentHttpResponse();
         $this->appCtx->setCurrentHttpRequest($request);
         $this->appCtx->setCurrentHttpResponse($response);
         try {
             $this->doDispatch($request, $response, $serverPath, microtime(true));
         } finally {
-            $this->appCtx->setCurrentHttpRequest(null);
-            $this->appCtx->setCurrentHttpResponse(null);
+            $this->appCtx->setCurrentHttpRequest($outerRequest);
+            $this->appCtx->setCurrentHttpResponse($outerResponse);
         }
     }
 
@@ -207,7 +210,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
             self::logException($e);
         }
 
-        if (!($request instanceof SwooleRequest)) {
+        if ($request->exitsAfterResponse()) {
             System::exit();
         }
     }
