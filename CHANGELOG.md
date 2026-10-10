@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.7
+
+### Added
+- MCP resources: `#[McpResource(uri: ...)]` on a `#[Service]`/`#[Component]` method serves a fixed resource (`config://app`) or a URI template (`site://{domain}/summary/{range}`, placeholders bound to the parameters of the same name) through `resources/list`, `resources/templates/list` and `resources/read`; an optional `listMethod` names the concrete resources for the caller, and `McpResourceNotFoundException` answers "Resource not found" (-32002).
+- MCP prompts: `#[McpPrompt]` on a `#[Service]`/`#[Component]` method serves it through `prompts/list` and `prompts/get`; its string parameters are the prompt's arguments, and it returns one user message or a list of `['role', 'text']` messages.
+- `McpToolContext::getArguments()` / `getArgument()` and `getOutcome()` (`ok`, `tool_error`, `denied`, `internal`, set before `afterCall()`): the tool call's validated arguments and how it ended, e.g. for audit logs and metrics in a `McpToolInterceptor`.
+- `winter.mcp.serverTitle`: sets `serverInfo.title`. `initialize` now advertises resources and prompts when the application has them.
+
 ## 2.1.6
 
 ### Fixed

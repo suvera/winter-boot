@@ -61,6 +61,22 @@ class McpTool implements StereoType {
         return $this->refOwner;
     }
 
+    /**
+     * Resources and prompts live on #[Service] / #[Component] methods:
+     * public, non-static, non-abstract.
+     */
+    public static function checkServiceMethod(RefMethod $ref, string $where): void {
+        if (!$ref->isPublic() || $ref->isStatic() || $ref->isAbstract()
+            || $ref->isConstructor() || $ref->isDestructor()) {
+            throw new McpDefinitionException($where . 'must be a public, non-static, non-abstract method');
+        }
+        $class = $ref->getDeclaringClass();
+        if (count($class->getAttributes(Service::class)) === 0
+            && count($class->getAttributes(Component::class)) === 0) {
+            throw new McpDefinitionException($where . 'its class must be a #[Service] or #[Component]');
+        }
+    }
+
     public function init(object $ref): void {
         /** @var RefMethod $ref */
         TypeAssert::typeOf($ref, RefMethod::class);
