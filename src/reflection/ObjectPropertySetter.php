@@ -34,9 +34,8 @@ trait ObjectPropertySetter {
                 0, $ex
             );
         } catch (Throwable $e) {
-            throw new TypeError($e->getMessage() . ', Property "'
-                . ' at class '
-                . ReflectionUtil::getFqName($property->getDeclaringClass()),
+            throw new TypeError('Property "' . $property->getName() . '" at class '
+                . ReflectionUtil::getFqName($property->getDeclaringClass()) . ': ' . $e->getMessage(),
                 0, $e
             );
         }

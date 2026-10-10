@@ -19,6 +19,8 @@ use dev\winterframework\mcp\invoke\DefaultMcpToolInvoker;
 use dev\winterframework\mcp\McpController;
 use dev\winterframework\mcp\McpServer;
 use dev\winterframework\mcp\McpToolRegistry;
+use dev\winterframework\stereotype\mcp\McpPrompt;
+use dev\winterframework\stereotype\mcp\McpResource;
 use dev\winterframework\stereotype\mcp\McpTool;
 use dev\winterframework\reflection\ref\RefKlass;
 use dev\winterframework\reflection\ref\RefMethod;
@@ -117,14 +119,16 @@ class WinterWebContext implements WebContext {
     }
 
     /**
-     * Serves the application's #[McpTool] methods on POST
-     * <context-path><winter.mcp.path> (default /mcp). Nothing is
-     * registered, and nothing runs, when the application has no tools.
+     * Serves the application's #[McpTool], #[McpResource] and #[McpPrompt]
+     * methods on POST <context-path><winter.mcp.path> (default /mcp).
+     * Nothing is registered, and nothing runs, when the application has none.
      * Tool definitions are derived here, so a broken tool fails at boot.
      */
     protected function buildMcp(): void {
         $resources = $this->ctxData->getResources();
-        if (!$resources->hasAttribute(McpTool::class)) {
+        if (!$resources->hasAttribute(McpTool::class)
+            && !$resources->hasAttribute(McpResource::class)
+            && !$resources->hasAttribute(McpPrompt::class)) {
             return;
         }
         $registry = McpToolRegistry::fromResources($resources);
@@ -147,6 +151,10 @@ class WinterWebContext implements WebContext {
             'name' => (string)$propCtx->get('winter.mcp.serverName', $this->appCtx->getApplicationName()),
             'version' => $this->appCtx->getApplicationVersion(),
         ];
+        $title = (string)$propCtx->get('winter.mcp.serverTitle', '');
+        if ($title !== '') {
+            $serverInfo['title'] = $title;
+        }
 
         $server = new McpServer(
             $registry,

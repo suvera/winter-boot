@@ -38,10 +38,17 @@ class Lockable implements AopStereoType {
         /** @var RefMethod $ref */
         TypeAssert::typeOf($ref, RefMethod::class);
 
+        // lockManager is a bean name (e.g. "redisLockManager") or a class name.
+        // Only a class name can be checked here; bean names resolve at call time.
         if (!empty($this->lockManager)
+            && class_exists($this->lockManager)
             && !is_a($this->lockManager, LockManager::class, true)) {
             throw new TypeError("LockManager provided for #[Lockable] attribute must implement "
                 . LockManager::class . ' at the method '
+                . ReflectionUtil::getFqName($ref));
+        }
+        if ($this->waitMilliSecs < 0 || $this->ttlSeconds < 0) {
+            throw new TypeError('#[Lockable] waitMilliSecs and ttlSeconds must not be negative at the method '
                 . ReflectionUtil::getFqName($ref));
         }
 

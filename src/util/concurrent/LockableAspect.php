@@ -30,11 +30,12 @@ class LockableAspect implements WinterAspect {
             $exCtx->getObject(),
             $exCtx->getArguments()
         );
-        self::logInfo('Lock name "' . $stereo->name . '", after parsed "' . $name . '"');
+        // The resolved name can contain argument values: DEBUG only.
+        self::logDebug('Lock name "' . $stereo->name . '", after parsed "' . $name . '"');
 
         $lock = $lockManager->provideLock($name, $stereo->ttlSeconds);
-        if (!$lock->tryLock()) {
-            throw new LockException('Lock cannot be acquired ');
+        if (!$lock->tryLock($stereo->waitMilliSecs)) {
+            throw new LockException('Lock "' . $stereo->name . '" cannot be acquired');
         }
         $exCtx->setVariable($stereo::class, $lock);
     }
@@ -43,8 +44,13 @@ class LockableAspect implements WinterAspect {
         Lockable $stereo,
         ApplicationContext $appCtx
     ): LockManager {
-        $lockManager = empty($stereo->lockManager) ? $appCtx->beanByClass(LockManager::class)
-            : $appCtx->beanByName($stereo->lockManager);
+        if (empty($stereo->lockManager)) {
+            $lockManager = $appCtx->beanByClass(LockManager::class);
+        } else if (class_exists($stereo->lockManager)) {
+            $lockManager = $appCtx->beanByClass($stereo->lockManager);
+        } else {
+            $lockManager = $appCtx->beanByName($stereo->lockManager);
+        }
 
         TypeAssert::typeOf($lockManager, LockManager::class);
 
@@ -58,7 +64,12 @@ class LockableAspect implements WinterAspect {
     ): void {
         /** @var Lockable $stereo */
         $stereo = $ctx->getStereoType();
-        self::logException($ex);
+        if ($ex instanceof LockException) {
+            // Busy lock: an expected outcome the caller receives as LockException.
+            self::logInfo($ex->getMessage());
+        } else {
+            self::logException($ex);
+        }
 
         $lock = $exCtx->getVariable($stereo::class);
         if (!empty($lock)) {
@@ -103,7 +114,7 @@ class LockableAspect implements WinterAspect {
     ): void {
         /** @var Lockable $stereo */
         $stereo = $ctx->getStereoType();
-        self::logException($ex);
+        // The method's exception propagates to the caller, which reports it.
 
         $lock = $exCtx->getVariable($stereo::class);
         if (isset($lock)) {
