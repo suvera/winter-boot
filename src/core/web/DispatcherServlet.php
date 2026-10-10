@@ -13,6 +13,7 @@ use dev\winterframework\core\web\config\InterceptorRegistry;
 use dev\winterframework\core\web\error\DefaultErrorController;
 use dev\winterframework\core\web\error\ErrorController;
 use dev\winterframework\core\web\route\RequestMappingRegistry;
+use dev\winterframework\exception\HttpRestException;
 use dev\winterframework\exception\NullPointerException;
 use dev\winterframework\exception\WinterException;
 use dev\winterframework\io\metrics\prometheus\PrometheusMetricRegistry;
@@ -150,7 +151,8 @@ class DispatcherServlet implements HttpRequestDispatcher {
         if ($matchedRoute === null) {
             // WB-2.1-04: $uri is attacker-controlled; never log/echo it raw.
             $safeUri = self::sanitizeUriForError($uri);
-            self::logError('Could not find Requested URI [' . $request->getMethod() . '] ' . $safeUri);
+            // A client error, not a server failure: INFO keeps scanners' noise out of ERROR.
+            self::logInfo('Could not find Requested URI [' . $request->getMethod() . '] ' . $safeUri);
             $this->handleError(
                 $request,
                 $response,
@@ -165,7 +167,14 @@ class DispatcherServlet implements HttpRequestDispatcher {
         try {
             $this->routeRequest($matchedRoute, $request, $response, $startTime);
         } catch (Throwable $t) {
-            self::logException($t);
+            if (self::isClientError($t)) {
+                // Expected outcome the error controller renders; no stack trace.
+                // The message is app text and may carry request data, so it is not logged.
+                self::logInfo('Request [' . $request->getMethod() . '] ' . self::sanitizeUriForError($uri)
+                    . ' answered ' . $t->getStatus()->getValue() . ' (' . $t::class . ')');
+            } else {
+                self::logException($t);
+            }
             $this->handleError(
                 $request,
                 $response,
@@ -536,7 +545,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 // WB-003: bind from the request, never process globals.
                 return ObjectCreator::createObject($varType, $request->getPostParams());
             } catch (Throwable $e) {
-                self::logException($e);
+                self::logBadInput($e);
                 throw new WinterException('Bad Request: Unexpected data passed');
             }
         } else if (str_contains($contentType, MediaType::MULTIPART_FORM_DATA)) {
@@ -549,7 +558,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
             try {
                 return ObjectCreator::createObject($varType, $data);
             } catch (Throwable $e) {
-                self::logException($e);
+                self::logBadInput($e);
                 throw new WinterException('Bad Request: Unexpected data passed');
             }
         } else if (
@@ -560,14 +569,14 @@ class DispatcherServlet implements HttpRequestDispatcher {
             try {
                 $row = JsonUtil::decodeArray($rawBody);
             } catch (Throwable $e) {
-                self::logException($e);
+                self::logBadInput($e);
                 throw new WinterException('Bad Request: Invalid JSON, ' . $e->getMessage());
             }
 
             try {
                 return ObjectCreator::createObject($varType, $row);
             } catch (Throwable $e) {
-                self::logException($e);
+                self::logBadInput($e);
                 throw new WinterException('Bad Request: Wrong JSON data passed, ' . $e->getMessage());
             }
         } else if (!$body->disableParsing && (str_contains($contentType, MediaType::APPLICATION_XML)
@@ -576,7 +585,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
             try {
                 return ObjectCreator::createObjectXml($varType, $rawBody);
             } catch (Throwable $e) {
-                self::logException($e);
+                self::logBadInput($e);
                 throw new WinterException('Bad Request: Wrong XML data passed');
             }
         }
@@ -584,7 +593,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
         try {
             return ObjectCreator::createObject($varType, $rawBody);
         } catch (Throwable $e) {
-            self::logException($e);
+            self::logBadInput($e);
             throw new WinterException('Bad Request: Unexpected data passed');
         }
     }
@@ -627,10 +636,10 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 $var->defaultValue
             );
         } catch (NullPointerException $ex) {
-            self::logException($ex);
+            self::logBadInput($ex, 'Parameter "' . $var->name . '": ');
             throw new WinterException('Bad Request: ' . $var->getRequiredText());
         } catch (Throwable $e) {
-            self::logException($e);
+            self::logBadInput($e, 'Parameter "' . $var->name . '": ');
             throw new WinterException('Bad Request: ' . $var->getInvalidText());
         }
     }
@@ -645,6 +654,27 @@ class DispatcherServlet implements HttpRequestDispatcher {
         $actual = strtolower(trim((string)strtok($contentType, ';')));
         $expected = strtolower(trim((string)strtok($mediaType, ';')));
         return $actual !== '' && $actual === $expected;
+    }
+
+    /**
+     * A failure the client caused and the error controller answers with
+     * a 4xx: a HttpRestException carrying a status below 500.
+     */
+    public static function isClientError(Throwable $t): bool {
+        if (!$t instanceof HttpRestException) {
+            return false;
+        }
+        $code = $t->getStatus()->getValue();
+        return $code >= 400 && $code < 500;
+    }
+
+    /**
+     * Request input that could not be bound (query values, body) is the
+     * client's mistake, answered with 400: DEBUG, one line, no stack trace.
+     */
+    protected static function logBadInput(Throwable $e, string $prefix = ''): void {
+        // The parameter name comes from code; only the message describes the input.
+        self::logDebug('Bad request input: ' . $prefix . $e::class . ': ' . $e->getMessage());
     }
 
     /**

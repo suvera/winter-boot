@@ -42,7 +42,8 @@ class TransactionalAspect implements WinterAspect, PropagatesCommitFailure {
         /** @var Transactional $stereo */
         $stereo = $ctx->getStereoType();
 
-        self::logInfo('Transaction started on method ' . ReflectionUtil::getFqName($ctx->getMethod()));
+        // Per call: DEBUG, not INFO.
+        self::logDebug('Transaction started on method ' . ReflectionUtil::getFqName($ctx->getMethod()));
 
         $txnMgr = $this->getTransactionManager($ctx);
         $txnStatus = $txnMgr->getTransaction($stereo->getTransactionDefinition());
@@ -70,7 +71,7 @@ class TransactionalAspect implements WinterAspect, PropagatesCommitFailure {
         AopExecutionContext $exCtx,
         mixed $result
     ): void {
-        self::logInfo('Committing transaction on method '
+        self::logDebug('Committing transaction on method '
             . ReflectionUtil::getFqName($ctx->getMethod()));
         /** @var TransactionStatus $txnStatus */
         $txnStatus = $exCtx->getVariable(self::OPERATION);
@@ -111,8 +112,6 @@ class TransactionalAspect implements WinterAspect, PropagatesCommitFailure {
         /** @var Transactional $stereo */
         $stereo = $ctx->getStereoType();
 
-        self::logException($ex);
-
         /** @var TransactionStatus $txnStatus */
         $txnStatus = $exCtx->getVariable(self::OPERATION);
         if (empty($txnStatus)) {
@@ -133,11 +132,17 @@ class TransactionalAspect implements WinterAspect, PropagatesCommitFailure {
         }
         foreach ($stereo->noRollbackFor as $cls) {
             if (ExceptionUtils::containsException($ex, $cls)) {
-                self::logInfo('NoRollback setup for exception ' . $cls . ', hence not rolling back!');
+                self::logDebug('NoRollback setup for exception ' . $cls . ', hence not rolling back!');
                 $rollBack = false;
                 break;
             }
         }
+
+        // The exception itself propagates to the caller, which reports it;
+        // logging its stack trace here too would report every failure twice.
+        $willRollBack = $rollBack || $txnStatus->isRollbackOnly();
+        self::logInfo(($willRollBack ? 'Rolling back' : 'Committing') . ' transaction on method '
+            . ReflectionUtil::getFqName($ctx->getMethod()) . ' after ' . $ex::class);
 
         self::completeAfterFailure($txnMgr, $txnStatus, $rollBack);
     }

@@ -6,17 +6,24 @@ namespace dev\winterframework\util\concurrent;
 use dev\winterframework\util\log\Wlf4p;
 use Throwable;
 
+/**
+ * Host-local locking (flock). Every provideLock() call returns a new
+ * handle: a handle shared between callers would let a second coroutine
+ * "acquire" a lock the first one already holds. getLocks() lists only the
+ * locks this process holds, so the registry doesn't grow with lock names.
+ */
 class DefaultLockManager implements LockManager {
     use Wlf4p;
 
-    private Locks $allLocks;
-
-    public function __construct() {
-        $this->allLocks = new Locks();
-    }
+    /** @var array<string, Lock> held locks by name */
+    private array $held = [];
 
     public function getLocks(): Locks {
-        return $this->allLocks;
+        $locks = new Locks();
+        foreach ($this->held as $name => $lock) {
+            $locks[$name] = $lock;
+        }
+        return $locks;
     }
 
     /** @noinspection PhpUnusedParameterInspection */
@@ -25,58 +32,39 @@ class DefaultLockManager implements LockManager {
     }
 
     public function provideLock(string $name, int $ttl = 0): Lock {
-        if (!isset($this->allLocks[$name])) {
-            $lock = $this->createLock($name, $ttl);
-            $this->allLocks[$name] = $lock;
-        }
-
-        return $this->allLocks[$name];
+        return new TrackedLock($this->createLock($name, $ttl), function (Lock $lock, bool $held) {
+            if ($held) {
+                $this->held[$lock->getName()] = $lock;
+            } elseif (($this->held[$lock->getName()] ?? null) === $lock) {
+                unset($this->held[$lock->getName()]);
+            }
+        });
     }
 
     public function removeLock(string|Lock $lock): bool {
-        if (!is_string($lock)) {
-            $name = $lock->getName();
-        } else {
-            $name = $lock;
-        }
-
-        if (isset($this->allLocks[$name])) {
-            try {
-                $this->allLocks[$name]->unlock();
-            } catch (Throwable $e) {
-                self::logException($e);
-            }
-            unset($this->allLocks[$name]);
-            return true;
-        }
-        return false;
+        return $this->unLock($lock);
     }
 
     public function updateLock(string|Lock $lock, int $ttl = 0): bool {
-        if ($lock instanceof Lock) {
-            $lock->update($ttl);
-            return true;
+        $lock = is_string($lock) ? ($this->held[$lock] ?? null) : $lock;
+        if ($lock === null) {
+            return false;
         }
-        if (isset($this->allLocks[$lock])) {
-            $this->allLocks[$lock]->update($ttl);
-            return true;
-        }
-
-        return false;
+        $lock->update($ttl);
+        return true;
     }
 
     public function unLock(string|Lock $lock): bool {
-        if ($lock instanceof Lock) {
+        $lock = is_string($lock) ? ($this->held[$lock] ?? null) : $lock;
+        if ($lock === null || !$lock->isLocked()) {
+            return false;
+        }
+        try {
             $lock->unlock();
-            return true;
+        } catch (Throwable $e) {
+            self::logException($e, 'Could not release lock "' . $lock->getName() . '". ');
+            return false;
         }
-        if (isset($this->allLocks[$lock])) {
-            $this->allLocks[$lock]->unlock();
-            return true;
-        }
-
-        return false;
+        return true;
     }
-
-
 }

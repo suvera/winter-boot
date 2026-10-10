@@ -68,3 +68,4 @@ Never land a user-visible framework change with docs missing.
    extension build), and included in Composer dists (no `.gitattributes`
    exclusion).
 3. Docs synced per above; `CHANGELOG.md` entry added.
+4. Make sure you add same tag on winter-modules and winter-doctrine repo's if they are changed along with winter-boot code.

@@ -303,20 +303,11 @@ class ReflectionUtil {
             self::logDebug($e->getMessage());
         }
 
+        $fromDefault = false;
         if (is_null($val)) {
             if (isset($autoValue->defaultValue)) {
-
-                try {
-                    $val = TypeCast::parseValue($autoValue->getTargetType(), $autoValue->defaultValue);
-                } catch (Throwable $e) {
-                    throw new WinterException('Invalid Type defined for config property #[Value] "'
-                        . $autoValue->name
-                        . '" (' . $autoValue->getTargetType() . ' - '
-                        . $e->getMessage() . '), so, Could not instantiate object for class '
-                        . get_class($bean), 0, $e
-                    );
-                }
-
+                $val = $autoValue->defaultValue;
+                $fromDefault = true;
             } else if (!$autoValue->isNullable()) {
 
                 throw new WinterException('Could not find config property #[Value] "'
@@ -328,6 +319,26 @@ class ReflectionUtil {
             } else {
                 return;
             }
+        }
+
+        // Resolved values ($env, $ini, yml) and defaults get the same strict
+        // conversion: a plain setValue() would turn the string "false" into true.
+        try {
+            $val = TypeCast::parseConfigValue($autoValue->getTargetType(), $val);
+        } catch (Throwable $e) {
+            // Never echo the value: config properties can hold secrets.
+            $fix = $fromDefault
+                ? 'fix the defaultValue of the #[Value] attribute'
+                : 'fix "' . substr($autoValue->name, 2, -1) . '" in application.yml, or in the $env/$ini/property'
+                    . ' source it points to';
+            throw new WinterException('Invalid ' . ($fromDefault ? 'default value' : 'value')
+                . ' for config property #[Value] "' . $autoValue->name . '" on '
+                . get_class($bean) . '::$' . $autoValue->getTargetName()
+                . ' (' . $autoValue->getTargetType() . '): ' . $e->getMessage() . '; ' . $fix, 0, $e);
+        }
+        if ($val === null && !$autoValue->isNullable()) {
+            throw new WinterException('Config property #[Value] "' . $autoValue->name . '" is null, but '
+                . get_class($bean) . '::$' . $autoValue->getTargetName() . ' is not nullable');
         }
 
         if ($autoValue->isTargetStatic()) {

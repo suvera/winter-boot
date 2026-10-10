@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.1.6
+
+### Fixed
+- `#[Value]`: configured values (`$env`, `$ini`, yml) and defaults are converted by meaning: `"false"`, `"no"`, `"off"` and `"0"` are `false` for a `bool` (they were `true`), and an `int`/`float` that isn't a number stops startup with an error naming the key, the property and where to fix it, without the value.
+- Expected client errors no longer log as server failures: a 4xx `HttpRestException` logs one INFO line (status and route, no stack trace or message), unbindable query/body input logs at DEBUG, and unknown URIs at INFO; server errors still log at ERROR with the trace.
+- Request parameter cast errors read `Parameter "limit": Cannot assign a value of type string to type "int"` instead of `Parameter "int" cannot be assigned to "STRING"`, and DTO property errors name the property.
+- `#[Transactional]`: the per-call "Transaction started" / "Committing" messages log at DEBUG, and a method's exception is no longer logged with a second stack trace by the aspect (one INFO line says whether the transaction rolled back).
+- `#[Lockable]` with the default local lock manager now excludes concurrent requests in the same worker: every caller gets its own lock handle (one shared handle let a second coroutine "acquire" a lock the first one held, so both ran the method).
+- `#[Lockable(lockManager: 'beanName')]` accepts a bean name as documented (it failed at startup unless the value was a class name), and `waitMilliSecs` is honored (it was ignored). Waiting yields only the waiting coroutine.
+- Lock managers no longer keep an entry for every lock name ever used; the resolved lock name (which can contain argument values) logs at DEBUG, and a guarded method's exception is not logged a second time.
+
+### Added
+- Distributed `#[Lockable]` locking: `PdoLockManager` (`dev\winterframework\pdbc\lock`) keeps leases in a database table on an isolated connection, so locks are visible across pods at once, even inside a transaction. `StoreLockManager` + the `LockStore` interface let any shared store back `#[Lockable]` (used by `RedisLockManager` in winter-data-redis and `DbalLockManager` in winter-doctrine).
+
 ## 2.1.5
 
 ### Added

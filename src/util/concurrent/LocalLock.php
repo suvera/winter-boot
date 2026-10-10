@@ -37,10 +37,11 @@ class LocalLock implements Lock {
             if ($locked) {
                 return true;
             }
-            usleep(1000);
-            if (System::currentTimeMillis() > $waitUntil) {
+            if (System::currentTimeMillis() >= $waitUntil) {
                 break;
             }
+            // Yields only this coroutine under Swoole instead of blocking the worker.
+            LockWait::sleepMs(5);
         }
         return false;
     }

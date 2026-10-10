@@ -344,12 +344,16 @@ class ParameterType {
         return null;
     }
 
+    /**
+     * @param string $valueKind kind of the value received (STRING, INTEGER, ...)
+     */
     private function throwTypeError(
-        string $type = ''
+        string $valueKind = ''
     ): void {
+        // The value itself is never included: it is request or config data.
         throw new TypeError(
-            'Parameter "' . $this->name
-                . '" cannot be assigned to "' . $type . '"'
+            'Cannot assign a value of type ' . strtolower($valueKind)
+                . ' to type "' . $this->name . '"'
         );
     }
 }
