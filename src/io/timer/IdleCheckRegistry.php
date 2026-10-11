@@ -25,8 +25,12 @@ class IdleCheckRegistry {
             self::logWarning('Timer functionality is not available, IdleCheckRegistry does not work!');
             return;
         }
-        $this->initialize();
-
+        // Registration never starts the timer: modules and datasources
+        // register during boot, in the master process, and a Swoole timer
+        // there creates the event loop, after which Swoole >= 6.2 refuses to
+        // start the HTTP server ("The event-loop has already been created").
+        // Each process starts its own timer through initialize(); callbacks
+        // added later are picked up on the next tick.
         $this->callbacks[] = $callback;
     }
 
