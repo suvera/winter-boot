@@ -271,7 +271,7 @@ class SqlMigrationService {
                     id BIGINT AUTO_INCREMENT PRIMARY KEY,
                     migration_path VARCHAR(512) NOT NULL UNIQUE,
                     executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    executed_by VARCHAR(100) DEFAULT USER()
+                    executed_by VARCHAR(100) DEFAULT (USER())
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
             case 'pgsql':
