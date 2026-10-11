@@ -5,6 +5,8 @@
 ## 2.1.8
 
 ### Fixed
+- Routes keep every path segment in order: a `{variable}` named like a literal segment (`staff/{staff}`), a repeated literal (`x/items/x`) or a method path repeating the class prefix no longer overwrites an earlier segment. A `{variable}` repeated in one path now fails at startup.
+- A class-level `#[RequestMapping(path: ['a', 'b'])]` prefixes each method path with every class path (`a/x` and `b/x`); it used to chain them into `b/a/x`. An empty class path maps the method path unprefixed.
 - Migrations (`DirectoryScanner::scanForSqlFiles()` / `scanForJsonFiles()`) run version folders in natural order: `1.9.0` before `1.10.0` (a plain string sort ran `1.10.0` first).
 
 ### Added
