@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- MySQL Docker image `suvera/winter-boot-mysql`: the runtime image with `pdo_mysql`, `mysqli` and the `mysql` client (for `useCli: true` migrations) in place of `pdo_pgsql`, `pgsql` and `psql`. `build/docker/build.sh` builds all images (`--db=pgsql|mysql` and `--hookall=0|1` narrow it).
+- `-hookall` Docker images (`suvera/winter-boot-hookall`, `suvera/winter-boot-mysql-hookall`) for apps running with `hook_flags: SWOOLE_HOOK_ALL`: Swoole is built with native cURL (`curl_multi` crashed the worker under the emulated hook) and, for PostgreSQL, the pgsql coroutine driver, so PDO-pgsql queries no longer block the worker.
+
 ## 2.1.7
 
 ### Added
