@@ -19,14 +19,14 @@ final class FakeSwooleHttpRequest extends \Swoole\Http\Request {
 
 class SwooleRequestTest extends \winterBootTests\Support\TestCase {
     /** @param array<string,mixed> $server */
-    private function swooleRequest(array $server, string $uri = '/x'): SwooleRequest {
+    private function swooleRequest(array $server, string $uri = '/x', array $files = []): SwooleRequest {
         $raw = new FakeSwooleHttpRequest();
         $raw->get = [];
         $raw->post = [];
         $raw->cookie = [];
         $raw->server = array_merge(['request_uri' => $uri], $server);
         $raw->header = [];
-        $raw->files = [];
+        $raw->files = $files;
         return new SwooleRequest($raw, new \Swoole\Http\Response());
     }
 
@@ -83,5 +83,26 @@ class SwooleRequestTest extends \winterBootTests\Support\TestCase {
         } finally {
             $_SERVER = $saved;
         }
+    }
+
+    public function testUploadLayoutsAreReadAsListsAndArrayFieldsRemembered(): void {
+        $file = fn (string $n) => ['name' => $n, 'type' => 'text/plain', 'tmp_name' => '/tmp/' . $n, 'error' => 0, 'size' => 2];
+        $req = $this->swooleRequest([], '/x', [
+            'photo' => $file('p.png'),
+            // Swoole: "docs[]" / "docs[0]" arrive as a list of per-file arrays
+            'docs' => [$file('a.pdf'), $file('b.pdf')],
+            'one' => [$file('c.pdf')],
+            // PHP's transposed $_FILES layout, nested one level ("scans[0][front]")
+            'scans' => ['name' => [['front' => 'f.jpg']], 'type' => [['front' => 'image/jpeg']], 'tmp_name' => [['front' => '/tmp/f']], 'error' => [['front' => 0]], 'size' => [['front' => 3]]],
+        ]);
+        $names = fn (string $field) => array_map(fn ($f) => $f->getName(), $req->getFiles()[$field]);
+        $this->assertSame(['p.png'], $names('photo'));
+        $this->assertSame(['a.pdf', 'b.pdf'], $names('docs'));
+        $this->assertSame(['c.pdf'], $names('one'));
+        $this->assertSame(['f.jpg'], $names('scans'));
+        $this->assertSame('/tmp/b.pdf', $req->getFiles()['docs'][1]->getFilePath());
+        $this->assertFalse($req->isFileList('photo'));
+        $this->assertTrue($req->isFileList('one'));
+        $this->assertTrue($req->isFileList('scans'));
     }
 }
