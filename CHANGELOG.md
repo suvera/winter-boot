@@ -10,6 +10,7 @@
 - Migrations (`DirectoryScanner::scanForSqlFiles()` / `scanForJsonFiles()`) run version folders in natural order: `1.9.0` before `1.10.0` (a plain string sort ran `1.10.0` first).
 
 ### Added
+- CORS (`winter.web.cors.*`, off unless `allowedOrigins` is set): the dispatcher answers a preflight `OPTIONS` request before routing and authentication (`204` with `Access-Control-Allow-*`, or `403` without CORS headers), and adds `Access-Control-Allow-Origin`, `Vary: Origin` and optional credentials/expose headers to responses for allowed origins. Origins match exactly, `null` never matches, and `*` with `allowCredentials` is refused. `#[CrossOrigin(origins, methods, headers, exposedHeaders, allowCredentials, maxAge)]` on a controller class or method overrides the global policy field by field (method over class over global); a preflight uses the policy of the route it asks about.
 - MySQL Docker image `suvera/winter-boot-mysql`: the runtime image with `pdo_mysql`, `mysqli` and the `mysql` client (for `useCli: true` migrations) in place of `pdo_pgsql`, `pgsql` and `psql`. `build/docker/build.sh` builds all images (`--db=pgsql|mysql` and `--hookall=0|1` narrow it).
 - `-hookall` Docker images (`suvera/winter-boot-hookall`, `suvera/winter-boot-mysql-hookall`) for apps running with `hook_flags: SWOOLE_HOOK_ALL`: Swoole is built with native cURL (`curl_multi` crashed the worker under the emulated hook) and, for PostgreSQL, the pgsql coroutine driver, so PDO-pgsql queries no longer block the worker.
 

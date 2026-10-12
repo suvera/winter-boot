@@ -10,6 +10,7 @@ use dev\winterframework\core\context\ApplicationContext;
 use dev\winterframework\core\context\ApplicationContextData;
 use dev\winterframework\core\System;
 use dev\winterframework\core\web\config\InterceptorRegistry;
+use dev\winterframework\core\web\cors\CorsPolicy;
 use dev\winterframework\core\web\error\DefaultErrorController;
 use dev\winterframework\core\web\error\ErrorController;
 use dev\winterframework\core\web\route\RequestMappingRegistry;
@@ -19,11 +20,13 @@ use dev\winterframework\exception\WinterException;
 use dev\winterframework\io\metrics\prometheus\PrometheusMetricRegistry;
 use dev\winterframework\reflection\ObjectCreator;
 use dev\winterframework\reflection\ref\RefMethod;
+use dev\winterframework\stereotype\web\CrossOrigin;
 use dev\winterframework\stereotype\web\RequestBody;
 use dev\winterframework\stereotype\web\RequestParam;
 use dev\winterframework\util\BeanFinderTrait;
 use dev\winterframework\util\JsonUtil;
 use dev\winterframework\util\log\Wlf4p;
+use dev\winterframework\web\http\HttpHeaders;
 use dev\winterframework\web\http\HttpRequest;
 use dev\winterframework\web\http\HttpStatus;
 use dev\winterframework\web\http\ResponseEntity;
@@ -48,6 +51,14 @@ class DispatcherServlet implements HttpRequestDispatcher {
     use BeanFinderTrait;
 
     protected ErrorController $errorController;
+    private ?CorsPolicy $corsPolicy = null;
+    /**
+     * Effective CORS policy per route id: a pure function of the route's
+     * attributes, bounded by the number of routes (not per-request state).
+     *
+     * @var array<string, CorsPolicy|false>
+     */
+    private array $routeCorsPolicies = [];
 
     /**
      * @param RequestMappingRegistry $mappingRegistry Resolves URIs to endpoint mappings.
@@ -72,6 +83,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 ErrorController::class,
                 DefaultErrorController::class
             );
+            $this->corsPolicy = CorsPolicy::fromProperties($this->ctxData->getPropertyContext());
         }
     }
 
@@ -146,7 +158,19 @@ class DispatcherServlet implements HttpRequestDispatcher {
 
         $uri = self::stripContextPath(trim($request->getUri(), '/'), $serverPath);
 
-        $matchedRoute = $this->mappingRegistry->find($uri, $request->getMethod());
+        try {
+            if ($this->answerPreflight($request, $response, $uri, $startTime)) {
+                return;
+            }
+            $matchedRoute = $this->mappingRegistry->find($uri, $request->getMethod());
+            // Up front so error responses carry the CORS headers too.
+            ($matchedRoute !== null ? $this->routeCorsPolicy($matchedRoute) : $this->corsPolicy)
+                ?->applyToResponse($request, $response);
+        } catch (Throwable $t) {
+            self::logException($t);
+            $this->handleError($request, $response, HttpStatus::$INTERNAL_SERVER_ERROR, $t, $startTime);
+            return;
+        }
 
         if ($matchedRoute === null) {
             // WB-2.1-04: $uri is attacker-controlled; never log/echo it raw.
@@ -184,6 +208,64 @@ class DispatcherServlet implements HttpRequestDispatcher {
             );
             return;
         }
+    }
+
+    /**
+     * CORS preflight (`winter.web.cors.*` and `#[CrossOrigin]`; off unless an
+     * origin is allowed). Answered here, before interceptors and
+     * authentication (browsers send it without credentials). The policy is the
+     * one of the route the preflight asks about
+     * (Access-Control-Request-Method on the same path), else the global one.
+     *
+     * @return bool True when the request was a preflight and is complete.
+     */
+    private function answerPreflight(
+        HttpRequest $request,
+        ResponseEntity $response,
+        string $uri,
+        ?float $startTime
+    ): bool {
+        if (!CorsPolicy::isPreflight($request)) {
+            return false;
+        }
+        $asked = $this->mappingRegistry->find(
+            $uri,
+            (string)$request->getFirstHeader(HttpHeaders::ACCESS_CONTROL_REQUEST_METHOD)
+        );
+        $policy = $asked !== null ? $this->routeCorsPolicy($asked) : $this->corsPolicy;
+        if ($policy === null) {
+            return false;
+        }
+
+        $policy->handlePreflight($request, $response);
+        /** @var ResponseRenderer $renderer */
+        $renderer = $this->appCtx->beanByClass(ResponseRenderer::class);
+        $renderer->render($response, $request);
+        $this->logRequestCompleted($request, $response, $startTime);
+        return true;
+    }
+
+    /**
+     * The global CORS policy with the route's `#[CrossOrigin]` attributes
+     * (class level, then method level) layered over it. Resolved once per route.
+     */
+    private function routeCorsPolicy(MatchedRequestMapping $route): ?CorsPolicy {
+        $mapping = $route->getMapping();
+        $id = $mapping->getId();
+        if (!isset($this->routeCorsPolicies[$id])) {
+            $owner = $mapping->getRefOwner();
+            $attributes = [];
+            if ($owner instanceof RefMethod) {
+                foreach ($owner->getDeclaringClass()->getAttributes(CrossOrigin::class) as $attr) {
+                    $attributes[] = $attr->newInstance();
+                }
+                foreach ($owner->getAttributes(CrossOrigin::class) as $attr) {
+                    $attributes[] = $attr->newInstance();
+                }
+            }
+            $this->routeCorsPolicies[$id] = CorsPolicy::resolve($this->corsPolicy, ...$attributes) ?? false;
+        }
+        return $this->routeCorsPolicies[$id] ?: null;
     }
 
     /**
@@ -253,6 +335,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
         /** @var PrometheusMetricRegistry $metrics */
         $metrics = $this->appCtx->beanByClass(PrometheusMetricRegistry::class);
         $interceptor = $this->ctxData->getInterceptorRegistry();
+        $cors = $this->routeCorsPolicy($route);
 
         $timer = $metrics->startTimer('http_request_duration');
         try {
@@ -262,6 +345,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 } catch (Throwable $e) {
                     self::logException($e);
                 }
+                $cors?->applyToResponse($request, $response);
                 $renderer->render($response, $request);
                 return;
             }
@@ -399,7 +483,7 @@ class DispatcherServlet implements HttpRequestDispatcher {
              */
             if ($controller instanceof ControllerInterceptor) {
                 if (!$controller->preHandle($request, $response, $method->getDelegate())) {
-                    $this->finishVetoed($interceptor, $renderer, $request, $response);
+                    $this->finishVetoed($interceptor, $renderer, $request, $response, $cors);
                     $this->logRequestCompleted($request, $response, $startTime);
                     return;
                 }
@@ -494,6 +578,9 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 $controller->postHandle($request, $response, $method->getDelegate());
             }
 
+            // A returned ResponseEntity was merged over the headers set at
+            // arrival (Vary in particular); the CORS headers are idempotent.
+            $cors?->applyToResponse($request, $response);
             $renderer->render($response, $request);
 
             try {
@@ -766,8 +853,10 @@ class DispatcherServlet implements HttpRequestDispatcher {
         InterceptorRegistry $registry,
         ResponseRenderer $renderer,
         HttpRequest $request,
-        ResponseEntity $response
+        ResponseEntity $response,
+        ?CorsPolicy $cors = null
     ): void {
+        $cors?->applyToResponse($request, $response);
         $renderer->render($response, $request);
         try {
             $this->afterCompletion($registry, $request, $response);
