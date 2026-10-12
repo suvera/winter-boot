@@ -15,6 +15,8 @@ class HttpRequest {
      * @var HttpUploadedFile[]
      */
     protected array $files;
+    /** @var array<string, true> upload fields sent as arrays */
+    protected array $fileLists = [];
     protected string $method;
     protected string $uri;
     protected string $body;
@@ -56,21 +58,78 @@ class HttpRequest {
         $this->files = $this->loadUploadedFiles($files);
     }
 
+    /**
+     * Uploads by field name, always as a list. Accepts the three layouts a
+     * field can arrive in: one file ("photo": name/tmp_name/error...), PHP's
+     * transposed $_FILES array ("docs[]": name => [...], error => [...]) and
+     * Swoole's list of per-file arrays ("docs[]": [{name, tmp_name...}, ...]).
+     * Deeper nesting ("docs[0][scan]") is flattened in order. Fields sent as
+     * arrays are remembered, see isFileList().
+     */
     protected function loadUploadedFiles(array $files): array {
         $uploaded = [];
+        $this->fileLists = [];
         foreach ($files as $name => $data) {
+            if (!is_array($data)) {
+                continue;
+            }
             $uploaded[$name] = [];
-            if (!is_array($data['error'])) {
-                $fileList = [$data];
-            } else {
-                $fileList = $data;
+            if (self::isUploadLeaf($data)) {
+                $uploaded[$name][] = HttpUploadedFile::fromArray($data);
+                continue;
             }
-
-            foreach ($fileList as $value) {
-                $uploaded[$name][] = HttpUploadedFile::fromArray($value);
-            }
+            $this->fileLists[$name] = true;
+            $leaves = isset($data['error']) && is_array($data['error']) ? self::transposeUploads($data) : $data;
+            self::collectUploads($leaves, $uploaded[$name]);
         }
         return $uploaded;
+    }
+
+    /** Whether the client sent this upload field as an array ("docs[]", "docs[0]"), even with one file. */
+    public function isFileList(string $name): bool {
+        return isset($this->fileLists[$name]);
+    }
+
+    private static function isUploadLeaf(array $data): bool {
+        return array_key_exists('error', $data) && !is_array($data['error']);
+    }
+
+    /** PHP's name => [...], error => [...] layout as a (nested) list of per-file arrays. */
+    private static function transposeUploads(array $data): array {
+        $out = [];
+        foreach ($data as $attr => $values) {
+            if (!is_array($values)) {
+                continue;
+            }
+            foreach ($values as $key => $value) {
+                if (is_array($value)) {
+                    $nested = [];
+                    foreach ($data as $a => $v) {
+                        if (is_array($v) && isset($v[$key])) {
+                            $nested[$a] = $v[$key];
+                        }
+                    }
+                    $out[$key] = self::transposeUploads($nested);
+                } else {
+                    $out[$key][$attr] = $value;
+                }
+            }
+        }
+        return $out;
+    }
+
+    /** @param HttpUploadedFile[] $into */
+    private static function collectUploads(array $data, array &$into): void {
+        foreach ($data as $value) {
+            if (!is_array($value)) {
+                continue;
+            }
+            if (self::isUploadLeaf($value)) {
+                $into[] = HttpUploadedFile::fromArray($value);
+            } else {
+                self::collectUploads($value, $into);
+            }
+        }
     }
 
     protected function loadHeaders(): void {

@@ -152,6 +152,15 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
     }
 
     /**
+     * No timer in the master: a Swoole timer creates the event loop, and
+     * Swoole >= 6.2 then refuses to start the server. Workers and the
+     * manager start their own timers (see the workerStart/managerStart
+     * callbacks).
+     */
+    protected function startIdleCheckTimer(): void {
+    }
+
+    /**
      * Runs #[OnWorkerStart] / #[OnWorkerStop] beans inside each HTTP and
      * task worker, after the framework's own worker setup. A failing start
      * hook fails the worker (Swoole restarts it); a failing stop hook is

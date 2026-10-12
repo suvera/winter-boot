@@ -91,15 +91,7 @@ class RequestMapping implements StereoType {
                 /** @var RequestMapping $parentMap */
                 $parentMap = $classReqMap[0]->newInstance();
                 if (!empty($parentMap->path)) {
-                    $classPaths = $this->getUniquePaths($parentMap->path);
-                    foreach ($classPaths as $classPath) {
-                        $classPath = trim($classPath, '/');
-                        if (!empty($classPath)) {
-                            foreach ($paths as $i => $path) {
-                                $paths[$i] = $classPath . '/' . ltrim($path, '/');
-                            }
-                        }
-                    }
+                    $paths = self::prefixClassPaths($this->getUniquePaths($parentMap->path), $paths);
                 }
             }
         }
@@ -107,6 +99,26 @@ class RequestMapping implements StereoType {
         foreach ($paths as $path) {
             $this->parsePath($path);
         }
+    }
+
+    /**
+     * Every class path prefixes every method path: class ['a', 'b'] with
+     * method 'x' maps 'a/x' and 'b/x' (it used to chain them into 'b/a/x').
+     * An empty class path maps the method path unprefixed.
+     *
+     * @param string[] $classPaths
+     * @param string[] $paths
+     * @return string[]
+     */
+    public static function prefixClassPaths(array $classPaths, array $paths): array {
+        $prefixed = [];
+        foreach ($classPaths as $classPath) {
+            $classPath = trim($classPath, '/');
+            foreach ($paths as $path) {
+                $prefixed[] = $classPath === '' ? $path : $classPath . '/' . ltrim($path, '/');
+            }
+        }
+        return array_values(array_unique($prefixed));
     }
 
     private function getUniquePaths(string|array $path): array {
@@ -211,15 +223,29 @@ class RequestMapping implements StereoType {
         $path = trim($path, '/');
         $parts = explode('/', $path);
 
+        // Parts stay in URI order as a list: keyed by text, a variable named
+        // like a literal segment ("staff/{staff}") or a repeated literal
+        // ("a/x/b/x") overwrote the earlier part and broke the route.
         /** @var UriPathPart[] $uriParts */
         $uriParts = [];
+        /** @var array<string, UriPathPart> $pathVariables name => part */
+        $pathVariables = [];
         foreach ($parts as $part) {
             $p = new UriPathPart($part);
-            $uriParts[$p->part] = $p;
+            $uriParts[] = $p;
+            if ($p->isPathVariable()) {
+                if (isset($pathVariables[$p->part])) {
+                    throw new InvalidSyntaxException(
+                        'URI Path ' . json_encode($path) . ' repeats the PathVariable ' . $p->part
+                        . ' at ' . ReflectionUtil::getFqName($this->refOwner)
+                    );
+                }
+                $pathVariables[$p->part] = $p;
+            }
         }
 
         if (!$this->isRestController) {
-            $this->parseMethodPath($uriParts, $this->refOwner);
+            $this->parseMethodPath($pathVariables, $this->refOwner);
         } else {
             $this->parseClassPath($uriParts, $this->refOwner);
         }
@@ -239,8 +265,8 @@ class RequestMapping implements StereoType {
         }
     }
 
-    private function parseMethodPath(array $uriParts, RefMethod $ref): void {
-        /** @var UriPathPart[] $uriParts */
+    /** @param array<string, UriPathPart> $pathVariables */
+    private function parseMethodPath(array $pathVariables, RefMethod $ref): void {
 
         if (!$ref->isPublic() || $ref->isStatic() || $ref->isAbstract()) {
             throw new InvalidSyntaxException(
@@ -260,12 +286,12 @@ class RequestMapping implements StereoType {
 
         $params = $ref->getParameters();
 
-        $this->parseMethodPathVariables($params, $uriParts, $ref);
+        $this->parseMethodPathVariables($params, $pathVariables, $ref);
         $this->parseMethodRequestParams($params, $ref);
     }
 
-    private function parseMethodPathVariables(array $params, array $uriParts, RefMethod $ref): void {
-        /** @var UriPathPart[] $uriParts */
+    /** @param array<string, UriPathPart> $pathVariables name => part */
+    private function parseMethodPathVariables(array $params, array $pathVariables, RefMethod $ref): void {
         /** @var ReflectionParameter[] $params */
 
         $pathVars = [];
@@ -297,7 +323,7 @@ class RequestMapping implements StereoType {
                 );
             }
 
-            if (!isset($uriParts[$attr->name])) {
+            if (!isset($pathVariables[$attr->name])) {
                 throw new InvalidSyntaxException(
                     'Argument "' . $param->getName() . '" is defined as PathVariable '
                     . ' but not found in the URI definition of the method ' . $ref->getName()
@@ -305,10 +331,10 @@ class RequestMapping implements StereoType {
             }
 
             $pathVars[$attr->name] = $attr;
-            $uriParts[$attr->name]->type = $attr->getVariableType();
+            $pathVariables[$attr->name]->type = $attr->getVariableType();
         }
 
-        foreach ($uriParts as $uriPart) {
+        foreach ($pathVariables as $uriPart) {
             if (!$uriPart->isPathVariable()) {
                 continue;
             }

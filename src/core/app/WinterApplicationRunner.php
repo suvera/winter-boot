@@ -511,6 +511,16 @@ abstract class WinterApplicationRunner {
             $bean->onApplicationReady();
         }
 
+        $this->startIdleCheckTimer();
+    }
+
+    /**
+     * Starts the idle-connection check timer in this process. Server
+     * applications override it: their worker and manager processes start
+     * the timer, and the master must not create a Swoole event loop before
+     * the server starts.
+     */
+    protected function startIdleCheckTimer(): void {
         /** @var IdleCheckRegistry $idleCheck */
         $idleCheck = $this->applicationContext->beanByClass(IdleCheckRegistry::class);
         $idleCheck->initialize();

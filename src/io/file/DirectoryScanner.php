@@ -29,6 +29,14 @@ class DirectoryScanner {
         return $files;
     }
 
+    /**
+     * Migration order: natural sort on the relative path, so version folders
+     * run as 1.9.0 before 1.10.0 (a plain sort() puts 1.10.0 first).
+     */
+    private static function sortNaturally(array &$files): void {
+        usort($files, fn(array $a, array $b): int => strnatcmp($a['relative'], $b['relative']));
+    }
+
     public static function scanForSqlFiles(string $baseDir): array {
         $files = [];
         $dir = new RecursiveDirectoryIterator($baseDir);
@@ -42,7 +50,7 @@ class DirectoryScanner {
                 'relative' => $relative
             ];
         }
-        sort($files);
+        self::sortNaturally($files);
         return $files;
     }
 
@@ -59,7 +67,7 @@ class DirectoryScanner {
                 'relative' => $relative
             ];
         }
-        sort($files);
+        self::sortNaturally($files);
         return $files;
     }
 
