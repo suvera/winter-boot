@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace dev\winterframework\mcp;
 
+use dev\winterframework\core\web\cors\CorsPolicy;
 use dev\winterframework\stereotype\RestController;
 use dev\winterframework\web\http\HttpRequest;
 use dev\winterframework\web\http\HttpStatus;
@@ -131,9 +132,9 @@ class McpController {
      * @param string[] $allowedOrigins
      */
     public static function isAllowedOrigin(string $origin, array $allowedOrigins): bool {
-        $origin = strtolower(rtrim(trim($origin), '/'));
+        $origin = CorsPolicy::normalizeOrigin($origin);
         foreach ($allowedOrigins as $allowed) {
-            if (is_string($allowed) && $origin === strtolower(rtrim(trim($allowed), '/'))) {
+            if (is_string($allowed) && $origin === CorsPolicy::normalizeOrigin($allowed)) {
                 return true;
             }
         }
