@@ -6,6 +6,7 @@ namespace dev\winterframework\util\log;
 
 use Cascade\Cascade;
 use Monolog\Handler\HandlerInterface;
+use Monolog\Level;
 use Monolog\Logger as MonoLogger;
 
 final class LoggerManager {
@@ -70,7 +71,7 @@ final class LoggerManager {
         LogWrapper::$LOG_CACHED_LEVELS = [];
 
         if (!LogWrapper::$LOG_LEVEL_NAMES) {
-            LogWrapper::$LOG_LEVEL_NAMES = LoggerManager::getLogger()->getLevels();
+            LogWrapper::$LOG_LEVEL_NAMES = array_combine(Level::NAMES, Level::VALUES);
         }
 
         foreach (LogWrapper::$LOG_LEVELS as $clsPath => $clsLevel) {

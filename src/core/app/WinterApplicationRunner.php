@@ -40,6 +40,7 @@ use dev\winterframework\util\log\WinterConsoleLogFormatter;
 use dev\winterframework\util\log\Wlf4p;
 use dev\winterframework\util\PropertyLoader;
 use Monolog\Handler\StreamHandler;
+use Monolog\Level;
 use Monolog\Logger;
 use Monolog\Processor\ProcessIdProcessor;
 
@@ -74,7 +75,7 @@ abstract class WinterApplicationRunner {
 
         // Initialize with a basic logger in case buildApplicationLogger doesn't run
         $this->console = new Logger('winter_console_logger');
-        $this->console->pushHandler(new StreamHandler('php://stdout', Logger::INFO));
+        $this->console->pushHandler(new StreamHandler('php://stdout', Level::Info));
     }
 
     /**

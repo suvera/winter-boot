@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 2.2.0
+
+### Changed
+- Monolog upgraded to 3.12.1 (from 2.3.5) through monolog-cascade; `psr/log` moves to 3.x and `vanilla/garden-cli` to 4.0. `logger.yml` files keep working unchanged, but custom Monolog processors, formatters and handlers now receive a `Monolog\LogRecord` object instead of an array.
+- `custom_level` names in `logger.yml` now resolve through `Monolog\Level`.
+
 ## 2.1.8
 
 ### Fixed
