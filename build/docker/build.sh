@@ -51,7 +51,8 @@ for HOOK_ALL in $HOOKS; do
     fi
 
     echo "Building $IMAGE:$VERSION and $IMAGE:latest ..."
-    docker build . -f ./build/docker/Dockerfile --build-arg DB="$DB" --build-arg HOOK_ALL="$HOOK_ALL" \
+    # --pull: always resolve php:8.5-cli-alpine from the registry, never a stale local copy
+    docker build --pull . -f ./build/docker/Dockerfile --build-arg DB="$DB" --build-arg HOOK_ALL="$HOOK_ALL" \
         -t "$IMAGE:$VERSION" -t "$IMAGE:latest"
     IMAGES+=("$IMAGE")
 done
