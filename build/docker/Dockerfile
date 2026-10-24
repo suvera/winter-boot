@@ -49,7 +49,7 @@ RUN set -eux; \
     pecl install rdkafka; \
     if [ -n "$swooleOpts" ]; then pecl install -D "$swooleOpts" swoole-6.2.2; else pecl install swoole-6.2.2; fi; \
     pecl install apcu; \
-    docker-php-ext-enable redis rdkafka swoole apcu; \
+    docker-php-ext-enable redis rdkafka swoole apcu bcmath dom zlib; \
     EXT_DIR="$(php-config --extension-dir)"; \
     echo "extension dir: $EXT_DIR"; \
     ls "$EXT_DIR"/*.so; \

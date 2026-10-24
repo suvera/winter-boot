@@ -77,3 +77,4 @@ examples/logs/MyApp.log
 logs/*.log
 
 
+/articles/
