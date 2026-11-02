@@ -44,12 +44,12 @@ RUN set -eux; \
         pax-utils \
         linux-headers \
         $dbDevPkgs libzip-dev curl-dev openssl-dev librdkafka-dev; \
-    docker-php-ext-install -j"$(nproc)" $dbExts pcntl curl zip; \
+    docker-php-ext-install -j"$(nproc)" $dbExts pcntl curl zip bcmath; \
     pecl install redis; \
     pecl install rdkafka; \
     if [ -n "$swooleOpts" ]; then pecl install -D "$swooleOpts" swoole-6.2.2; else pecl install swoole-6.2.2; fi; \
     pecl install apcu; \
-    docker-php-ext-enable redis rdkafka swoole apcu bcmath dom zlib; \
+    docker-php-ext-enable redis rdkafka swoole apcu; \
     EXT_DIR="$(php-config --extension-dir)"; \
     echo "extension dir: $EXT_DIR"; \
     ls "$EXT_DIR"/*.so; \
@@ -114,6 +114,9 @@ RUN set -eux; \
     php --ri pcntl > /dev/null; \
     php --ri curl > /dev/null; \
     php --ri zip > /dev/null; \
+    php --ri bcmath > /dev/null; \
+    php --ri dom > /dev/null; \
+    php --ri zlib > /dev/null; \
     php --ri redis > /dev/null; \
     php --ri rdkafka > /dev/null; \
     php --ri swoole > /dev/null; \
