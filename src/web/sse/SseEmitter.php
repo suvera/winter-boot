@@ -2,7 +2,11 @@
 
 declare(strict_types=1);
 
-namespace dev\winterframework\web\http;
+namespace dev\winterframework\web\sse;
+
+use dev\winterframework\util\concurrent\CancellationToken;
+use dev\winterframework\web\http\ResponseWriter;
+use dev\winterframework\web\http\StreamingResponseEntity;
 
 use InvalidArgumentException;
 use JsonException;
@@ -50,6 +54,25 @@ final class SseEmitter {
             $out .= 'id: ' . self::field($id, 'event id') . "\n";
         }
         return $this->writer->write($out . self::dataLines($data) . "\n");
+    }
+
+    /**
+     * Sends a parsed or prepared {@see SseEvent} as is (for example one
+     * received from an upstream service with SseParser): its event name
+     * (omitted when "message"), id, retry and data.
+     */
+    public function send(SseEvent $event): bool {
+        $out = '';
+        if ($event->event !== '' && $event->event !== 'message') {
+            $out .= 'event: ' . self::field($event->event, 'event name') . "\n";
+        }
+        if ($event->id !== null) {
+            $out .= 'id: ' . self::field($event->id, 'event id') . "\n";
+        }
+        if ($event->retry !== null) {
+            $out .= 'retry: ' . max(0, $event->retry) . "\n";
+        }
+        return $this->writer->write($out . self::dataLines($event->data) . "\n");
     }
 
     /** An unnamed event (a browser EventSource delivers it to onmessage). */
@@ -105,6 +128,11 @@ final class SseEmitter {
 
     public function isConnected(): bool {
         return $this->writer->isConnected();
+    }
+
+    /** Cancelled once the client disconnects: see {@see ResponseWriter::getCancellationToken()}. */
+    public function getCancellationToken(): CancellationToken {
+        return $this->writer->getCancellationToken();
     }
 
     public function getWriter(): ResponseWriter {

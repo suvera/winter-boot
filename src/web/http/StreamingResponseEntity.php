@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace dev\winterframework\web\http;
 
 use dev\winterframework\web\MediaType;
+use dev\winterframework\web\sse\SseEmitter;
 
 /**
  * A response whose body is written in chunks as it is produced, returned

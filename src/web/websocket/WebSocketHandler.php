@@ -12,7 +12,7 @@ use dev\winterframework\web\http\HttpRequest;
  *
  * Every call runs in its own coroutine with the connection's context
  * restored (the handshake request is the current request, and each
- * {@see WebSocketContextHook} has run restore()). Messages of one
+ * {@see \dev\winterframework\core\web\RequestContextPropagator} has run restore()). Messages of one
  * connection can therefore run concurrently: a long onMessage() (an AI
  * answer) does not hold back the next message (a "stop"). See
  * {@see WebSocketSession::beginWork()} for cancelling running work.

@@ -31,6 +31,8 @@ class EchoSocket implements WebSocketHandler, WebSocketErrorHandler {
     private WebSocketSessions $sessions;
 
     public function onOpen(WebSocketSession $session, HttpRequest $handshake): void {
+        // Application data the tests find sessions by.
+        $session->setAttribute('user', FixtureContext::user());
         if ($handshake->getQueryParam('reject') === '1') {
             $session->close(4003, 'rejected in onOpen');
             return;
@@ -39,7 +41,13 @@ class EchoSocket implements WebSocketHandler, WebSocketErrorHandler {
             // Messages sent meanwhile must wait for onOpen to finish.
             Coroutine::sleep(0.3);
         }
-        $session->send(['type' => 'hello', 'user' => FixtureContext::user(), 'path' => $session->getPath(), 'pid' => getmypid()]);
+        $session->send([
+            'type' => 'hello',
+            'user' => FixtureContext::user(),
+            'path' => $session->getPath(),
+            'pid' => getmypid(),
+            'id' => $session->getId(),
+        ]);
     }
 
     public function onMessage(WebSocketSession $session, WebSocketMessage $message): void {

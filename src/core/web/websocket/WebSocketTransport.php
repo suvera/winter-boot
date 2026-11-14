@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
-namespace dev\winterframework\web\websocket;
+namespace dev\winterframework\core\web\websocket;
 
 /**
  * Frame-level access to the server's connections, used by
- * {@see WebSocketSession}. The Swoole implementation wraps
- * Swoole\WebSocket\Server; tests substitute a recording one.
+ * {@see DefaultWebSocketSession}. The Swoole implementation wraps
+ * Swoole\WebSocket\Server.
+ *
+ * @internal
  */
 interface WebSocketTransport {
 

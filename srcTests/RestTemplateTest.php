@@ -300,7 +300,7 @@ final class RestTemplateTest extends TestCase {
         mkdir($tmp, 0777, true);
         file_put_contents(
             $tmp . '/application.yml',
-            "winter:\n    rest:\n        timeout: 3.5\n        connect-timeout: 1.25\n"
+            "winter:\n    rest:\n        timeout: 3.5\n        connect-timeout: 1.25\n        stream-idle-timeout: 45\n"
         );
         try {
             $ctxData = new ApplicationContextData();
@@ -348,6 +348,7 @@ final class RestTemplateTest extends TestCase {
             $bean = $provider->beanByClass(RestTemplate::class);
             $this->assertTrue($bean instanceof RestTemplate);
             $this->assertSame(3.5, $bean->getTimeout());
+            $this->assertSame(45.0, $bean->getStreamIdleTimeout());
             $this->assertSame(1.25, $bean->getConnectTimeout());
 
             // A user-defined RestTemplate bean is never clobbered by the default.

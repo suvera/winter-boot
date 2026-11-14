@@ -12,8 +12,12 @@ use dev\winterframework\web\client\RestClientException;
 use dev\winterframework\web\client\RestClientTimeoutException;
 use dev\winterframework\web\client\RestClientTransport;
 use dev\winterframework\web\client\RestTemplate;
-use dev\winterframework\web\client\sse\SseEvent;
-use dev\winterframework\web\client\sse\SseParser;
+use dev\winterframework\util\concurrent\CancellationToken;
+use dev\winterframework\web\client\StreamDecoder;
+use dev\winterframework\web\client\StreamRequest;
+use dev\winterframework\web\client\StreamDecodeException;
+use dev\winterframework\web\sse\SseEvent;
+use dev\winterframework\web\sse\SseParser;
 use dev\winterframework\web\client\stream\HttpResponseStreamParser;
 use dev\winterframework\web\client\stream\HttpStreamClient;
 use dev\winterframework\web\client\stream\StreamSocket;
@@ -38,17 +42,15 @@ final class FakeStreamingRestClientTransport implements RestClientTransport, Str
         throw new \LogicException('request() must not be used for streaming');
     }
 
-    public function stream(
-        string $method,
-        string $url,
-        array $headers,
-        ?string $body,
-        float $idleTimeout,
-        float $connectTimeout,
-        callable $onResponse,
-        callable $onChunk
-    ): void {
-        $this->calls[] = compact('method', 'url', 'headers', 'body', 'idleTimeout', 'connectTimeout');
+    public function stream(StreamRequest $request, callable $onResponse, callable $onChunk): void {
+        $this->calls[] = [
+            'method' => $request->method,
+            'url' => $request->url,
+            'headers' => $request->headers,
+            'body' => $request->body,
+            'idleTimeout' => $request->idleTimeout,
+            'connectTimeout' => $request->connectTimeout,
+        ];
         $next = array_shift($this->queued);
         $onResponse($next['status'], $next['headers']);
         $this->delivered = 0;
@@ -98,7 +100,15 @@ final class ScriptedStreamSocket implements StreamSocket {
         $this->log[] = 'send ' . strtok($data, "\r\n");
     }
 
+    /** Called before every read with the read count (e.g. to cancel mid-stream). */
+    public ?\Closure $onRecv = null;
+    public int $recvCalls = 0;
+
     public function recv(float $timeout): ?string {
+        $this->recvCalls++;
+        if ($this->onRecv !== null) {
+            ($this->onRecv)($this->recvCalls);
+        }
         if ($this->reads === []) {
             return '';
         }
@@ -125,7 +135,7 @@ final class RestTemplateStreamTest extends TestCase {
         $res = (new RestTemplate($t))->exchangeStream('post', 'https://ai.example/v1/{m}', new HttpEntity(['q' => 1]),
             function (string $chunk) use (&$got) {
                 $got[] = $chunk;
-            }, ['m' => 'chat']);
+            }, uriVars: ['m' => 'chat']);
         $this->assertSame(['a', 'b', 'c'], $got);
         $this->assertSame(200, $res->getStatus()->getValue());
         $this->assertFalse($res->isAborted());
@@ -149,13 +159,18 @@ final class RestTemplateStreamTest extends TestCase {
         $this->assertTrue($res->isAborted());
     }
 
-    public function testReadTimeoutIsPassedAsIdleTimeout(): void {
+    public function testStreamIdleTimeoutIsSeparateFromTheTotalTimeout(): void {
         $t = new FakeStreamingRestClientTransport();
+        $t->queue(200, []);
         $t->queue(200, []);
         $rest = new RestTemplate($t, 7.5, 2.5);
         $rest->exchangeStream('GET', 'http://h/s', null, fn() => true);
-        $this->assertSame(7.5, $t->calls[0]['idleTimeout']);
+        $this->assertSame(RestTemplate::DEFAULT_STREAM_IDLE_TIMEOUT, $t->calls[0]['idleTimeout'], 'not the 7.5 s total timeout');
         $this->assertSame(2.5, $t->calls[0]['connectTimeout']);
+        $rest->setStreamIdleTimeout(90.0);
+        $rest->exchangeStream('GET', 'http://h/s', null, fn() => true);
+        $this->assertSame(90.0, $t->calls[1]['idleTimeout']);
+        $this->assertSame(90.0, $rest->getStreamIdleTimeout());
     }
 
     public function testClientErrorThrowsWithBodyAndNeverCallsOnChunk(): void {
@@ -223,9 +238,9 @@ final class RestTemplateStreamTest extends TestCase {
         $t->queue(200, ["data: {\"t\":\"Hel", "lo\"}\n\nevent: progress\ndata: 50\n", "\ndata: [DONE]\n\ndata: late\n\n"]);
         $events = [];
         (new RestTemplate($t))->exchangeStream('POST', 'http://h/s', null,
-            RestTemplate::sse(function (SseEvent $e) use (&$events) {
+            function (SseEvent $e) use (&$events) {
                 $events[] = $e->event . '=' . $e->data;
-            }));
+            }, decoder: StreamDecoder::sse());
         $this->assertSame(['message={"t":"Hello"}', 'progress=50'], $events);
     }
 
@@ -234,9 +249,9 @@ final class RestTemplateStreamTest extends TestCase {
         $t->queue(200, ["data: 1\n\n", "data: 2\n\n", "data: 3\n\n"]);
         $seen = 0;
         $res = (new RestTemplate($t))->exchangeStream('GET', 'http://h/s', null,
-            RestTemplate::sse(function () use (&$seen) {
+            function () use (&$seen) {
                 return ++$seen < 2;
-            }));
+            }, decoder: StreamDecoder::sse());
         $this->assertSame(2, $seen);
         $this->assertTrue($res->isAborted());
     }
@@ -245,9 +260,9 @@ final class RestTemplateStreamTest extends TestCase {
         $tr = new DefaultRestClientTransport();
         $noop = fn() => true;
         $this->assertThrows(RestClientException::class,
-            fn() => $tr->stream('GET', 'file:///etc/passwd', [], null, 1, 1, fn() => null, $noop));
+            fn() => $tr->stream(new StreamRequest('GET', 'file:///etc/passwd', [], null, 1, 1), fn() => null, $noop));
         $this->assertThrows(RestClientException::class,
-            fn() => $tr->stream('GET', 'http://h/', ['X' => "a\r\nB: c"], null, 1, 1, fn() => null, $noop));
+            fn() => $tr->stream(new StreamRequest('GET', 'http://h/', ['X' => "a\r\nB: c"], null, 1, 1), fn() => null, $noop));
     }
 
     // ---- HttpStreamClient over a scripted socket ------------------------
@@ -484,7 +499,7 @@ final class RestTemplateStreamTest extends TestCase {
         $this->assertSame('Hi', $e->json()['choices'][0]['delta']['content']);
         $this->assertFalse($e->isDone());
         $this->assertTrue((new SseEvent('message', '[DONE]'))->isDone());
-        $this->assertThrows(RestClientException::class, fn() => (new SseEvent('message', '{bad'))->json());
+        $this->assertThrows(\JsonException::class, fn() => (new SseEvent('message', '{bad'))->json());
     }
 
     public function testSseIncompleteEventOnlyOnRequest(): void {
@@ -497,7 +512,7 @@ final class RestTemplateStreamTest extends TestCase {
 
     public function testSsePendingDataIsCapped(): void {
         $p = new SseParser(64);
-        $this->assertThrows(RestClientException::class, fn() => $p->feed(str_repeat('a', 100)));
+        $this->assertThrows(\dev\winterframework\web\sse\SseException::class, fn() => $p->feed(str_repeat('a', 100)));
     }
 
     public function testRequestLineCannotBeSplit(): void {
@@ -510,5 +525,122 @@ final class RestTemplateStreamTest extends TestCase {
         $this->assertThrows(RestClientException::class, fn() => \dev\winterframework\web\client\stream\HttpStreamClient::buildRequest(
             'GET', ['path' => '/a b'], 'api.example.com', 80, false, [], null
         ));
+    }
+
+    // ---- 2.3.0 design: decoders, cancellation, result ------------------
+
+    public function testNdjsonDecoderJoinsLinesSplitAcrossChunks(): void {
+        $t = new FakeStreamingRestClientTransport();
+        $t->queue(200, ["{\"m\":\"He", "llo\"}\r\n\n{\"m\":", "\"wor\"}\n{\"done\":true}"]);
+        $lines = [];
+        $res = (new RestTemplate($t))->exchangeStream('POST', 'http://h/api/generate', null,
+            function (array $line) use (&$lines) {
+                $lines[] = $line;
+            }, decoder: StreamDecoder::ndjson());
+        $this->assertSame([['m' => 'Hello'], ['m' => 'wor'], ['done' => true]], $lines, 'last line without newline delivered at the end');
+        $this->assertTrue($res->isCompleted());
+        $this->assertSame(3, $res->getItemsDelivered());
+    }
+
+    public function testDecodeFailureIsAStreamDecodeExceptionWithoutBodyContent(): void {
+        $t = new FakeStreamingRestClientTransport();
+        $t->queue(200, ["{\"secret\":\"tok-123\"\n"]);
+        try {
+            (new RestTemplate($t))->exchangeStream('GET', 'http://h/s?key=K', null, fn() => true, decoder: StreamDecoder::ndjson());
+            throw new \RuntimeException('expected StreamDecodeException');
+        } catch (StreamDecodeException $e) {
+            $this->assertFalse(str_contains($e->getMessage(), 'tok-123'), 'no body content');
+            $this->assertFalse(str_contains($e->getMessage(), 'key=K'), 'no query');
+            $this->assertTrue($e->getPrevious() instanceof \JsonException);
+        }
+        $t->queue(200, [str_repeat('x', 40)]);
+        $this->assertThrows(StreamDecodeException::class, fn() => (new RestTemplate($t))
+            ->exchangeStream('GET', 'http://h/s', null, fn() => true, decoder: StreamDecoder::ndjson(16)));
+    }
+
+    public function testCallbackExceptionsPropagateUnwrapped(): void {
+        $t = new FakeStreamingRestClientTransport();
+        $t->queue(200, ["data: 1\n\n"]);
+        $this->assertThrows(\DomainException::class, fn() => (new RestTemplate($t))->exchangeStream('GET', 'http://h/s', null,
+            function () {
+                throw new \DomainException('app failure');
+            }, decoder: StreamDecoder::sse()));
+    }
+
+    public function testSseDecoderCompletesAtDoneAndKeepsLastEventId(): void {
+        $t = new FakeStreamingRestClientTransport();
+        $t->queue(200, ["id: 7\ndata: a\n\n", "id: 8\ndata: [DONE]\n\n", "data: never-read\n\n"]);
+        $sse = StreamDecoder::sse();
+        $seen = [];
+        $res = (new RestTemplate($t))->exchangeStream('GET', 'http://h/s', null,
+            function (SseEvent $e) use (&$seen) {
+                $seen[] = $e->data;
+            }, decoder: $sse);
+        $this->assertSame(['a'], $seen);
+        $this->assertTrue($res->isCompleted());
+        $this->assertFalse($res->isAborted());
+        $this->assertSame(2, $t->delivered, 'reading stopped at [DONE]');
+        $this->assertSame('8', $sse->getLastEventId());
+    }
+
+    public function testCancelBeforeTheCallMakesNoRequest(): void {
+        $t = new FakeStreamingRestClientTransport();
+        $token = new CancellationToken();
+        $token->cancel();
+        $res = (new RestTemplate($t))->exchangeStream('GET', 'http://h/s', null, fn() => true, cancel: $token);
+        $this->assertTrue($res->isCancelled());
+        $this->assertSame([], $t->calls, 'no request sent');
+    }
+
+    public function testCancelDuringTheStreamStopsItWithoutError(): void {
+        $t = new FakeStreamingRestClientTransport();
+        $t->queue(200, ['a', 'b', 'c', 'd']);
+        $token = new CancellationToken();
+        $got = [];
+        $res = (new RestTemplate($t))->exchangeStream('GET', 'http://h/s', null,
+            function (string $c) use (&$got, $token) {
+                $got[] = $c;
+                if ($c === 'b') {
+                    $token->cancel('stop');
+                }
+            }, cancel: $token);
+        $this->assertSame(['a', 'b'], $got);
+        $this->assertTrue($res->isCancelled());
+        $this->assertFalse($res->isAborted());
+        $this->assertFalse($res->isCompleted());
+    }
+
+    public function testStreamClientStopsPromptlyWhileTheServerIsSilent(): void {
+        // Headers and one chunk, then silence (each null is an empty wait slice).
+        $socket = new ScriptedStreamSocket(array_merge(
+            ["HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nhi\r\n"],
+            array_fill(0, 50, null)
+        ));
+        $token = new CancellationToken();
+        $socket->onRecv = function (int $n) use ($token): void {
+            if ($n === 4) {
+                $token->cancel();
+            }
+        };
+        $chunks = [];
+        $client = new HttpStreamClient($socket, true, null, null);
+        $client->execute('GET', 'http://h/s', parse_url('http://h/s'), [], null, 30.0, 1.0,
+            fn() => null, function (string $c) use (&$chunks) {
+                $chunks[] = $c;
+                return true;
+            }, $token);
+        $this->assertSame(['hi'], $chunks);
+        $this->assertSame(4, $socket->recvCalls, 'stopped at the first check after cancel(), long before the 30 s idle timeout');
+        $this->assertTrue($socket->closed);
+    }
+
+    public function testWholeBodyTransportGoesThroughTheDecoder(): void {
+        $lines = [];
+        $res = (new RestTemplate(new FakeWholeBodyTransport(200, "{\"a\":1}\n{\"a\":2}\n")))
+            ->exchangeStream('GET', 'http://h/s', null, function (array $l) use (&$lines) {
+                $lines[] = $l['a'];
+            }, decoder: StreamDecoder::ndjson());
+        $this->assertSame([1, 2], $lines);
+        $this->assertTrue($res->isCompleted());
     }
 }

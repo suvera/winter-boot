@@ -41,6 +41,7 @@ class FixtureAuthInterceptor implements HandlerInterceptor {
 
     public function postHandle(HttpRequest $request, ResponseEntity $response): void {
         self::count('post', $request);
+        $response->withHeader('X-Fixture-Post', 'ok');
     }
 
     public function afterCompletion(HttpRequest $request, ResponseEntity $response, ?Throwable $ex = null): void {

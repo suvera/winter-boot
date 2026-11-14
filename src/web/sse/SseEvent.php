@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-namespace dev\winterframework\web\client\sse;
+namespace dev\winterframework\web\sse;
 
-use dev\winterframework\web\client\RestClientException;
 
 /**
  * One server-sent event, as dispatched by {@see SseParser}.
@@ -36,13 +35,9 @@ final class SseEvent {
     /**
      * Decodes the data as JSON (associative arrays).
      *
-     * @throws RestClientException when the data is not valid JSON
+     * @throws \JsonException when the data is not valid JSON
      */
     public function json(): mixed {
-        try {
-            return json_decode($this->data, true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException $e) {
-            throw new RestClientException('SSE event data is not valid JSON', 0, $e);
-        }
+        return json_decode($this->data, true, 512, JSON_THROW_ON_ERROR);
     }
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace dev\winterframework\web\http;
 
+use dev\winterframework\util\concurrent\CancellationToken;
+
 /**
  * Writes the body of a streamed response chunk by chunk (see
  * {@see StreamingResponseEntity}). The status and headers go out with the
@@ -37,4 +39,13 @@ interface ResponseWriter {
     public function isCommitted(): bool;
 
     public function getBytesWritten(): int;
+
+    /**
+     * Cancelled as soon as the client disconnects (or the stream ended).
+     * Pass it on to work that should stop with the client, e.g. the
+     * upstream call of a relay: `$rest->exchangeStream(..., cancel: $out->getCancellationToken())`
+     * stops within about 100 ms of the client leaving, even while the
+     * upstream is silent.
+     */
+    public function getCancellationToken(): CancellationToken;
 }

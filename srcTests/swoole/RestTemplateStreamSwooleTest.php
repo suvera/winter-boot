@@ -9,7 +9,9 @@ use dev\winterframework\web\client\HttpClientErrorException;
 use dev\winterframework\web\client\RestClientException;
 use dev\winterframework\web\client\RestClientTimeoutException;
 use dev\winterframework\web\client\RestTemplate;
-use dev\winterframework\web\client\sse\SseEvent;
+use dev\winterframework\util\concurrent\CancellationToken;
+use dev\winterframework\web\client\StreamDecoder;
+use dev\winterframework\web\sse\SseEvent;
 use dev\winterframework\web\client\stream\CoroutineStreamSocket;
 use dev\winterframework\web\client\stream\HttpStreamClient;
 use dev\winterframework\web\client\stream\PhpStreamSocket;
@@ -44,10 +46,10 @@ class RestTemplateStreamSwooleTest {
                 $data = [];
                 $start = microtime(true);
                 $res = (new RestTemplate(null, 5.0))->exchangeStream('GET', $this->url('/sse?k=1'), null,
-                    RestTemplate::sse(function (SseEvent $e) use (&$times, &$data, $start): void {
+                    function (SseEvent $e) use (&$times, &$data, $start): void {
                         $times[] = microtime(true) - $start;
                         $data[] = $e->data;
-                    }));
+                    }, decoder: StreamDecoder::sse());
                 $this->check($res->getStatus()->getValue() === 200, "$engine: status");
                 $this->check($data === ['0', '1', '2', '3', '4'], "$engine: events " . json_encode($data));
                 $this->check($times[0] < 0.4, "$engine: first event late ({$times[0]})");
@@ -60,6 +62,7 @@ class RestTemplateStreamSwooleTest {
         $this->withServer(function (): void {
             $this->onBothEngines(function (string $engine): void {
                 $rest = new RestTemplate(null, 0.5);
+                $rest->setStreamIdleTimeout(0.5);
                 // 10 chunks 0.15 s apart: 1.5 s total, never idle for 0.5 s.
                 $n = 0;
                 $rest->exchangeStream('GET', $this->url('/steady'), null, function () use (&$n): void {
@@ -81,6 +84,44 @@ class RestTemplateStreamSwooleTest {
                 $this->check($got === ['first'], "$engine: chunk before the gap");
                 $this->check($elapsed < 1.2, "$engine: timeout took $elapsed s");
             });
+        });
+    }
+
+    /**
+     * The "stop" button while the model is thinking: the server is silent,
+     * another coroutine cancels, and the call returns at once instead of
+     * waiting for the next byte or the idle timeout.
+     */
+    public function testCancelStopsASilentStreamPromptly(): void {
+        $this->withServer(function (): void {
+            Coroutine::set(['hook_flags' => 0]);
+            $error = null;
+            run(function () use (&$error): void {
+                try {
+                    $token = new CancellationToken();
+                    Coroutine::create(function () use ($token): void {
+                        Coroutine::sleep(0.3);
+                        $token->cancel('stop');
+                    });
+                    $got = [];
+                    $start = microtime(true);
+                    $rest = new RestTemplate(null, 10.0);
+                    $rest->setStreamIdleTimeout(10.0);
+                    $res = $rest->exchangeStream('GET', $this->url('/gap'), null,
+                        function (string $c) use (&$got): void {
+                            $got[] = $c;
+                        }, cancel: $token);
+                    $elapsed = microtime(true) - $start;
+                    $this->check($got === ['first'], 'chunk before the silence: ' . json_encode($got));
+                    $this->check($res->isCancelled() && !$res->isCompleted(), 'reported as cancelled');
+                    $this->check($elapsed < 0.7, "returned promptly after cancel(): {$elapsed}s");
+                } catch (\Throwable $e) {
+                    $error = $e;
+                }
+            });
+            if ($error !== null) {
+                throw $error;
+            }
         });
     }
 
@@ -148,18 +189,18 @@ class RestTemplateStreamSwooleTest {
                 $direct = new RestTemplate(new DefaultRestClientTransport(true, null, $ca), 5.0);
                 $data = [];
                 $direct->exchangeStream('GET', 'https://localhost:' . ($this->port + 1) . '/sse', null,
-                    RestTemplate::sse(function (SseEvent $e) use (&$data): void {
+                    function (SseEvent $e) use (&$data): void {
                         $data[] = $e->data;
-                    }));
+                    }, decoder: StreamDecoder::sse());
                 $this->check(count($data) === 5, "$engine: tls direct got " . count($data));
 
                 @unlink($this->dir . '/proxy.log');
                 $proxied = new RestTemplate(new DefaultRestClientTransport(true, 'http://u:p%40ss@127.0.0.1:' . ($this->port + 4), $ca), 5.0);
                 $data = [];
                 $proxied->exchangeStream('GET', 'https://localhost:' . ($this->port + 1) . '/sse', null,
-                    RestTemplate::sse(function (SseEvent $e) use (&$data): void {
+                    function (SseEvent $e) use (&$data): void {
                         $data[] = $e->data;
-                    }));
+                    }, decoder: StreamDecoder::sse());
                 $this->check(count($data) === 5, "$engine: tls via proxy got " . count($data));
                 $body = '';
                 $proxied->exchangeStream('POST', $this->url('/echo'), null, function (string $c) use (&$body): void {

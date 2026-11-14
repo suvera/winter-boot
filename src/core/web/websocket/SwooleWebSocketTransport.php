@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace dev\winterframework\core\web\websocket;
 
-use dev\winterframework\web\websocket\WebSocketTransport;
 use Swoole\WebSocket\Server;
 
 /**

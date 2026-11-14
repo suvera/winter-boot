@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace dev\winterframework\web\client\stream;
 
+use dev\winterframework\util\concurrent\CancellationToken;
 use dev\winterframework\web\client\RestClientException;
 use dev\winterframework\web\client\RestClientTimeoutException;
 use dev\winterframework\web\client\RestTemplate;
@@ -22,6 +23,8 @@ use dev\winterframework\web\client\RestTemplate;
  */
 final class HttpStreamClient {
     private const PROXY_HEAD_MAX = 16384;
+    /** How often a cancellation token is checked while waiting for data. */
+    private const CANCEL_CHECK_SECONDS = 0.1;
 
     /**
      * @param string|null $proxy `http://[user:pass@]host:port`; null for a direct connection
@@ -63,9 +66,13 @@ final class HttpStreamClient {
         float $idleTimeout,
         float $connectTimeout,
         callable $onResponse,
-        callable $onChunk
+        callable $onChunk,
+        ?CancellationToken $cancel = null
     ): void {
         $method = strtoupper($method);
+        if ($cancel?->isCancelled()) {
+            return;
+        }
         $https = strtolower((string)$parts['scheme']) === 'https';
         $host = (string)$parts['host'];
         $connectHost = trim($host, '[]');
@@ -97,18 +104,33 @@ final class HttpStreamClient {
                 throw new $class($e->getMessage() . ' for ' . $safeUrl, 0, $e);
             }
 
+            if ($cancel?->isCancelled()) {
+                return;
+            }
             $this->socket->send(self::buildRequest(
                 $method, $parts, $host, $port, $https, $headers, $body,
                 $absoluteForm ? $proxy : null
             ));
 
+            // With a cancellation token, wait in short slices so cancel()
+            // stops the call promptly even while the server sends nothing.
+            $slice = $cancel !== null ? min($idle, self::CANCEL_CHECK_SECONDS) : $idle;
+            $lastData = microtime(true);
             while (true) {
-                $data = $this->socket->recv($idle);
+                if ($cancel?->isCancelled()) {
+                    return;
+                }
+                $data = $this->socket->recv($slice);
                 if ($data === null) {
+                    // A slice ended (only with a token): keep waiting until the idle time is used up.
+                    if ($cancel !== null && microtime(true) - $lastData < $idle) {
+                        continue;
+                    }
                     throw new RestClientTimeoutException(
                         'Read timed out after ' . $idle . 's without data for ' . $safeUrl
                     );
                 }
+                $lastData = microtime(true);
                 if ($data === '') {
                     $parser->finish();
                     return;

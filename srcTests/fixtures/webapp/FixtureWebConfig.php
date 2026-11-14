@@ -15,7 +15,7 @@ class FixtureWebConfig implements WebMvcConfigurer {
     public function addInterceptors(InterceptorRegistry $registry): void {
         $registry->addInterceptor(new FixtureAuthInterceptor(), '^\/secure', '^\/stream', '^\/ws\/secure');
         if (class_exists(FixtureSocketContext::class)) {
-            $registry->addWebSocketContextHook(new FixtureSocketContext());
+            $registry->addContextPropagator(new FixtureSocketContext());
         }
     }
 }

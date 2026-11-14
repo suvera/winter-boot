@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace dev\winterframework\web\websocket;
+namespace dev\winterframework\util\concurrent;
 
 use RuntimeException;
 

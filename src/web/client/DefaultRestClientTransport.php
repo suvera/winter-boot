@@ -65,24 +65,26 @@ class DefaultRestClientTransport implements RestClientTransport, StreamingRestCl
         return $this->requestViaStream($method, $url, $headers, $body, $timeout, $connectTimeout);
     }
 
-    public function stream(
-        string $method,
-        string $url,
-        array $headers,
-        ?string $body,
-        float $idleTimeout,
-        float $connectTimeout,
-        callable $onResponse,
-        callable $onChunk
-    ): void {
-        $parts = self::validate($url, $headers);
+    public function stream(StreamRequest $request, callable $onResponse, callable $onChunk): void {
+        $parts = self::validate($request->url, $request->headers);
         $client = new HttpStreamClient(
             HttpStreamClient::defaultSocket(),
             $this->sslVerification,
             $this->caFile,
             is_string($this->proxy) && $this->proxy !== '' ? $this->proxy : null
         );
-        $client->execute($method, $url, $parts, $headers, $body, $idleTimeout, $connectTimeout, $onResponse, $onChunk);
+        $client->execute(
+            $request->method,
+            $request->url,
+            $parts,
+            $request->headers,
+            $request->body,
+            $request->idleTimeout,
+            $request->connectTimeout,
+            $onResponse,
+            $onChunk,
+            $request->cancel
+        );
     }
 
     /**

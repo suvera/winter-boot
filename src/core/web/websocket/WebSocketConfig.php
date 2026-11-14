@@ -14,7 +14,7 @@ use dev\winterframework\exception\WinterException;
  * |---|---|---|
  * | enabled | auto | true serves WebSockets even without a handler; false never does |
  * | allowedOrigins | [] | browser Origins allowed to connect; [] = same host only; "*" = any |
- * | maxFrameSize | 1048576 | largest incoming message in bytes; bigger ones close with 1009 |
+ * | maxMessageSize | 1048576 | largest incoming message (fragments joined) in bytes; bigger ones close with 1009 |
  * | idleTimeout | 90 | seconds without any frame (pongs count) before closing; 0 = never |
  * | heartbeatInterval | 30 | seconds between server pings; 0 = no pings |
  * | maxConcurrentMessages | 32 | messages of one connection handled at once; more closes with 1008 |
@@ -30,7 +30,7 @@ final class WebSocketConfig {
      */
     public function __construct(
         public readonly array $allowedOrigins = [],
-        public readonly int $maxFrameSize = 1048576,
+        public readonly int $maxMessageSize = 1048576,
         public readonly float $idleTimeout = 90.0,
         public readonly float $heartbeatInterval = 30.0,
         public readonly int $maxConcurrentMessages = 32,
@@ -49,14 +49,14 @@ final class WebSocketConfig {
         ));
         $config = new self(
             $origins,
-            $prop->getInt(self::PREFIX . 'maxFrameSize', 1048576),
+            $prop->getInt(self::PREFIX . 'maxMessageSize', 1048576),
             $prop->getFloat(self::PREFIX . 'idleTimeout', 90.0),
             $prop->getFloat(self::PREFIX . 'heartbeatInterval', 30.0),
             $prop->getInt(self::PREFIX . 'maxConcurrentMessages', 32),
             $prop->getBool(self::PREFIX . 'compression', false)
         );
-        if ($config->maxFrameSize < 1) {
-            throw new WinterException('server.websocket.maxFrameSize must be a positive number of bytes');
+        if ($config->maxMessageSize < 1) {
+            throw new WinterException('server.websocket.maxMessageSize must be a positive number of bytes');
         }
         if ($config->maxConcurrentMessages < 1) {
             throw new WinterException('server.websocket.maxConcurrentMessages must be at least 1');
@@ -80,7 +80,7 @@ final class WebSocketConfig {
      * control frames reach the framework (close codes for onClose(), pings
      * and pongs count as activity). Swoole drops frames larger than
      * package_max_length before the framework sees them, and that setting
-     * also caps HTTP bodies, so it is never lowered: a maxFrameSize above
+     * also caps HTTP bodies, so it is never lowered: a maxMessageSize above
      * it fails startup instead of loosening the HTTP limit silently.
      *
      * @param array<string, mixed> $serverArgs the configured server.swoole.* settings
@@ -88,11 +88,11 @@ final class WebSocketConfig {
      */
     public function swooleSettings(array $serverArgs): array {
         $packageMax = (int)($serverArgs['package_max_length'] ?? self::SWOOLE_DEFAULT_PACKAGE_MAX);
-        if ($this->maxFrameSize > $packageMax) {
+        if ($this->maxMessageSize > $packageMax) {
             throw new WinterException(
-                "server.websocket.maxFrameSize ({$this->maxFrameSize}) exceeds server.swoole.package_max_length"
+                "server.websocket.maxMessageSize ({$this->maxMessageSize}) exceeds server.swoole.package_max_length"
                 . " ($packageMax): Swoole would drop such frames. Raise package_max_length (it also caps HTTP bodies)"
-                . ' or lower maxFrameSize.'
+                . ' or lower maxMessageSize.'
             );
         }
         $settings = [

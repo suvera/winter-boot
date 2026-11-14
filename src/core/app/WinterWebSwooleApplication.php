@@ -10,6 +10,7 @@ use dev\winterframework\core\web\websocket\SwooleWebSocketTransport;
 use dev\winterframework\core\web\websocket\WebSocketConfig;
 use dev\winterframework\core\web\websocket\WebSocketEndpoint;
 use dev\winterframework\core\web\websocket\WebSocketHandlerRegistry;
+use dev\winterframework\core\web\websocket\WebSocketSessionRegistry;
 use dev\winterframework\io\metrics\prometheus\PrometheusMetricRegistry;
 use dev\winterframework\web\websocket\WebSocketSessions;
 use dev\winterframework\core\context\WinterWebSwooleContext;
@@ -314,8 +315,12 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
      * is registered either way so it can always be autowired.
      */
     protected function buildWebSocket(WinterServer $wServer): void {
-        $sessions = new WebSocketSessions();
-        $this->appCtxData->getBeanProvider()->registerInternalBean($sessions, WebSocketSessions::class, false);
+        $sessionRegistry = new WebSocketSessionRegistry();
+        $this->appCtxData->getBeanProvider()->registerInternalBean(
+            new WebSocketSessions($sessionRegistry),
+            WebSocketSessions::class,
+            false
+        );
         if (!$wServer->isWebSocket()) {
             return;
         }
@@ -323,8 +328,6 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         if (!$dispatcher instanceof DispatcherServlet) {
             throw new WinterException('WebSocket support needs the DispatcherServlet');
         }
-        /** @var WebSocketSessions $sessions */
-        $sessions = $this->applicationContext->beanByClass(WebSocketSessions::class);
         $config = WebSocketConfig::fromProperties($this->appCtxData->getPropertyContext());
         foreach ($config->swooleSettings($wServer->getServerArgs()) as $name => $value) {
             $wServer->addServerArg($name, $value);
@@ -337,7 +340,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
             $dispatcher,
             $this->appCtxData->getInterceptorRegistry(),
             $registry,
-            $sessions,
+            $sessionRegistry,
             $config,
             new SwooleWebSocketTransport($server),
             $this->applicationContext->beanByClass(PrometheusMetricRegistry::class)

@@ -23,15 +23,16 @@ use Throwable;
  * runs on every path (also errors and vetoes), with the response status.
  *
  * Tracing never breaks a request: every OpenTelemetry call is contained.
- * The span and its scope are kept as request attributes (`_otel_span`,
- * `_otel_scope`), so concurrent requests never share them.
+ * The span and its scope are kept as request attributes
+ * ({@see SPAN_ATTRIBUTE}, {@see SCOPE_ATTRIBUTE}), so concurrent requests
+ * never share them.
  *
  * Register it in a WebMvcConfigurer:
  * `$registry->addInterceptor(new OpenTelemetryWebInterceptor(), '.*');`
  */
 class OpenTelemetryWebInterceptor implements HandlerInterceptor {
-    public const SPAN_ATTRIBUTE = '_otel_span';
-    public const SCOPE_ATTRIBUTE = '_otel_scope';
+    public const SPAN_ATTRIBUTE = 'winter.otel.span';
+    public const SCOPE_ATTRIBUTE = 'winter.otel.scope';
 
     /**
      * @param TracerProviderInterface|null $tracerProvider the provider to use

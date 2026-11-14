@@ -6,7 +6,7 @@ namespace dev\winterframework\core\web\config;
 
 use dev\winterframework\core\web\HandlerInterceptor;
 use dev\winterframework\exception\InvalidSyntaxException;
-use dev\winterframework\web\websocket\WebSocketContextHook;
+use dev\winterframework\core\web\RequestContextPropagator;
 
 class InterceptorRegistry {
 
@@ -16,9 +16,9 @@ class InterceptorRegistry {
     protected array $interceptors = [];
 
     /**
-     * @var WebSocketContextHook[]
+     * @var RequestContextPropagator[]
      */
-    protected array $webSocketContextHooks = [];
+    protected array $contextPropagators = [];
 
     public function addInterceptor(HandlerInterceptor $interceptor, string ...$regexPaths): void {
         foreach ($regexPaths as $regexPath) {
@@ -37,17 +37,18 @@ class InterceptorRegistry {
     }
 
     /**
-     * Restores request-scoped context for every WebSocket call (see
-     * {@see WebSocketContextHook}); hooks run in registration order
-     * (clear() in reverse).
+     * Carries request-scoped context into later coroutines of the same
+     * request (every WebSocket message and close); see
+     * {@see RequestContextPropagator}. restore() runs in registration order,
+     * clear() in reverse.
      */
-    public function addWebSocketContextHook(WebSocketContextHook $hook): void {
-        $this->webSocketContextHooks[spl_object_id($hook)] = $hook;
+    public function addContextPropagator(RequestContextPropagator $propagator): void {
+        $this->contextPropagators[spl_object_id($propagator)] = $propagator;
     }
 
-    /** @return WebSocketContextHook[] */
-    public function getWebSocketContextHooks(): array {
-        return array_values($this->webSocketContextHooks);
+    /** @return RequestContextPropagator[] */
+    public function getContextPropagators(): array {
+        return array_values($this->contextPropagators);
     }
 
 }

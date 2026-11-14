@@ -709,18 +709,24 @@ class DispatcherServlet implements HttpRequestDispatcher {
     }
 
     /**
-     * Sends a {@see StreamingBody} response: runs the producer with a writer
-     * that sends the head with the first chunk and each write as one chunk,
-     * then ends the response and runs postHandle() and afterCompletion()
-     * once each, after the stream (headers they set are not sent then).
+     * Sends a {@see StreamingBody} response, keeping the interceptor order
+     * of every other response:
+     *
+     * 1. postHandle() (app-level, then the controller's), in the request's
+     *    coroutine before the producer runs, so headers and cookies they set
+     *    (a refreshed session cookie) go out with the first chunk. A failure
+     *    here fails the request like any other.
+     * 2. The producer, with a writer that sends the head with the first
+     *    chunk and every write as one chunk.
+     * 3. afterCompletion() once, after the stream ended.
      *
      * A producer failure before anything was written propagates, so the
      * request fails through the error controller like any other. Once the
      * head is out the failure can no longer change the status: it is logged,
-     * the response ends and afterCompletion() receives it. Nothing from this
+     * the response ends and afterCompletion() receives it. Nothing from that
      * point reaches handleError(), which would write into the open stream.
      *
-     * @throws Throwable producer failure before the first chunk
+     * @throws Throwable postHandle() failure, or a producer failure before the first chunk
      */
     protected function sendStreamingResponse(
         StreamingBody $body,
@@ -731,6 +737,9 @@ class DispatcherServlet implements HttpRequestDispatcher {
         ResponseEntity $response,
         ?float $startTime
     ): void {
+        $this->postHandle($registry, $request, $response);
+        $controller?->postHandle($request, $response, $handler);
+
         $writer = new StreamedResponseWriter($response, $response->getOutputStream());
         $failure = null;
         try {
@@ -748,13 +757,6 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 . $writer->getBytesWritten() . ' bytes');
         }
 
-        try {
-            $this->postHandle($registry, $request, $response);
-            $controller?->postHandle($request, $response, $handler);
-        } catch (Throwable $e) {
-            self::logException($e);
-            $failure ??= $e;
-        }
         try {
             $this->afterCompletion($registry, $request, $response, $failure);
         } catch (Throwable $e) {

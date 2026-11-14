@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace dev\winterframework\web\websocket;
 
+use dev\winterframework\core\web\websocket\WebSocketSessionRegistry;
+use JsonSerializable;
+
 /**
  * The open WebSocket sessions of the current worker, for pushing from
  * elsewhere in the application (a service, a scheduled task, another
@@ -18,28 +21,36 @@ namespace dev\winterframework\web\websocket;
  * Only this worker's connections are visible: a user connected through
  * another worker or another pod is not. Applications that must reach every
  * connection publish the event (e.g. Redis pub/sub) and let each worker
- * deliver to its own sessions.
+ * deliver to its own sessions; a stored {@see WebSocketSession::getId()}
+ * that get() does not know belongs to another worker or has closed.
  */
-class WebSocketSessions {
-    /** @var array<int, WebSocketSession> Bounded by the open connections of this worker. */
-    private array $sessions = [];
+final class WebSocketSessions {
 
-    public function get(int $id): ?WebSocketSession {
-        return $this->sessions[$id] ?? null;
+    /** @internal created by the framework */
+    public function __construct(
+        private WebSocketSessionRegistry $registry
+    ) {
+    }
+
+    /** The open session with this id in this worker, or null. */
+    public function get(string $id): ?WebSocketSession {
+        $session = $this->registry->byId($id);
+        return $session !== null && $session->isOpen() ? $session : null;
     }
 
     /**
-     * @param string|null $handlerPath only sessions of that #[WebSocketController] path
+     * Open sessions, optionally only those of one #[WebSocketController] path.
+     *
      * @return WebSocketSession[]
      */
     public function all(?string $handlerPath = null): array {
-        if ($handlerPath === null) {
-            return array_values($this->sessions);
+        $out = [];
+        foreach ($this->registry->all() as $session) {
+            if ($session->isOpen() && ($handlerPath === null || $session->getHandlerPath() === $handlerPath)) {
+                $out[] = $session;
+            }
         }
-        return array_values(array_filter(
-            $this->sessions,
-            fn(WebSocketSession $s): bool => $s->getHandlerPath() === $handlerPath
-        ));
+        return $out;
     }
 
     /**
@@ -49,8 +60,8 @@ class WebSocketSessions {
      */
     public function findByAttribute(string $name, mixed $value): array {
         $found = [];
-        foreach ($this->sessions as $session) {
-            if ($session->hasAttribute($name) && $session->getAttribute($name) === $value && $session->isOpen()) {
+        foreach ($this->all() as $session) {
+            if ($session->hasAttribute($name) && $session->getAttribute($name) === $value) {
                 $found[] = $session;
             }
         }
@@ -61,7 +72,7 @@ class WebSocketSessions {
      * Sends $data to every open session whose attribute matches; returns
      * how many accepted it.
      */
-    public function sendToAttribute(string $name, mixed $value, string|array|\JsonSerializable $data): int {
+    public function sendToAttribute(string $name, mixed $value, string|array|JsonSerializable $data): int {
         $sent = 0;
         foreach ($this->findByAttribute($name, $value) as $session) {
             if ($session->send($data)) {
@@ -71,19 +82,8 @@ class WebSocketSessions {
         return $sent;
     }
 
+    /** Number of open sessions in this worker. */
     public function count(): int {
-        return count($this->sessions);
-    }
-
-    /** @internal */
-    public function add(WebSocketSession $session): void {
-        $this->sessions[$session->getId()] = $session;
-    }
-
-    /** @internal */
-    public function remove(int $id): ?WebSocketSession {
-        $session = $this->sessions[$id] ?? null;
-        unset($this->sessions[$id]);
-        return $session;
+        return count($this->all());
     }
 }

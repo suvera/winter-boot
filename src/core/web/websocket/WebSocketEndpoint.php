@@ -20,9 +20,6 @@ use dev\winterframework\web\websocket\WebSocketCloseCode;
 use dev\winterframework\web\websocket\WebSocketErrorHandler;
 use dev\winterframework\web\websocket\WebSocketHandler;
 use dev\winterframework\web\websocket\WebSocketMessage;
-use dev\winterframework\web\websocket\WebSocketSession;
-use dev\winterframework\web\websocket\WebSocketSessions;
-use dev\winterframework\web\websocket\WebSocketTransport;
 use Swoole\Coroutine;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
@@ -53,7 +50,7 @@ class WebSocketEndpoint {
     private bool $exiting = false;
     private bool $metricsRegistered = false;
     private float $lastSweep = 0.0;
-    /** @var array<int, float> last ping per session id; bounded by the open sessions */
+    /** @var array<int, float> last ping per connection (fd); bounded by the open sessions */
     private array $lastPing = [];
 
     public function __construct(
@@ -61,14 +58,14 @@ class WebSocketEndpoint {
         private DispatcherServlet $dispatcher,
         private InterceptorRegistry $interceptors,
         private WebSocketHandlerRegistry $handlers,
-        private WebSocketSessions $sessions,
+        private WebSocketSessionRegistry $sessions,
         private WebSocketConfig $config,
         private WebSocketTransport $transport,
         private ?PrometheusMetricRegistry $metrics = null
     ) {
     }
 
-    public function getSessions(): WebSocketSessions {
+    public function getSessions(): WebSocketSessionRegistry {
         return $this->sessions;
     }
 
@@ -130,7 +127,7 @@ class WebSocketEndpoint {
     /**
      * Sends the 101 response (with any headers and cookies the
      * interceptors added), registers the session before the client can
-     * send, runs the context hooks' capture() and onOpen() in this
+     * send, captures the context propagators' snapshots and runs onOpen() in this
      * coroutine, then releases messages that arrived meanwhile.
      */
     private function accept(string $uri, int $fd, HttpRequest $request, ResponseEntity $entity, Response $response): void {
@@ -150,7 +147,8 @@ class WebSocketEndpoint {
 
         // Registered before the 101 goes out, so a frame the client sends
         // right after it already finds its session (and waits for onOpen).
-        $session = new WebSocketSession(
+        $session = new DefaultWebSocketSession(
+            DefaultWebSocketSession::newId(),
             $fd,
             '/' . ltrim((string)strtok($request->getUri(), '?'), '/'),
             $request,
@@ -177,12 +175,14 @@ class WebSocketEndpoint {
         }
 
         $this->count('websocket_connections_opened', ['path' => $entry['path']]);
-        self::logInfo('WebSocket opened ' . $entry['path'] . ' #' . $fd);
+        self::logInfo('WebSocket opened ' . $entry['path'] . ' ' . $session->getId());
 
         try {
-            foreach ($this->interceptors->getWebSocketContextHooks() as $hook) {
-                $hook->capture($session, $request);
+            $snapshots = [];
+            foreach ($this->interceptors->getContextPropagators() as $propagator) {
+                $snapshots[] = [$propagator, $propagator->capture($request)];
             }
+            $session->setContextSnapshots($snapshots);
             $handler->onOpen($session, $request);
         } catch (Throwable $e) {
             $this->reportError($handler, $session, $e);
@@ -208,7 +208,7 @@ class WebSocketEndpoint {
     }
 
     public function handleFrame(int $fd, int $opcode, string $data, int $closeCode = 0, string $closeReason = ''): void {
-        $session = $this->sessions->get($fd);
+        $session = $this->sessions->byFd($fd);
         if ($session === null) {
             return;
         }
@@ -239,11 +239,11 @@ class WebSocketEndpoint {
         }
     }
 
-    private function dispatchMessage(WebSocketSession $session, string $data, bool $binary): void {
+    private function dispatchMessage(DefaultWebSocketSession $session, string $data, bool $binary): void {
         $path = $session->getHandlerPath();
-        if (strlen($data) > $this->config->maxFrameSize) {
+        if (strlen($data) > $this->config->maxMessageSize) {
             $this->count('websocket_errors', ['path' => $path]);
-            self::logInfo('WebSocket ' . $path . ' #' . $session->getId() . ' message too big (' . strlen($data) . ' bytes)');
+            self::logInfo('WebSocket ' . $path . ' ' . $session->getId() . ' message too big (' . strlen($data) . ' bytes)');
             $session->close(WebSocketCloseCode::MESSAGE_TOO_BIG, 'Message too big');
             return;
         }
@@ -253,7 +253,7 @@ class WebSocketEndpoint {
         if ($session->enterMessage() > $this->config->maxConcurrentMessages) {
             $session->leaveMessage();
             $this->count('websocket_errors', ['path' => $path]);
-            self::logInfo('WebSocket ' . $path . ' #' . $session->getId() . ' exceeded maxConcurrentMessages');
+            self::logInfo('WebSocket ' . $path . ' ' . $session->getId() . ' exceeded maxConcurrentMessages');
             $session->close(WebSocketCloseCode::POLICY_VIOLATION, 'Too many concurrent messages');
             return;
         }
@@ -282,9 +282,9 @@ class WebSocketEndpoint {
      * Runs onClose() exactly once (whichever of the close event, worker
      * stop or a failed open gets here first), after onOpen() returned.
      */
-    public function finish(WebSocketSession $session): void {
-        $this->sessions->remove($session->getId());
-        unset($this->lastPing[$session->getId()]);
+    public function finish(DefaultWebSocketSession $session): void {
+        $this->sessions->remove($session->getFd());
+        unset($this->lastPing[$session->getFd()]);
         $closed = $session->markClosed();
         if ($closed === null) {
             return;
@@ -295,7 +295,7 @@ class WebSocketEndpoint {
         $path = $session->getHandlerPath();
         $this->count('websocket_connections_closed', ['path' => $path, 'code' => WebSocketCloseCode::label($code)]);
         self::logInfo(sprintf(
-            'WebSocket closed %s #%d code=%d messages=%d after %.1fs',
+            'WebSocket closed %s %s code=%d messages=%d after %.1fs',
             $path,
             $session->getId(),
             $code,
@@ -332,7 +332,7 @@ class WebSocketEndpoint {
      * Worker stop. Swoole calls it outside any coroutine, after the event
      * loop ended, so the connections are already gone: onClose() still runs
      * once for every session left, inside a coroutine of its own so
-     * handlers and context hooks get their usual environment.
+     * handlers and context propagators get their usual environment.
      */
     public function onWorkerStop(): void {
         $this->stopTimer();
@@ -410,9 +410,9 @@ class WebSocketEndpoint {
             if (!$session->isOpen()) {
                 continue;
             }
-            $id = $session->getId();
+            $id = $session->getFd();
             if ($this->config->idleTimeout > 0 && $now - $session->getLastSeen() >= $this->config->idleTimeout) {
-                self::logInfo('WebSocket ' . $session->getHandlerPath() . ' #' . $id . ' idle timeout');
+                self::logInfo('WebSocket ' . $session->getHandlerPath() . ' ' . $session->getId() . ' idle timeout');
                 $session->close(WebSocketCloseCode::NORMAL, 'Idle timeout');
                 continue;
             }
@@ -426,7 +426,7 @@ class WebSocketEndpoint {
 
     // ---- Calls into the application --------------------------------------
 
-    private function handlerOf(WebSocketSession $session): WebSocketHandler {
+    private function handlerOf(DefaultWebSocketSession $session): WebSocketHandler {
         $entry = $this->handlers->find($session->getHandlerPath());
         if ($entry === null) {
             throw new \LogicException('No WebSocket handler for ' . $session->getHandlerPath());
@@ -436,19 +436,20 @@ class WebSocketEndpoint {
 
     /**
      * Runs one handler call with the connection's context: the handshake
-     * request bound as the current request and every hook's restore()
-     * before, clear() after (also on failure). A failing restore() fails
+     * request bound as the current request and every propagator's
+     * restore() with its handshake snapshot before, clear() after (also on
+     * failure). A failing restore() fails
      * closed: the call is skipped and the connection closes with 1011.
      */
-    private function invoke(WebSocketHandler $handler, WebSocketSession $session, callable $call): void {
+    private function invoke(WebSocketHandler $handler, DefaultWebSocketSession $session, callable $call): void {
         $outerRequest = $this->appCtx->getCurrentHttpRequest();
         $this->appCtx->setCurrentHttpRequest($session->getHandshake());
         $restored = [];
         try {
             try {
-                foreach ($this->interceptors->getWebSocketContextHooks() as $hook) {
-                    $restored[] = $hook;
-                    $hook->restore($session);
+                foreach ($session->getContextSnapshots() as [$propagator, $snapshot]) {
+                    $restored[] = $propagator;
+                    $propagator->restore($snapshot);
                 }
             } catch (Throwable $e) {
                 $this->count('websocket_errors', ['path' => $session->getHandlerPath()]);
@@ -464,9 +465,9 @@ class WebSocketEndpoint {
                 $this->reportError($handler, $session, $e);
             }
         } finally {
-            foreach (array_reverse($restored) as $hook) {
+            foreach (array_reverse($restored) as $propagator) {
                 try {
-                    $hook->clear($session);
+                    $propagator->clear();
                 } catch (Throwable $e) {
                     self::logException($e, 'WebSocket context clear failed');
                 }
@@ -475,7 +476,7 @@ class WebSocketEndpoint {
         }
     }
 
-    private function reportError(WebSocketHandler $handler, WebSocketSession $session, Throwable $e): void {
+    private function reportError(WebSocketHandler $handler, DefaultWebSocketSession $session, Throwable $e): void {
         $this->count('websocket_errors', ['path' => $session->getHandlerPath()]);
         if ($handler instanceof WebSocketErrorHandler) {
             try {

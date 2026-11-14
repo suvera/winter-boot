@@ -107,6 +107,7 @@ class StreamingResponseSwooleTest {
         $this->check(($resp['headers']['transfer-encoding'] ?? '') === 'chunked', 'chunked transfer');
         $this->check(!isset($resp['headers']['content-length']), 'no content-length');
         $this->check(($resp['headers']['x-fixture-auth'] ?? '') === 'ok', 'preHandle header sent with the head');
+        $this->check(($resp['headers']['x-fixture-post'] ?? '') === 'ok', 'postHandle header sent with the head (e.g. a session cookie)');
         $this->check(count($res['lines']) === 5, 'five chunks, got ' . count($res['lines']));
         foreach ($res['lines'] as $i => [$chunk, $at]) {
             $this->check(str_starts_with($chunk, "chunk-$i@"), "chunk $i in order: $chunk");
@@ -178,6 +179,31 @@ class StreamingResponseSwooleTest {
         $s->stop();
     }
 
+    /**
+     * The tab closes while the model is thinking: the relay's upstream call
+     * (cancel: its writer's token) stops at once, and the upstream sees its
+     * client go, although no byte flows in either direction.
+     */
+    public function testClientDisconnectCancelsTheUpstreamCallPromptly(): void {
+        $s = $this->server();
+        $sock = $this->openRequest($s, '/stream/relay?id=r');
+        $this->check($this->readUntil($sock, 'first'), 'relayed the first chunk');
+        $closedAt = microtime(true);
+        fclose($sock);
+        $relay = ['writes' => -1];
+        for ($i = 0; $i < 40 && ($relay['writes'] ?? -1) === -1; $i++) {
+            usleep(50000);
+            $relay = json_decode($s->http('GET', '/probe/stream-status?id=relay-r')['body'], true);
+        }
+        $elapsed = microtime(true) - $closedAt;
+        $this->check(($relay['reason'] ?? '') === 'cancelled', 'relay call cancelled: ' . json_encode($relay));
+        $this->check($elapsed < 1.5, sprintf('within moments of the disconnect: %.2fs', $elapsed));
+        usleep(300000);
+        $up = json_decode($s->http('GET', '/probe/stream-status?id=up-r')['body'], true);
+        $this->check(($up['reason'] ?? '') === 'client-gone', 'upstream saw the relay leave: ' . json_encode($up));
+        $s->stop();
+    }
+
     public function testIdleProducerSeesDisconnectWithoutWriting(): void {
         $s = $this->server();
         $sock = $this->openRequest($s, '/stream/idle?id=i');
@@ -196,7 +222,7 @@ class StreamingResponseSwooleTest {
         $this->check(str_contains($resp['body'], '"status":500'), 'error body: ' . $resp['body']);
         $this->check(!str_contains($resp['body'], 'producer failed'), 'no exception text leaked');
         $calls = $this->calls($s, '/stream/fail-early');
-        $this->check($calls === ['pre' => 1, 'after' => 1], 'failed request: afterCompletion once, no postHandle: ' . json_encode($calls));
+        $this->check($calls === ['pre' => 1, 'post' => 1, 'after' => 1], 'failed producer: postHandle ran before it, afterCompletion once: ' . json_encode($calls));
         $s->stop();
     }
 

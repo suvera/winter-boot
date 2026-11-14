@@ -453,7 +453,7 @@ class WebSocketSwooleTest {
     }
 
     public function testOversizedMessageClosesWith1009(): void {
-        $s = (new FixtureServer("    websocket:\n        maxFrameSize: 1024"))->start();
+        $s = (new FixtureServer("    websocket:\n        maxMessageSize: 1024"))->start();
         $this->run(function () use ($s): void {
             $c = $this->open($s, 'kate');
             $c->push(str_repeat('a', 1024));

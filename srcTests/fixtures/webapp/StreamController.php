@@ -7,8 +7,11 @@ namespace winterBootTests\fixtures\webapp;
 use dev\winterframework\stereotype\RestController;
 use dev\winterframework\stereotype\web\GetMapping;
 use dev\winterframework\stereotype\web\RequestParam;
+use dev\winterframework\web\client\HttpEntity;
+use dev\winterframework\web\client\RestTemplate;
+use dev\winterframework\web\http\HttpRequest;
 use dev\winterframework\web\http\ResponseWriter;
-use dev\winterframework\web\http\SseEmitter;
+use dev\winterframework\web\sse\SseEmitter;
 use dev\winterframework\web\http\StreamingResponseEntity;
 use dev\winterframework\web\MediaType;
 use RuntimeException;
@@ -85,6 +88,44 @@ class StreamController {
                 Coroutine::sleep(0.05);
             }
             self::$stopped[$id] = ['writes' => 1, 'reason' => 'disconnected'];
+        }, MediaType::TEXT_PLAIN);
+    }
+
+    /** Upstream: one chunk, then silence until its client (the relay) is gone. */
+    #[GetMapping(path: '/stream/silent')]
+    public function silent(#[RequestParam] string $id): StreamingResponseEntity {
+        return StreamingResponseEntity::of(function (ResponseWriter $out) use ($id): void {
+            $out->write("first\n");
+            $token = $out->getCancellationToken();
+            $start = microtime(true);
+            while (!$token->isCancelled() && microtime(true) - $start < 10) {
+                Coroutine::sleep(0.05);
+            }
+            self::$stopped['up-' . $id] = ['writes' => 1, 'reason' => $token->isCancelled() ? 'client-gone' : 'limit'];
+        }, MediaType::TEXT_PLAIN);
+    }
+
+    /** Relay: streams /stream/silent to its own client, stopping when that client leaves. */
+    #[GetMapping(path: '/stream/relay')]
+    public function relay(HttpRequest $req, #[RequestParam] string $id): StreamingResponseEntity {
+        $port = (int)$req->getServerPort();
+        $cookie = $req->getCookieHeader();
+        return StreamingResponseEntity::of(function (ResponseWriter $out) use ($port, $cookie, $id): void {
+            $rest = new RestTemplate();
+            $rest->setStreamIdleTimeout(30.0);
+            $start = microtime(true);
+            $result = $rest->exchangeStream(
+                'GET',
+                'http://127.0.0.1:' . $port . '/stream/silent?id=' . $id,
+                HttpEntity::withHeaders(['Cookie' => $cookie]),
+                fn(string $chunk) => $out->write($chunk),
+                cancel: $out->getCancellationToken()
+            );
+            self::$stopped['relay-' . $id] = [
+                'writes' => 1,
+                'reason' => $result->isCancelled() ? 'cancelled' : 'other',
+                'seconds' => round(microtime(true) - $start, 2),
+            ];
         }, MediaType::TEXT_PLAIN);
     }
 

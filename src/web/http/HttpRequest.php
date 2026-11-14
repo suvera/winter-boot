@@ -33,6 +33,7 @@ class HttpRequest {
      * Request attributes: per-request values set by interceptors or the
      * framework (e.g. the tracing span), never sent by the client. They live
      * on this request object only, so concurrent requests never share them.
+     * Names starting with `winter.` are reserved for the framework.
      *
      * @var array<string, mixed>
      */
@@ -173,6 +174,24 @@ class HttpRequest {
 
     public function getCookie(string $name): ?string {
         return $this->cookies[$name] ?? null;
+    }
+
+    /**
+     * The request's cookies as one `Cookie` header value
+     * (`name=value; other=value`, values URL-encoded), e.g. to call another
+     * service as the same user. Rebuilt from the parsed cookies: under
+     * Swoole the original `Cookie` header is not among the headers. Empty
+     * when the request has no cookies.
+     */
+    public function getCookieHeader(): string {
+        $pairs = [];
+        foreach ($this->cookies as $name => $value) {
+            if (!is_scalar($value)) {
+                continue;
+            }
+            $pairs[] = rawurlencode((string)$name) . '=' . rawurlencode((string)$value);
+        }
+        return implode('; ', $pairs);
     }
 
     public function getCookies(): array {

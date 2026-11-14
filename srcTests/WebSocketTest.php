@@ -12,15 +12,17 @@ use dev\winterframework\core\web\websocket\WebSocketHandlerRegistry;
 use dev\winterframework\core\web\websocket\WebSocketOriginPolicy;
 use dev\winterframework\exception\DuplicatePathException;
 use dev\winterframework\exception\WinterException;
-use dev\winterframework\web\client\sse\SseParser;
+use dev\winterframework\web\sse\SseParser;
 use dev\winterframework\web\http\HttpRequest;
-use dev\winterframework\web\http\SseEmitter;
+use dev\winterframework\web\sse\SseEmitter;
 use dev\winterframework\web\http\StreamingResponseEntity;
 use dev\winterframework\web\websocket\WebSocketCloseCode;
 use dev\winterframework\web\websocket\WebSocketMessage;
-use dev\winterframework\web\websocket\WebSocketSession;
+use dev\winterframework\core\web\websocket\DefaultWebSocketSession;
+use dev\winterframework\core\web\websocket\WebSocketSessionRegistry;
+use dev\winterframework\test\web\TestWebSocketSession;
 use dev\winterframework\web\websocket\WebSocketSessions;
-use dev\winterframework\web\websocket\WebSocketTransport;
+use dev\winterframework\core\web\websocket\WebSocketTransport;
 use winterBootTests\Support\TestCase;
 
 final class RecordingWebSocketTransport implements WebSocketTransport {
@@ -74,8 +76,8 @@ class WebSocketTest extends TestCase {
         return new WinterPropertyContext([$dir]);
     }
 
-    private function session(RecordingWebSocketTransport $t, int $id = 7): WebSocketSession {
-        return new WebSocketSession($id, '/ws/chat', new HttpRequest(), $t, '/ws/chat');
+    private function session(RecordingWebSocketTransport $t, int $fd = 7): DefaultWebSocketSession {
+        return new DefaultWebSocketSession('id-' . $fd, $fd, '/ws/chat', new HttpRequest(), $t, '/ws/chat');
     }
 
     // ---- Origin -----------------------------------------------------------
@@ -111,7 +113,7 @@ class WebSocketTest extends TestCase {
         $p = $this->props("server:\n    port: 1\n");
         $c = WebSocketConfig::fromProperties($p);
         $this->assertSame([], $c->allowedOrigins);
-        $this->assertSame(1048576, $c->maxFrameSize);
+        $this->assertSame(1048576, $c->maxMessageSize);
         $this->assertSame(90.0, $c->idleTimeout);
         $this->assertSame(30.0, $c->heartbeatInterval);
         $this->assertFalse(WebSocketConfig::isEnabled($p, false), 'no handler: plain HTTP');
@@ -122,7 +124,7 @@ class WebSocketTest extends TestCase {
 
     public function testConfigParsesOriginsAndRejectsFrameSizeAbovePackageLimit(): void {
         $c = WebSocketConfig::fromProperties($this->props(
-            "server:\n    websocket:\n        allowedOrigins: 'https://a.io, https://b.io'\n        maxFrameSize: 3000000\n        compression: true\n"
+            "server:\n    websocket:\n        allowedOrigins: 'https://a.io, https://b.io'\n        maxMessageSize: 3000000\n        compression: true\n"
         ));
         $this->assertSame(['https://a.io', 'https://b.io'], $c->allowedOrigins);
         $this->assertThrows(WinterException::class, fn() => $c->swooleSettings([]));
@@ -133,7 +135,7 @@ class WebSocketTest extends TestCase {
         $this->assertFalse(isset($settings['package_max_length']), 'HTTP body limit never touched');
         $this->assertSame(false, $c->swooleSettings(['package_max_length' => 4000000, 'websocket_compression' => false])['websocket_compression'] ?? false);
         $this->assertThrows(WinterException::class, fn() => WebSocketConfig::fromProperties(
-            $this->props("server:\n    websocket:\n        maxFrameSize: 0\n")
+            $this->props("server:\n    websocket:\n        maxMessageSize: 0\n")
         ));
     }
 
@@ -180,7 +182,7 @@ class WebSocketTest extends TestCase {
         $this->assertTrue($s->send(['a' => 'b/c']));
         $this->assertTrue($s->sendBinary("\x00"));
         $this->assertSame([[7, 'hi', false], [7, '{"a":"b/c"}', false], [7, "\x00", true]], $t->frames);
-        $this->assertFalse($s->send(['bad' => NAN]), 'unencodable data: false, not an exception');
+        $this->assertThrows(\JsonException::class, fn() => $s->send(['bad' => NAN]), 'unencodable data is a programming error');
 
         $this->assertTrue($s->close(4001, str_repeat('é', 100)));
         $this->assertSame(4001, $t->closes[0][1]);
@@ -211,7 +213,7 @@ class WebSocketTest extends TestCase {
         $this->assertFalse($second->isCancelled());
         $this->assertTrue($s->cancelWork('answer', 'stop'));
         $this->assertFalse($s->cancelWork('answer'), 'already cancelled');
-        $this->assertThrows(\dev\winterframework\web\websocket\CancelledException::class, fn() => $second->throwIfCancelled());
+        $this->assertThrows(\dev\winterframework\util\concurrent\CancelledException::class, fn() => $second->throwIfCancelled());
         $s->endWork('answer', $first);
         $this->assertSame($second, $s->getWork('answer'), 'endWork of an older token keeps the current one');
         $s->endWork('answer', $second);
@@ -225,20 +227,60 @@ class WebSocketTest extends TestCase {
 
     public function testSessionsRegistry(): void {
         $t = new RecordingWebSocketTransport();
-        $reg = new WebSocketSessions();
+        $registry = new WebSocketSessionRegistry();
+        $sessions = new WebSocketSessions($registry);
         $a = $this->session($t, 1);
         $a->setAttribute('userId', 5);
         $b = $this->session($t, 2);
         $b->setAttribute('userId', '5');
-        $reg->add($a);
-        $reg->add($b);
-        $this->assertSame([$a], $reg->findByAttribute('userId', 5), 'strict comparison');
-        $this->assertSame(1, $reg->sendToAttribute('userId', 5, ['n' => 1]));
-        $this->assertSame(2, $reg->count());
-        $this->assertSame($a, $reg->remove(1));
-        $this->assertNull($reg->get(1));
-        $this->assertSame([$b], $reg->all('/ws/chat'));
-        $this->assertSame([], $reg->all('/other'));
+        $registry->add($a);
+        $registry->add($b);
+        $this->assertSame([$a], $sessions->findByAttribute('userId', 5), 'strict comparison');
+        $this->assertSame(1, $sessions->sendToAttribute('userId', 5, ['n' => 1]));
+        $this->assertSame(2, $sessions->count());
+        $this->assertSame($a, $sessions->get('id-1'), 'found by its id');
+        $this->assertSame($a, $registry->remove(1));
+        $this->assertNull($sessions->get('id-1'), 'gone once closed');
+        $this->assertSame($b, $registry->byFd(2));
+        $this->assertSame([$b], $sessions->all('/ws/chat'));
+        $this->assertSame([], $sessions->all('/other'));
+        $b->close();
+        $this->assertSame([], $sessions->all(), 'only open sessions are listed');
+        $this->assertNull($sessions->get('id-2'));
+    }
+
+    public function testSessionIdsAreOpaqueAndNeverReused(): void {
+        $ids = [];
+        for ($i = 0; $i < 1000; $i++) {
+            $ids[DefaultWebSocketSession::newId()] = true;
+        }
+        $this->assertSame(1000, count($ids), 'no repeats');
+        $id = array_key_first($ids);
+        $this->assertSame(1, preg_match('/^[0-9a-f]{24}$/', $id), 'opaque hex, no fd inside: ' . $id);
+    }
+
+    public function testTestWebSocketSessionRecordsWhatHandlersSend(): void {
+        $s = new TestWebSocketSession('/ws/assistant');
+        $this->assertTrue($s->isOpen());
+        $this->assertSame('/ws/assistant', $s->getPath());
+        $s->send(['type' => 'echo', 'text' => 'hi']);
+        $this->assertSame([['type' => 'echo', 'text' => 'hi']], $s->getSentJson());
+        $s->send('plain');
+        $s->sendBinary("\x01");
+        $this->assertThrows(\JsonException::class, fn() => $s->getSentJson(), 'not every frame is JSON now');
+        $this->assertSame(['{"type":"echo","text":"hi"}', 'plain'], $s->getSentMessages());
+        $this->assertSame(3, count($s->getSentFrames()));
+        $token = $s->beginWork('answer');
+        $s->close(4001, 'bye');
+        $this->assertSame(4001, $s->getCloseCode());
+        $this->assertSame('bye', $s->getCloseReason());
+        $this->assertTrue($token->isCancelled(), 'close cancels running work');
+        $this->assertFalse($s->send('late'));
+
+        $gone = new TestWebSocketSession();
+        $gone->disconnect();
+        $this->assertFalse($gone->send('x'), 'client left');
+        $this->assertFalse($gone->isOpen());
     }
 
     public function testMessage(): void {

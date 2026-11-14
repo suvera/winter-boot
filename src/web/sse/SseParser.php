@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-namespace dev\winterframework\web\client\sse;
+namespace dev\winterframework\web\sse;
 
-use dev\winterframework\web\client\RestClientException;
 
 /**
  * Incremental `text/event-stream` parser following the WHATWG rules: feed it
@@ -39,7 +38,7 @@ final class SseParser {
 
     /**
      * @return SseEvent[] events completed by this chunk, in order
-     * @throws RestClientException when the pending line/event exceeds the cap
+     * @throws SseException when the pending line/event exceeds the cap
      */
     public function feed(string $chunk): array {
         if (!$this->started) {
@@ -91,7 +90,7 @@ final class SseParser {
         }
         $this->buffer = (string)substr($this->buffer, $offset);
         if (strlen($this->buffer) + $this->dataBytes > $this->maxPendingBytes) {
-            throw new RestClientException('SSE event exceeds ' . $this->maxPendingBytes . ' bytes');
+            throw new SseException('SSE event exceeds ' . $this->maxPendingBytes . ' bytes');
         }
         return $events;
     }

@@ -9,7 +9,7 @@ use dev\winterframework\io\stream\ChunkedOutputStream;
 use dev\winterframework\io\stream\InputStream;
 use dev\winterframework\io\stream\StringInputStream;
 use dev\winterframework\web\http\HttpCookie;
-use dev\winterframework\web\http\SseEmitter;
+use dev\winterframework\web\sse\SseEmitter;
 use dev\winterframework\web\http\StreamingBody;
 use dev\winterframework\web\http\StreamingResponseEntity;
 use dev\winterframework\web\MediaType;
@@ -190,5 +190,62 @@ class StreamingResponseTest extends TestCase {
         $writer = $this->writerFor($entity, $stream);
         $entity->getBody()->run($writer);
         $this->assertSame(1, $calls);
+    }
+
+    public function testSseEmitterResendsAParsedEvent(): void {
+        // An upstream event parsed with SseParser goes out unchanged: the relay case.
+        $parsed = (new \dev\winterframework\web\sse\SseParser())->feed("event: token\nid: 9\nretry: 2000\ndata: a\ndata: b\n\n")[0];
+        $stream = new RecordingChunkedStream();
+        $writer = $this->writerFor(StreamingResponseEntity::of(fn() => null), $stream);
+        $emitter = new SseEmitter($writer);
+        $this->assertTrue($emitter->send($parsed));
+        $this->assertTrue($emitter->send(new \dev\winterframework\web\sse\SseEvent('message', 'plain')));
+        $this->assertSame(["event: token\nid: 9\nretry: 2000\ndata: a\ndata: b\n\n", "data: plain\n\n"], $stream->chunks());
+
+        $again = (new \dev\winterframework\web\sse\SseParser())->feed(implode('', $stream->chunks()));
+        $this->assertSame(['token', 'a' . "\n" . 'b', '9', 2000], [$again[0]->event, $again[0]->data, $again[0]->id, $again[0]->retry]);
+        $this->assertThrows(\InvalidArgumentException::class,
+            fn() => $emitter->send(new \dev\winterframework\web\sse\SseEvent("x\ndata: forged", 'y')));
+    }
+
+    public function testConditionTokenCancelsWhenTheConditionTurnsTrue(): void {
+        $gone = false;
+        $token = \dev\winterframework\util\concurrent\CancellationToken::when(function () use (&$gone) { return $gone; }, 'client disconnected');
+        $this->assertFalse($token->isCancelled());
+        $this->assertSame('', $token->getReason());
+        $gone = true;
+        $this->assertTrue($token->isCancelled(), 'noticed on the next check, without cancel()');
+        $this->assertSame('client disconnected', $token->getReason());
+        $gone = false;
+        $this->assertTrue($token->isCancelled(), 'stays cancelled');
+        $this->assertThrows(\dev\winterframework\util\concurrent\CancelledException::class, fn() => $token->throwIfCancelled());
+    }
+
+    public function testWriterTokenCancelsWhenTheClientDisconnects(): void {
+        $stream = new RecordingChunkedStream();
+        $writer = $this->writerFor(StreamingResponseEntity::of(fn() => null), $stream);
+        $token = $writer->getCancellationToken();
+        $this->assertSame($token, $writer->getCancellationToken(), 'one token per response');
+        $this->assertFalse($token->isCancelled());
+        $stream->connected = false;                     // the connection probe reports the drop
+        $this->assertTrue($token->isCancelled(), 'without any write');
+
+        $ended = $this->writerFor(StreamingResponseEntity::of(fn() => null), new RecordingChunkedStream());
+        $ended->end();
+        $this->assertTrue($ended->getCancellationToken()->isCancelled(), 'the stream ended');
+    }
+
+    public function testTestResponseWriter(): void {
+        $writer = new \dev\winterframework\test\web\TestResponseWriter();
+        $entity = StreamingResponseEntity::sse(function (SseEmitter $sse): void {
+            $sse->event('token', ['t' => 'a']);
+        });
+        $entity->getBody()->run($writer);
+        $this->assertSame([": stream open\n\n", "event: token\ndata: {\"t\":\"a\"}\n\n"], $writer->getChunks());
+        $this->assertTrue($writer->isCommitted());
+        $token = $writer->getCancellationToken();
+        $writer->disconnect();
+        $this->assertFalse($writer->write('x'));
+        $this->assertTrue($token->isCancelled());
     }
 }

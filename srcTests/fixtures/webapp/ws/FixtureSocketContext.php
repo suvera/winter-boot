@@ -4,23 +4,22 @@ declare(strict_types=1);
 
 namespace winterBootTests\fixtures\webapp\ws;
 
+use dev\winterframework\core\web\RequestContextPropagator;
 use dev\winterframework\web\http\HttpRequest;
-use dev\winterframework\web\websocket\WebSocketContextHook;
-use dev\winterframework\web\websocket\WebSocketSession;
 use winterBootTests\fixtures\webapp\FixtureContext;
 
 /** What SocMon does with its TenantContext: capture at the handshake, restore per call. */
-class FixtureSocketContext implements WebSocketContextHook {
+class FixtureSocketContext implements RequestContextPropagator {
 
-    public function capture(WebSocketSession $session, HttpRequest $handshake): void {
-        $session->setAttribute('user', FixtureContext::user());
+    public function capture(HttpRequest $request): mixed {
+        return FixtureContext::user();
     }
 
-    public function restore(WebSocketSession $session): void {
-        FixtureContext::set($session->getAttribute('user'));
+    public function restore(mixed $snapshot): void {
+        FixtureContext::set($snapshot);
     }
 
-    public function clear(WebSocketSession $session): void {
+    public function clear(): void {
         FixtureContext::clear();
     }
 }

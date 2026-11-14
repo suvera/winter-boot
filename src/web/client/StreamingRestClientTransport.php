@@ -22,21 +22,15 @@ interface StreamingRestClientTransport {
      * returning false stops reading and closes the connection without an
      * error.
      *
-     * @param array<string, string> $headers flat request headers, already merged
-     * @param float $idleTimeout longest wait for the next bytes (seconds), not a total budget
+     * When the request carries a cancellation token, the transport stops
+     * promptly (within about 100 ms) once it is cancelled, also while no
+     * data is arriving: it closes the connection and returns without an
+     * error.
+     *
      * @param callable(int, array<string, string[]>): void $onResponse
      * @param callable(string): bool $onChunk
      * @throws RestClientTimeoutException when the connection or a read times out
      * @throws RestClientException on any other transport failure
      */
-    public function stream(
-        string $method,
-        string $url,
-        array $headers,
-        ?string $body,
-        float $idleTimeout,
-        float $connectTimeout,
-        callable $onResponse,
-        callable $onChunk
-    ): void;
+    public function stream(StreamRequest $request, callable $onResponse, callable $onChunk): void;
 }
