@@ -47,7 +47,7 @@ RUN set -eux; \
     docker-php-ext-install -j"$(nproc)" $dbExts pcntl curl zip bcmath; \
     pecl install redis; \
     pecl install rdkafka; \
-    if [ -n "$swooleOpts" ]; then pecl install -D "$swooleOpts" swoole-6.2.2; else pecl install swoole-6.2.2; fi; \
+    if [ -n "$swooleOpts" ]; then pecl install -D "$swooleOpts" swoole-6.2.5; else pecl install swoole-6.2.5; fi; \
     pecl install apcu; \
     docker-php-ext-enable redis rdkafka swoole apcu; \
     EXT_DIR="$(php-config --extension-dir)"; \

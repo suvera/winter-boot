@@ -25,6 +25,9 @@
 - `CancellationToken` (`dev\winterframework\util\concurrent`), shared by WebSocket work, streamed responses and `exchangeStream()`; `CancellationToken::when()` cancels as soon as a condition holds.
 - Test doubles in `dev\winterframework\test\web`: `TestWebSocketSession` (records frames and close) and `TestResponseWriter` (records chunks, simulates a disconnect).
 
+### Changed
+- Docker images ship Swoole 6.2.5 (was 6.2.2): crash fixes in coroutine context and server shutdown, HTTP/WebSocket parser hardening, a fix for rejected client-supplied upload file markers, and PDO-pgsql connect timeouts and query cancellation under the pgsql coroutine hook.
+
 ## 2.2.0
 
 ### Changed
