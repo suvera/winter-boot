@@ -3,13 +3,20 @@ declare(strict_types=1);
 
 namespace dev\winterframework\io\stream;
 
+use Closure;
 use dev\winterframework\web\http\HttpCookie;
 use Swoole\Http\Response;
 
-class SwooleOutputStream implements HttpOutputStream {
+class SwooleOutputStream implements ChunkedOutputStream {
 
+    /**
+     * @param Closure(): bool|null $connectionProbe tells whether the client
+     *     connection still exists (Server::exist() on the response's fd);
+     *     without it only a failed write reveals a gone client.
+     */
     public function __construct(
-        protected Response $response
+        protected Response $response,
+        protected ?Closure $connectionProbe = null
     ) {
     }
 
@@ -57,6 +64,21 @@ class SwooleOutputStream implements HttpOutputStream {
         }
         $this->response->write($data);
         return strlen($data);
+    }
+
+    public function writeChunk(string $data): bool {
+        if ($data === '') {
+            return $this->isClientConnected();
+        }
+        // @: Swoole warns when the client is gone; the false return says so.
+        return @$this->response->write($data) === true;
+    }
+
+    public function isClientConnected(): bool {
+        if (!$this->response->isWritable()) {
+            return false;
+        }
+        return $this->connectionProbe === null || ($this->connectionProbe)();
     }
 
     public function flush(): bool {

@@ -161,6 +161,7 @@ Full documentation lives at **https://suvera.github.io/winter-boot/** — same c
 -   [**Request Mapping**](https://suvera.github.io/winter-boot/web/request-mapping)
 -   [**Interceptors**](https://suvera.github.io/winter-boot/web/interceptors)
 -   [**RestTemplate**](https://suvera.github.io/winter-boot/web/rest-template)
+-   [**WebSockets**](https://suvera.github.io/winter-boot/web/websockets)
 
 ### Data
 

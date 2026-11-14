@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace dev\winterframework\web\client;
 
 use dev\winterframework\reflection\ObjectCreator;
+use dev\winterframework\util\concurrent\CancellationToken;
 use dev\winterframework\web\http\HttpHeaders;
 use dev\winterframework\web\http\HttpStatus;
 use dev\winterframework\web\http\ResponseEntity;
@@ -30,6 +31,13 @@ use dev\winterframework\web\MediaType;
 class RestTemplate {
     public const DEFAULT_TIMEOUT = 10.0;
     public const DEFAULT_CONNECT_TIMEOUT = 5.0;
+    /**
+     * Longest silence between two reads of a streamed response. Generous on
+     * purpose: AI models can think for tens of seconds before the first token.
+     */
+    public const DEFAULT_STREAM_IDLE_TIMEOUT = 60.0;
+    /** Error bodies of streamed calls are buffered up to this many bytes. */
+    public const STREAM_ERROR_BODY_MAX = 1048576;
 
     /**
      * Desktop-browser User-Agent sent by default. Some publishers and WAFs
@@ -44,6 +52,7 @@ class RestTemplate {
     private RestClientTransport $transport;
     private float $timeout;
     private float $connectTimeout;
+    private float $streamIdleTimeout = self::DEFAULT_STREAM_IDLE_TIMEOUT;
     /** @var array<string, string> */
     private array $defaultHeaders = [];
     private ?string $basicUser = null;
@@ -86,6 +95,20 @@ class RestTemplate {
 
     public function getConnectTimeout(): float {
         return $this->connectTimeout;
+    }
+
+    /**
+     * Longest wait for the next bytes of a streamed response
+     * ({@see exchangeStream()}): a stream may run for any length of time
+     * as long as data keeps coming. `winter.rest.stream-idle-timeout` for
+     * the default bean; {@see DEFAULT_STREAM_IDLE_TIMEOUT} otherwise.
+     */
+    public function setStreamIdleTimeout(float $seconds): void {
+        $this->streamIdleTimeout = $seconds;
+    }
+
+    public function getStreamIdleTimeout(): float {
+        return $this->streamIdleTimeout;
     }
 
     public function setDefaultHeader(string $name, string $value): void {
@@ -285,6 +308,165 @@ class RestTemplate {
         return self::toEntity($status, $responseHeaders, self::convertBody($responseBody, $responseType));
     }
 
+    /**
+     * Streaming call: the response body is decoded as it arrives and each
+     * item goes to $onItem, instead of being returned whole (an AI model's
+     * token stream, server-sent events, JSON lines).
+     *
+     * - $decoder turns bytes into items: {@see StreamDecoder::raw()} (the
+     *   default, string chunks), {@see StreamDecoder::sse()} (SseEvent; ends
+     *   at `[DONE]`), {@see StreamDecoder::ndjson()} (one decoded JSON value
+     *   per line), or your own. Malformed input throws
+     *   {@see StreamDecodeException}.
+     * - `$onItem(mixed $item): bool|null` returning false stops reading and
+     *   closes the connection; the result then reports isAborted().
+     * - $cancel stops the call within about 100 ms of cancel(), also while
+     *   the server sends nothing (isCancelled()). Neither is an error.
+     * - Status and headers are known before the first byte: a 4xx/5xx
+     *   response never reaches $onItem; its body (up to
+     *   {@see STREAM_ERROR_BODY_MAX} bytes) is mapped exactly like
+     *   {@see exchange()}.
+     * - {@see setStreamIdleTimeout()} (default 60 s) is the longest wait for
+     *   the next bytes, not a total budget; the connect timeout applies as
+     *   for exchange(). setTimeout() (the total for exchange()) does not
+     *   apply. Exceeding either throws {@see RestClientTimeoutException}.
+     * - Inside a Swoole coroutine it never blocks the worker (Swoole's
+     *   coroutine socket, not curl). Redirects are not followed;
+     *   `Accept-Encoding: identity` is always requested.
+     *
+     * Transports without {@see StreamingRestClientTransport} still work: the
+     * whole body is decoded at once after it arrived.
+     *
+     * @param callable(mixed): (bool|null) $onItem
+     * @param array<string, string|int|float|bool> $uriVars
+     * @param array<string, string|int|float|bool> $query
+     * @throws RestClientException
+     */
+    public function exchangeStream(
+        string $method,
+        string $url,
+        ?HttpEntity $entity,
+        callable $onItem,
+        ?StreamDecoder $decoder = null,
+        ?CancellationToken $cancel = null,
+        array $uriVars = [],
+        array $query = []
+    ): StreamExchangeResult {
+        $method = strtoupper($method);
+        $entity = $entity ?? HttpEntity::empty();
+        $decoder = $decoder ?? StreamDecoder::raw();
+
+        $targetUrl = self::appendQuery(self::expandUri($url, $uriVars), $query);
+        [$payload, $requestHeaders] = $this->encodeBody($entity);
+
+        $status = 0;
+        /** @var array<string, string[]> $responseHeaders */
+        $responseHeaders = [];
+        $errorBody = '';
+        $aborted = false;
+        $completed = false;
+        $bytes = 0;
+        $items = 0;
+
+        $emit = function (iterable $decoded) use (&$aborted, &$items, $onItem): bool {
+            foreach ($decoded as $item) {
+                $items++;
+                if ($onItem($item) === false) {
+                    $aborted = true;
+                    return false;
+                }
+            }
+            return true;
+        };
+        $decode = function (callable $step) use ($method, $targetUrl): iterable {
+            try {
+                return $step();
+            } catch (\Throwable $e) {
+                // The message names the call only: never the body content.
+                throw new StreamDecodeException(
+                    'Could not decode the streamed response of ' . $method . ' '
+                    . self::sanitizeUrl($targetUrl) . ' (' . $e::class . ')', 0, $e
+                );
+            }
+        };
+        $deliver = function (string $chunk) use (
+            &$status, &$errorBody, &$bytes, &$completed, $emit, $decode, $decoder, $cancel
+        ): bool {
+            if ($status >= 400) {
+                $room = self::STREAM_ERROR_BODY_MAX - strlen($errorBody);
+                $errorBody .= substr($chunk, 0, max(0, $room));
+                // Enough of the error body: stop reading the rest.
+                return strlen($errorBody) < self::STREAM_ERROR_BODY_MAX;
+            }
+            $bytes += strlen($chunk);
+            if (!$emit($decode(fn() => $decoder->feed($chunk)))) {
+                return false;
+            }
+            if ($decoder->isDone()) {
+                $completed = true;
+                return false;
+            }
+            return !$cancel?->isCancelled();
+        };
+
+        if ($cancel?->isCancelled()) {
+            $result = new StreamExchangeResult();
+            self::fillEntity($result, 0, [], null);
+            $result->setStreamOutcome(false, true, false, 0, 0);
+            return $result;
+        }
+
+        if ($this->transport instanceof StreamingRestClientTransport) {
+            $this->transport->stream(
+                new StreamRequest(
+                    $method,
+                    $targetUrl,
+                    $requestHeaders,
+                    $payload,
+                    $this->streamIdleTimeout,
+                    $this->connectTimeout,
+                    $cancel
+                ),
+                function (int $code, array $headers) use (&$status, &$responseHeaders): void {
+                    $status = $code;
+                    $responseHeaders = $headers;
+                },
+                $deliver
+            );
+        } else {
+            $result = $this->transport->request(
+                $method,
+                $targetUrl,
+                $requestHeaders,
+                $payload,
+                $this->streamIdleTimeout,
+                $this->connectTimeout
+            );
+            $status = (int)($result['status'] ?? 0);
+            $responseHeaders = $result['headers'] ?? [];
+            $whole = (string)($result['body'] ?? '');
+            if ($whole !== '') {
+                $deliver($whole);
+            }
+        }
+
+        $result = new StreamExchangeResult();
+        if ($status >= 400) {
+            $this->handleError($method, $targetUrl, $status, $responseHeaders, $errorBody);
+            self::fillEntity($result, $status, $responseHeaders, $errorBody);
+            return $result;
+        }
+        $cancelled = !$aborted && !$completed && $cancel !== null && $cancel->isCancelled();
+        if (!$aborted && !$completed && !$cancelled) {
+            // The server ended the body: deliver what the decoder still holds.
+            if ($emit($decode(fn() => $decoder->finish()))) {
+                $completed = true;
+            }
+        }
+        self::fillEntity($result, $status, $responseHeaders, null);
+        $result->setStreamOutcome($aborted, $cancelled, $completed, $bytes, $items);
+        return $result;
+    }
     /**
      * @param array<string, string[]> $responseHeaders
      * @throws HttpStatusCodeException
@@ -512,7 +694,11 @@ class RestTemplate {
 
     /** @param array<string, string[]> $headers */
     private static function toEntity(int $status, array $headers, mixed $body): ResponseEntity {
-        $entity = new ResponseEntity();
+        return self::fillEntity(new ResponseEntity(), $status, $headers, $body);
+    }
+
+    /** @param array<string, string[]> $headers */
+    private static function fillEntity(ResponseEntity $entity, int $status, array $headers, mixed $body): ResponseEntity {
         $entity->withStatus(self::toHttpStatus($status));
         $httpHeaders = new HttpHeaders();
         foreach ($headers as $name => $values) {

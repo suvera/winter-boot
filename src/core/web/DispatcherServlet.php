@@ -30,6 +30,7 @@ use dev\winterframework\web\http\HttpHeaders;
 use dev\winterframework\web\http\HttpRequest;
 use dev\winterframework\web\http\HttpStatus;
 use dev\winterframework\web\http\ResponseEntity;
+use dev\winterframework\web\http\StreamingBody;
 use dev\winterframework\web\HttpRequestDispatcher;
 use dev\winterframework\web\MediaType;
 use ReflectionNamedType;
@@ -130,6 +131,99 @@ class DispatcherServlet implements HttpRequestDispatcher {
         $this->appCtx->setCurrentHttpResponse($response);
         try {
             $this->doDispatch($request, $response, $serverPath, microtime(true));
+        } finally {
+            $this->appCtx->setCurrentHttpRequest($outerRequest);
+            $this->appCtx->setCurrentHttpResponse($outerResponse);
+        }
+    }
+
+    /**
+     * Runs a WebSocket upgrade request through the HTTP pipeline, so the
+     * handshake is authenticated exactly like a normal request.
+     *
+     * 1. $precheck($uri) validates the upgrade (handler path, Origin,
+     *    headers) and returns the refusal as an exception, or null.
+     *    A refusal renders through the error controller (404, 403, 400).
+     * 2. App-level preHandle() interceptors; a veto renders the
+     *    interceptor's response (e.g. 401) and nothing is upgraded.
+     * 3. postHandle(), so headers and cookies interceptors add (a refreshed
+     *    session cookie) go out with the 101 response.
+     * 4. $accept($uri) sends the 101 response and opens the connection
+     *    (onOpen runs here, with the interceptors' context still bound).
+     *    It sets the response status to 101 when it sends it; a failure
+     *    before that renders a 500 instead.
+     * 5. afterCompletion() once.
+     *
+     * The request is bound as the current request throughout, as dispatch() does.
+     *
+     * @param callable(string): ?HttpRestException $precheck
+     * @param callable(string): void $accept
+     */
+    public function dispatchHandshake(
+        HttpRequest $request,
+        ResponseEntity $response,
+        callable $precheck,
+        callable $accept
+    ): void {
+        $this->initialize();
+        $serverPath = $this->ctxData->getPropertyContext()->get('server.context-path', '/');
+        $serverPath = isset($serverPath) ? trim($serverPath, '/') : '';
+        $startTime = microtime(true);
+
+        $outerRequest = $this->appCtx->getCurrentHttpRequest();
+        $outerResponse = $this->appCtx->getCurrentHttpResponse();
+        $this->appCtx->setCurrentHttpRequest($request);
+        $this->appCtx->setCurrentHttpResponse($response);
+        try {
+            $this->logRequestReceived($request);
+            $uri = self::stripContextPath(trim((string)strtok($request->getUri(), '?'), '/'), $serverPath);
+            $registry = $this->ctxData->getInterceptorRegistry();
+            $accepting = false;
+            try {
+                $refusal = $precheck($uri);
+                if ($refusal !== null) {
+                    self::logInfo('WebSocket handshake [' . self::sanitizeUriForError($uri) . '] refused with '
+                        . $refusal->getStatus()->getValue());
+                    $this->handleError($request, $response, $refusal->getStatus(), $refusal, $startTime);
+                    return;
+                }
+                if (!$this->preHandle($registry, $request, $response)) {
+                    try {
+                        $this->afterCompletion($registry, $request, $response);
+                    } catch (Throwable $e) {
+                        self::logException($e);
+                    }
+                    /** @var ResponseRenderer $renderer */
+                    $renderer = $this->appCtx->beanByClass(ResponseRenderer::class);
+                    $renderer->render($response, $request);
+                    $this->logRequestCompleted($request, $response, $startTime);
+                    return;
+                }
+                $this->postHandle($registry, $request, $response);
+                $accepting = true;
+                $accept($uri);
+            } catch (Throwable $t) {
+                // $accept sets status 101 when it sends the switch: after that
+                // the connection is a WebSocket and no error can be rendered.
+                if ($accepting && $response->getStatus()->getValue() === 101) {
+                    self::logException($t);
+                    try {
+                        $this->afterCompletion($registry, $request, $response, $t);
+                    } catch (Throwable $e) {
+                        self::logException($e);
+                    }
+                    return;
+                }
+                self::logException($t);
+                $this->handleError($request, $response, HttpStatus::$INTERNAL_SERVER_ERROR, $t, $startTime);
+                return;
+            }
+            try {
+                $this->afterCompletion($registry, $request, $response);
+            } catch (Throwable $e) {
+                self::logException($e);
+            }
+            $this->logRequestCompleted($request, $response, $startTime);
         } finally {
             $this->appCtx->setCurrentHttpRequest($outerRequest);
             $this->appCtx->setCurrentHttpResponse($outerResponse);
@@ -569,6 +663,21 @@ class DispatcherServlet implements HttpRequestDispatcher {
                 $response->setBody($out);
             }
 
+            $streamingBody = $response->getBody();
+            if ($streamingBody instanceof StreamingBody) {
+                $cors?->applyToResponse($request, $response);
+                $this->sendStreamingResponse(
+                    $streamingBody,
+                    $interceptor,
+                    $controller instanceof ControllerInterceptor ? $controller : null,
+                    $method->getDelegate(),
+                    $request,
+                    $response,
+                    $startTime
+                );
+                return;
+            }
+
 
             /**
              * STEP - 6.3 : post-intercept Controller
@@ -597,6 +706,63 @@ class DispatcherServlet implements HttpRequestDispatcher {
             // unbounded number of metric series.
             $timer->stop(['path' => self::routeLabel($route), 'method' => $request->getMethod()]);
         }
+    }
+
+    /**
+     * Sends a {@see StreamingBody} response, keeping the interceptor order
+     * of every other response:
+     *
+     * 1. postHandle() (app-level, then the controller's), in the request's
+     *    coroutine before the producer runs, so headers and cookies they set
+     *    (a refreshed session cookie) go out with the first chunk. A failure
+     *    here fails the request like any other.
+     * 2. The producer, with a writer that sends the head with the first
+     *    chunk and every write as one chunk.
+     * 3. afterCompletion() once, after the stream ended.
+     *
+     * A producer failure before anything was written propagates, so the
+     * request fails through the error controller like any other. Once the
+     * head is out the failure can no longer change the status: it is logged,
+     * the response ends and afterCompletion() receives it. Nothing from that
+     * point reaches handleError(), which would write into the open stream.
+     *
+     * @throws Throwable postHandle() failure, or a producer failure before the first chunk
+     */
+    protected function sendStreamingResponse(
+        StreamingBody $body,
+        InterceptorRegistry $registry,
+        ?ControllerInterceptor $controller,
+        \ReflectionMethod $handler,
+        HttpRequest $request,
+        ResponseEntity $response,
+        ?float $startTime
+    ): void {
+        $this->postHandle($registry, $request, $response);
+        $controller?->postHandle($request, $response, $handler);
+
+        $writer = new StreamedResponseWriter($response, $response->getOutputStream());
+        $failure = null;
+        try {
+            $body->run($writer);
+        } catch (Throwable $e) {
+            if (!$writer->isCommitted()) {
+                throw $e;
+            }
+            $failure = $e;
+            self::logException($e, 'Streamed response failed after it started');
+        }
+        $writer->end();
+        if ($failure === null && $writer->hasFailed()) {
+            self::logDebug('Streamed response stopped: client disconnected after '
+                . $writer->getBytesWritten() . ' bytes');
+        }
+
+        try {
+            $this->afterCompletion($registry, $request, $response, $failure);
+        } catch (Throwable $e) {
+            self::logException($e);
+        }
+        $this->logRequestCompleted($request, $response, $startTime);
     }
 
     /**

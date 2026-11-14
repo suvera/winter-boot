@@ -9,6 +9,14 @@ use dev\winterframework\web\http\ResponseEntity;
 abstract class AbstractResponseRenderer {
 
     protected function renderHeaders(ResponseEntity $entity, HttpOutputStream $stream): void {
+        self::writeHead($entity, $stream);
+    }
+
+    /**
+     * Status line, headers and cookies of $entity onto $stream; shared with
+     * streamed responses, which send the head without a renderer.
+     */
+    public static function writeHead(ResponseEntity $entity, HttpOutputStream $stream): void {
         /**
          * STEP - 1 : HTTP Status
          */

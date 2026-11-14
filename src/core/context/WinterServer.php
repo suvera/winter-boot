@@ -3,9 +3,11 @@ declare(strict_types=1);
 
 namespace dev\winterframework\core\context;
 
+use dev\winterframework\core\web\websocket\WebSocketConfig;
 use dev\winterframework\io\server\ServerPidManager;
 use dev\winterframework\io\server\WinterServerAdmin;
 use dev\winterframework\util\Debug;
+use dev\winterframework\stereotype\web\WebSocketController;
 use dev\winterframework\util\log\Wlf4p;
 use dev\winterframework\util\SocketUtil;
 use Swoole\Http\Request;
@@ -51,6 +53,7 @@ class WinterServer {
     protected static bool $started = false;
     protected WinterServerAdmin $adminHandler;
     protected ServerPidManager $pidManager;
+    protected bool $webSocket = false;
 
     public function __construct(
         private ApplicationContext $appCtx,
@@ -59,7 +62,12 @@ class WinterServer {
 
         [$this->address, $this->port] = self::listenAddress($this->appCtxData->getPropertyContext());
 
-        $this->server = new Server($this->address, $this->port);
+        // A WebSocket server is an HTTP server too (same port, same routes);
+        // without a #[WebSocketController] nothing changes.
+        $this->webSocket = self::webSocketEnabled($this->appCtxData);
+        $this->server = $this->webSocket
+            ? new \Swoole\WebSocket\Server($this->address, $this->port)
+            : new Server($this->address, $this->port);
         $this->pidManager = new ServerPidManager($this->appCtx);
         $this->adminHandler = new WinterServerAdmin($this->appCtx, $this->pidManager);
         self::$instance = $this;
@@ -74,6 +82,21 @@ class WinterServer {
      */
     public static function listenAddress(PropertyContext $prop): array {
         return [$prop->getStr('server.address', '127.0.0.1'), $prop->getInt('server.port', 8080)];
+    }
+
+    /**
+     * server.websocket.enabled, or (when unset) whether the application has
+     * a #[WebSocketController].
+     */
+    public static function webSocketEnabled(ApplicationContextData $data): bool {
+        return WebSocketConfig::isEnabled(
+            $data->getPropertyContext(),
+            $data->getResources()->hasAttribute(WebSocketController::class)
+        );
+    }
+
+    public function isWebSocket(): bool {
+        return $this->webSocket;
     }
 
     public function addPid(string $id, int $pid, int $psType): void {
@@ -181,7 +204,7 @@ class WinterServer {
             return;
         }
         self::$started = true;
-        self::logInfo("Starting Http server on $this->address:$this->port" . ', pid:' . getmypid());
+        self::logInfo('Starting ' . ($this->webSocket ? 'Http+WebSocket' : 'Http') . " server on $this->address:$this->port, pid:" . getmypid());
         
         $this->serverArgs = array_merge(self::$defaultServerArgs, $this->serverArgs);
         $this->server->set($this->getServerArgs());
@@ -219,6 +242,10 @@ class WinterServer {
         }
         /** @var Port $servPort */
         $servPort = @$this->server->listen('127.0.0.1', $port, SWOOLE_SOCK_TCP);
+        if ($this->webSocket) {
+            // Added ports inherit the WebSocket protocol; the admin port stays plain HTTP.
+            $servPort->set(['open_websocket_protocol' => false, 'open_http_protocol' => true]);
+        }
 
         $servPort->on('Request', function (Request $request, Response $response) {
             $this->adminHandler->serveRequest($request, $response);

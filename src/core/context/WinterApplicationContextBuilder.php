@@ -292,20 +292,21 @@ abstract class WinterApplicationContextBuilder implements ApplicationContext {
         // Spring-style HTTP client, autowirable everywhere. overwrite=false so
         // an application-defined RestTemplate @Bean always wins over this one
         // (internals are registered after user beans, see buildContext()).
-        $this->beanProvider->registerInternalBean(
-            new RestTemplate(
-                timeout: $this->propertyContext->getFloat(
-                    'winter.rest.timeout',
-                    RestTemplate::DEFAULT_TIMEOUT
-                ),
-                connectTimeout: $this->propertyContext->getFloat(
-                    'winter.rest.connect-timeout',
-                    RestTemplate::DEFAULT_CONNECT_TIMEOUT
-                ),
+        $restTemplate = new RestTemplate(
+            timeout: $this->propertyContext->getFloat(
+                'winter.rest.timeout',
+                RestTemplate::DEFAULT_TIMEOUT
             ),
-            RestTemplate::class,
-            false
+            connectTimeout: $this->propertyContext->getFloat(
+                'winter.rest.connect-timeout',
+                RestTemplate::DEFAULT_CONNECT_TIMEOUT
+            ),
         );
+        $restTemplate->setStreamIdleTimeout($this->propertyContext->getFloat(
+            'winter.rest.stream-idle-timeout',
+            RestTemplate::DEFAULT_STREAM_IDLE_TIMEOUT
+        ));
+        $this->beanProvider->registerInternalBean($restTemplate, RestTemplate::class, false);
 
         $this->beanProvider->registerInternalBean(
             new IdleCheckRegistry(),

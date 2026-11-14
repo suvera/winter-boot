@@ -27,6 +27,7 @@ use dev\winterframework\stereotype\Module;
 use dev\winterframework\stereotype\PostConstruct;
 use dev\winterframework\stereotype\Qualifier;
 use dev\winterframework\stereotype\RestController;
+use dev\winterframework\stereotype\web\WebSocketController;
 use dev\winterframework\stereotype\Service;
 use dev\winterframework\stereotype\test\WinterBootTest;
 use dev\winterframework\stereotype\Value;
@@ -146,12 +147,13 @@ final class WinterBeanProviderContext implements BeanProviderContext {
             case Component::class:
             case Configuration::class:
             case RestController::class:
+            case WebSocketController::class:
             case Service::class:
             case WinterBootTest::class:
             case WinterBootApplication::class:
             case Module::class:
                 /**
-                 * @var Component|Configuration|RestController|Service $attribute
+                 * @var Component|Configuration|RestController|WebSocketController|Service $attribute
                  * @var WinterBootTest|Module $attribute
                  */
                 $beanProvider = new BeanProvider($class, null);
