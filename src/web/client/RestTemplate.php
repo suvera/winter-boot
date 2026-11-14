@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace dev\winterframework\web\client;
 
 use dev\winterframework\reflection\ObjectCreator;
+use dev\winterframework\web\client\sse\SseEvent;
+use dev\winterframework\web\client\sse\SseParser;
 use dev\winterframework\web\http\HttpHeaders;
 use dev\winterframework\web\http\HttpStatus;
 use dev\winterframework\web\http\ResponseEntity;
@@ -30,6 +32,8 @@ use dev\winterframework\web\MediaType;
 class RestTemplate {
     public const DEFAULT_TIMEOUT = 10.0;
     public const DEFAULT_CONNECT_TIMEOUT = 5.0;
+    /** Error bodies of streamed calls are buffered up to this many bytes. */
+    public const STREAM_ERROR_BODY_MAX = 1048576;
 
     /**
      * Desktop-browser User-Agent sent by default. Some publishers and WAFs
@@ -286,6 +290,146 @@ class RestTemplate {
     }
 
     /**
+     * Streaming call: the response body is handed to $onChunk piece by piece
+     * as it arrives (e.g. an AI model's token stream), instead of being
+     * returned whole.
+     *
+     * - `$onChunk(string $bytes): bool|null` runs for every body piece;
+     *   returning false stops reading and closes the connection (the
+     *   "stop" button) — the result then reports isAborted().
+     * - Status and headers are known before the first chunk: a 4xx/5xx
+     *   response never reaches $onChunk; its body (up to
+     *   {@see STREAM_ERROR_BODY_MAX} bytes) is mapped exactly like
+     *   {@see exchange()} (HttpClientErrorException / HttpServerErrorException,
+     *   or the error handler / setThrowOnError(false)).
+     * - The read timeout ({@see setTimeout()}) is the longest wait for the
+     *   next bytes, not a total budget: a stream may run for minutes as long
+     *   as data keeps coming. The connect timeout applies as for exchange().
+     *   Exceeding either throws {@see RestClientTimeoutException}.
+     * - Inside a Swoole coroutine it never blocks the worker (the default
+     *   transport uses Swoole's coroutine socket, not curl). Redirects are
+     *   not followed; `Accept-Encoding: identity` is always requested.
+     *
+     * For `text/event-stream` responses wrap the event handler with
+     * {@see sse()}: `$rest->exchangeStream('POST', $url, $entity, RestTemplate::sse(fn (SseEvent $e) => ...))`.
+     *
+     * Transports without {@see StreamingRestClientTransport} still work: the
+     * whole body arrives as a single chunk.
+     *
+     * @param callable(string): (bool|null) $onChunk
+     * @param array<string, string|int|float|bool> $uriVars
+     * @param array<string, string|int|float|bool> $query
+     * @throws RestClientException
+     */
+    public function exchangeStream(
+        string $method,
+        string $url,
+        ?HttpEntity $entity,
+        callable $onChunk,
+        array $uriVars = [],
+        array $query = []
+    ): StreamResponseEntity {
+        $method = strtoupper($method);
+        $entity = $entity ?? HttpEntity::empty();
+
+        $targetUrl = self::appendQuery(self::expandUri($url, $uriVars), $query);
+        [$payload, $requestHeaders] = $this->encodeBody($entity);
+
+        $status = 0;
+        /** @var array<string, string[]> $responseHeaders */
+        $responseHeaders = [];
+        $errorBody = '';
+        $aborted = false;
+        $bytes = 0;
+
+        $deliver = function (string $chunk) use (&$status, &$errorBody, &$aborted, &$bytes, $onChunk): bool {
+            if ($status >= 400) {
+                $room = self::STREAM_ERROR_BODY_MAX - strlen($errorBody);
+                $errorBody .= substr($chunk, 0, max(0, $room));
+                // Enough of the error body: stop reading the rest.
+                return strlen($errorBody) < self::STREAM_ERROR_BODY_MAX;
+            }
+            $bytes += strlen($chunk);
+            if ($onChunk($chunk) === false) {
+                $aborted = true;
+                return false;
+            }
+            return true;
+        };
+
+        if ($this->transport instanceof StreamingRestClientTransport) {
+            $this->transport->stream(
+                $method,
+                $targetUrl,
+                $requestHeaders,
+                $payload,
+                $this->timeout,
+                $this->connectTimeout,
+                function (int $code, array $headers) use (&$status, &$responseHeaders): void {
+                    $status = $code;
+                    $responseHeaders = $headers;
+                },
+                $deliver
+            );
+        } else {
+            $result = $this->transport->request(
+                $method,
+                $targetUrl,
+                $requestHeaders,
+                $payload,
+                $this->timeout,
+                $this->connectTimeout
+            );
+            $status = (int)($result['status'] ?? 0);
+            $responseHeaders = $result['headers'] ?? [];
+            $whole = (string)($result['body'] ?? '');
+            if ($whole !== '') {
+                $deliver($whole);
+            }
+        }
+
+        $result = new StreamResponseEntity();
+        if ($status >= 400) {
+            $this->handleError($method, $targetUrl, $status, $responseHeaders, $errorBody);
+            self::fillEntity($result, $status, $responseHeaders, $errorBody);
+            return $result;
+        }
+        self::fillEntity($result, $status, $responseHeaders, null);
+        $result->setStreamOutcome($aborted, $bytes);
+        return $result;
+    }
+
+    /**
+     * Adapts a server-sent-event handler to an {@see exchangeStream()}
+     * chunk callback: chunks are parsed with {@see SseParser} and every
+     * complete event goes to `$onEvent(SseEvent $event): bool|null`.
+     * Returning false stops the stream. The `data: [DONE]` sentinel used by
+     * AI vendors ends delivery: it is not passed on, and nothing after it is.
+     *
+     * @param callable(SseEvent): (bool|null) $onEvent
+     * @return callable(string): bool
+     */
+    public static function sse(callable $onEvent): callable {
+        $parser = new SseParser();
+        $done = false;
+        return function (string $chunk) use ($parser, $onEvent, &$done): bool {
+            if ($done) {
+                return true;
+            }
+            foreach ($parser->feed($chunk) as $event) {
+                if ($event->isDone()) {
+                    $done = true;
+                    return true;
+                }
+                if ($onEvent($event) === false) {
+                    return false;
+                }
+            }
+            return true;
+        };
+    }
+
+    /**
      * @param array<string, string[]> $responseHeaders
      * @throws HttpStatusCodeException
      */
@@ -512,7 +656,11 @@ class RestTemplate {
 
     /** @param array<string, string[]> $headers */
     private static function toEntity(int $status, array $headers, mixed $body): ResponseEntity {
-        $entity = new ResponseEntity();
+        return self::fillEntity(new ResponseEntity(), $status, $headers, $body);
+    }
+
+    /** @param array<string, string[]> $headers */
+    private static function fillEntity(ResponseEntity $entity, int $status, array $headers, mixed $body): ResponseEntity {
         $entity->withStatus(self::toHttpStatus($status));
         $httpHeaders = new HttpHeaders();
         foreach ($headers as $name => $values) {

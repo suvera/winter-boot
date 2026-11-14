@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace dev\winterframework\web\client;
 
+use dev\winterframework\web\client\stream\HttpStreamClient;
+
 /**
  * Default {@see RestClientTransport}: picks the HTTP engine at runtime.
  *
@@ -18,17 +20,27 @@ namespace dev\winterframework\web\client;
  * The engine choice is a private runtime detail: no engine name appears in
  * any public class or method, so callers (and future refactors) never depend
  * on which one is underneath.
+ *
+ * Streaming ({@see stream()}, used by {@see RestTemplate::exchangeStream()})
+ * runs its own HTTP/1.1 exchange over Swoole's coroutine socket inside a
+ * coroutine (non-blocking whatever the app's hook_flags, curl included) and
+ * over PHP stream sockets elsewhere, so the status is known before the first
+ * body byte and the read timeout is the idle time between reads.
  */
-class DefaultRestClientTransport implements RestClientTransport {
+class DefaultRestClientTransport implements RestClientTransport, StreamingRestClientTransport {
     /**
      * @param string|false|null $proxy explicit proxy url, false to disable
      *   proxying, null (default) to leave transport defaults untouched.
-     *   Honoured by the cURL and stream engines; the coroutine engine cannot
-     *   proxy and ignores it.
+     *   Honoured by the cURL and stream engines and by streaming calls
+     *   (`http://[user:pass@]host:port`; https goes through a CONNECT
+     *   tunnel); the coroutine engine of request() cannot proxy and ignores it.
+     * @param string|null $caFile PEM bundle to verify TLS peers against
+     *   instead of the system CAs (streaming calls).
      */
     public function __construct(
         private bool $sslVerification = true,
-        private string|false|null $proxy = null
+        private string|false|null $proxy = null,
+        private ?string $caFile = null
     ) {
     }
 
@@ -40,6 +52,44 @@ class DefaultRestClientTransport implements RestClientTransport {
         float $timeout,
         float $connectTimeout
     ): array {
+        $parts = self::validate($url, $headers);
+
+        if ($this->useCoroutineClient()) {
+            return $this->requestViaCoroutine($method, $parts, $headers, $body, $timeout, $connectTimeout);
+        }
+
+        if (function_exists('curl_init')) {
+            return $this->requestViaCurl($method, $url, $headers, $body, $timeout, $connectTimeout);
+        }
+
+        return $this->requestViaStream($method, $url, $headers, $body, $timeout, $connectTimeout);
+    }
+
+    public function stream(
+        string $method,
+        string $url,
+        array $headers,
+        ?string $body,
+        float $idleTimeout,
+        float $connectTimeout,
+        callable $onResponse,
+        callable $onChunk
+    ): void {
+        $parts = self::validate($url, $headers);
+        $client = new HttpStreamClient(
+            HttpStreamClient::defaultSocket(),
+            $this->sslVerification,
+            $this->caFile,
+            is_string($this->proxy) && $this->proxy !== '' ? $this->proxy : null
+        );
+        $client->execute($method, $url, $parts, $headers, $body, $idleTimeout, $connectTimeout, $onResponse, $onChunk);
+    }
+
+    /**
+     * @param array<string, string> $headers
+     * @return array<string, mixed> parse_url() parts of a valid http(s) url
+     */
+    private static function validate(string $url, array $headers): array {
         $parts = parse_url($url);
         if ($parts === false || !isset($parts['host']) || $parts['host'] === '') {
             throw new RestClientException(
@@ -57,16 +107,7 @@ class DefaultRestClientTransport implements RestClientTransport {
         foreach ($headers as $name => $value) {
             self::assertNoCrlf((string)$name, (string)$value);
         }
-
-        if ($this->useCoroutineClient()) {
-            return $this->requestViaCoroutine($method, $parts, $headers, $body, $timeout, $connectTimeout);
-        }
-
-        if (function_exists('curl_init')) {
-            return $this->requestViaCurl($method, $url, $headers, $body, $timeout, $connectTimeout);
-        }
-
-        return $this->requestViaStream($method, $url, $headers, $body, $timeout, $connectTimeout);
+        return $parts;
     }
 
     private static function assertNoCrlf(string $name, string $value): void {

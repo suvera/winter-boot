@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 2.3.0
+
+### Added
+- WebSockets on the HTTP port: `#[WebSocketController(path)]` beans implementing `WebSocketHandler` (`onOpen`, `onMessage`, `onClose`, optional `WebSocketErrorHandler::onError`) turn the server into a `Swoole\WebSocket\Server`; without a handler (and without `server.websocket.enabled: true`) the server is the plain HTTP server as before.
+- The WebSocket upgrade runs through the app's `HandlerInterceptor`s (a `preHandle()` veto answers with its HTTP status and nothing is upgraded; `postHandle()` before the 101 so its cookies are sent; `afterCompletion()` once after `onOpen()`); unknown paths get 404, bad handshakes 400/426.
+- `WebSocketContextHook` (`capture`/`restore`/`clear`, registered with `InterceptorRegistry::addWebSocketContextHook()`) restores request-scoped context (tenant, user) for every message and close, each of which runs in its own coroutine with the handshake request bound; a failing `restore()` closes the connection with 1011.
+- `WebSocketSession`: id, path, handshake headers/cookies, attributes, `send()` (arrays as JSON; false instead of an exception when closed), `sendBinary()`, `close(code, reason)`, `isOpen()`, and `beginWork()`/`cancelWork()` cancellation tokens so a "stop" message can cancel a long-running answer; `WebSocketSessions` bean finds this worker's sessions by attribute (`findByAttribute()`, `sendToAttribute()`).
+- `server.websocket.*` settings: `enabled`, `allowedOrigins`, `maxFrameSize` (1009 above it; must not exceed `server.swoole.package_max_length`), `idleTimeout`, `heartbeatInterval` (server pings), `maxConcurrentMessages` (1008 above it), `compression`; messages wait for `onOpen()`, `onClose()` runs exactly once, and a worker that starts exiting (reload or shutdown) closes its connections with 1001 so clients reconnect.
+- WebSocket telemetry: one INFO line per open and close (never message bodies), Prometheus counters `websocket_connections_opened`, `websocket_connections_closed`, `websocket_messages_received`, `websocket_errors` labelled with the handler path.
+- Streamed controller responses: `StreamingResponseEntity::of(fn(ResponseWriter $w) => ...)` writes the body in chunks as it is produced (chunked transfer, never compressed, `Content-Length` removed); `write()` returns false and `isConnected()` turns false once the client is gone; `postHandle()`/`afterCompletion()` run once after the stream; a producer failure before the first chunk renders a normal error response, after it the response ends.
+- `StreamingResponseEntity::sse()` with `SseEmitter` (`event()`, `data()`, `comment()`, `retry()`, `heartbeat()`) for `text/event-stream`; event names and ids with line breaks are rejected.
+- `RestTemplate::exchangeStream()` streams a response body to a callback as it arrives (returning false aborts, `StreamResponseEntity::isAborted()`); 4xx/5xx never reach the callback and map like `exchange()`; the read timeout is the idle time between reads (`RestClientTimeoutException`); inside Swoole it never blocks the worker, also with `-SWOOLE_HOOK_CURL`; proxies (CONNECT for https) and a custom `caFile` are supported.
+- `RestTemplate::sse()`, `SseParser` and `SseEvent` parse server-sent events (multi-line data, comments, any line ending, events split across chunks, the `[DONE]` sentinel).
+- `StreamingRestClientTransport` for custom transports; transports without it still work with `exchangeStream()` (the body arrives as one chunk).
+
 ## 2.2.0
 
 ### Changed

@@ -5,6 +5,13 @@ declare(strict_types=1);
 namespace dev\winterframework\core\app;
 
 use dev\winterframework\core\context\WinterServer;
+use dev\winterframework\core\web\DispatcherServlet;
+use dev\winterframework\core\web\websocket\SwooleWebSocketTransport;
+use dev\winterframework\core\web\websocket\WebSocketConfig;
+use dev\winterframework\core\web\websocket\WebSocketEndpoint;
+use dev\winterframework\core\web\websocket\WebSocketHandlerRegistry;
+use dev\winterframework\io\metrics\prometheus\PrometheusMetricRegistry;
+use dev\winterframework\web\websocket\WebSocketSessions;
 use dev\winterframework\core\context\WinterWebSwooleContext;
 use dev\winterframework\exception\WinterException;
 use dev\winterframework\io\kv\KvClient;
@@ -43,6 +50,8 @@ use function Ramsey\Uuid\v4;
 class WinterWebSwooleApplication extends WinterApplicationRunner implements WinterApplication {
 
     protected WinterWebSwooleContext $webContext;
+    protected ?WinterServer $winterServer = null;
+    protected ?WebSocketEndpoint $webSocketEndpoint = null;
 
     public function __construct() {
         parent::__construct();
@@ -59,13 +68,20 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
 
     public function serveRequest(Request $request, Response $response): void {
         $wrapperReq = new SwooleRequest($request, $response);
-        $wrapperResp = new SwooleResponseEntity($response);
+        $server = $this->winterServer?->getServer();
+        $fd = $response->fd;
+        // Lets a streamed response notice a gone client without writing.
+        $wrapperResp = new SwooleResponseEntity(
+            $response,
+            $server !== null ? static fn(): bool => $server->exist($fd) : null
+        );
 
         $this->webContext->getDispatcher()->dispatch($wrapperReq, $wrapperResp);
     }
 
     protected function startServer() {
         $wServer = new WinterServer($this->applicationContext, $this->appCtxData);
+        $this->winterServer = $wServer;
 
         $args = $this->getServerArgs();
         if (is_array($args)) {
@@ -81,6 +97,7 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
         }
 
         $wServer->addEventCallback('request', [$this, 'serveRequest']);
+        $this->buildWebSocket($wServer);
 
         $wServer->addEventCallback('start', function (Server $server) use ($wServer) {
             // NOTE: Do NOT call posix_setpgid() here or in the worker/manager
@@ -287,6 +304,59 @@ class WinterWebSwooleApplication extends WinterApplicationRunner implements Wint
             $flags = $remove ? ($flags & ~$bit) : ($flags | $bit);
         }
         return $flags;
+    }
+
+    /**
+     * WebSocket support (#[WebSocketController] or server.websocket.enabled):
+     * the handshake, message and close events, and per-worker timers for the
+     * idle/heartbeat sweep and 1001 closes when the worker exits (reload or
+     * shutdown). The WebSocketSessions bean
+     * is registered either way so it can always be autowired.
+     */
+    protected function buildWebSocket(WinterServer $wServer): void {
+        $sessions = new WebSocketSessions();
+        $this->appCtxData->getBeanProvider()->registerInternalBean($sessions, WebSocketSessions::class, false);
+        if (!$wServer->isWebSocket()) {
+            return;
+        }
+        $dispatcher = $this->webContext->getDispatcher();
+        if (!$dispatcher instanceof DispatcherServlet) {
+            throw new WinterException('WebSocket support needs the DispatcherServlet');
+        }
+        /** @var WebSocketSessions $sessions */
+        $sessions = $this->applicationContext->beanByClass(WebSocketSessions::class);
+        $config = WebSocketConfig::fromProperties($this->appCtxData->getPropertyContext());
+        foreach ($config->swooleSettings($wServer->getServerArgs()) as $name => $value) {
+            $wServer->addServerArg($name, $value);
+        }
+        $registry = WebSocketHandlerRegistry::fromResources($this->resources);
+        /** @var \Swoole\WebSocket\Server $server */
+        $server = $wServer->getServer();
+        $endpoint = new WebSocketEndpoint(
+            $this->applicationContext,
+            $dispatcher,
+            $this->appCtxData->getInterceptorRegistry(),
+            $registry,
+            $sessions,
+            $config,
+            new SwooleWebSocketTransport($server),
+            $this->applicationContext->beanByClass(PrometheusMetricRegistry::class)
+        );
+        $this->webSocketEndpoint = $endpoint;
+
+        $wServer->addEventCallback('handshake', [$endpoint, 'onHandshake']);
+        $wServer->addEventCallback('message', [$endpoint, 'onMessage']);
+        $wServer->addEventCallback('close', [$endpoint, 'onClose']);
+        $wServer->addEventCallback('workerStart', function (Server $server, int $workerId) use ($endpoint) {
+            if ($workerId < $server->setting['worker_num']) {
+                $endpoint->startTimer(static fn(): bool => $server->getWorkerStatus() === SWOOLE_WORKER_EXIT);
+            }
+        });
+        $wServer->addEventCallback('workerStop', function (Server $server, int $workerId) use ($endpoint) {
+            $endpoint->onWorkerStop();
+        });
+
+        self::logInfo('WebSocket endpoints: ' . ($registry->isEmpty() ? '(none)' : implode(', ', $registry->getPaths())));
     }
 
     protected function buildSharedServer(WinterServer $wServer): void {
