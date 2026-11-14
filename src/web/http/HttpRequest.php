@@ -29,6 +29,14 @@ class HttpRequest {
     protected ?string $queryString = null;
     protected ?int $requestTime = null;
     protected ?float $requestTimeFloat = null;
+    /**
+     * Request attributes: per-request values set by interceptors or the
+     * framework (e.g. the tracing span), never sent by the client. They live
+     * on this request object only, so concurrent requests never share them.
+     *
+     * @var array<string, mixed>
+     */
+    protected array $attributes = [];
 
     public function __construct() {
         $this->queryParams = $_GET ?? [];
@@ -245,6 +253,27 @@ class HttpRequest {
 
     public function getFile(string $name): null|array|HttpUploadedFile {
         return $this->files[$name] ?? null;
+    }
+
+    public function getAttribute(string $name, mixed $default = null): mixed {
+        return array_key_exists($name, $this->attributes) ? $this->attributes[$name] : $default;
+    }
+
+    public function setAttribute(string $name, mixed $value): void {
+        $this->attributes[$name] = $value;
+    }
+
+    public function hasAttribute(string $name): bool {
+        return array_key_exists($name, $this->attributes);
+    }
+
+    public function removeAttribute(string $name): void {
+        unset($this->attributes[$name]);
+    }
+
+    /** @return array<string, mixed> */
+    public function getAttributes(): array {
+        return $this->attributes;
     }
 
     /**

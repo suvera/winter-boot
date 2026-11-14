@@ -4,7 +4,11 @@
 
 ## 2.3.0
 
+### Fixed
+- `OpenTelemetryWebInterceptor` no longer fails every request it is registered for (it called `HttpRequest::setAttribute()`/`getAttribute()`, which did not exist, so `postHandle()` threw and a failed `preHandle()` left the span's scope active): it now ends one server span per request in `afterCompletion()` (also on errors and vetoes), marks only 5xx and exceptions as errors (exception class, never the message), detaches its scope, contains every OpenTelemetry failure, and accepts a tracer provider in its constructor.
+
 ### Added
+- `HttpRequest` attributes (`getAttribute()`, `setAttribute()`, `hasAttribute()`, `removeAttribute()`, `getAttributes()`): per-request values set by interceptors or the framework, never by the client.
 - WebSockets on the HTTP port: `#[WebSocketController(path)]` beans implementing `WebSocketHandler` (`onOpen`, `onMessage`, `onClose`, optional `WebSocketErrorHandler::onError`) turn the server into a `Swoole\WebSocket\Server`; without a handler (and without `server.websocket.enabled: true`) the server is the plain HTTP server as before.
 - The WebSocket upgrade runs through the app's `HandlerInterceptor`s (a `preHandle()` veto answers with its HTTP status and nothing is upgraded; `postHandle()` before the 101 so its cookies are sent; `afterCompletion()` once after `onOpen()`); unknown paths get 404, bad handshakes 400/426.
 - `WebSocketContextHook` (`capture`/`restore`/`clear`, registered with `InterceptorRegistry::addWebSocketContextHook()`) restores request-scoped context (tenant, user) for every message and close, each of which runs in its own coroutine with the handshake request bound; a failing `restore()` closes the connection with 1011.
